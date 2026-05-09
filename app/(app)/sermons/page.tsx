@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { Plus, Mic, Play, Search, X, LayoutGrid, List } from "lucide-react";
@@ -145,6 +145,17 @@ export default function SermonsPage() {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [search, setSearch] = useState("");
 
+  // Persist view preference
+  useEffect(() => {
+    const saved = localStorage.getItem("bj-sermon-view");
+    if (saved === "list" || saved === "grid") setView(saved);
+  }, []);
+
+  function handleViewChange(v: "grid" | "list") {
+    setView(v);
+    localStorage.setItem("bj-sermon-view", v);
+  }
+
   const filtered = search.trim()
     ? sermons.filter((s) => matches(s, search.trim()))
     : sermons;
@@ -220,7 +231,7 @@ export default function SermonsPage() {
             style={{ background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line-soft)" }}
           >
             <button
-              onClick={() => setView("grid")}
+              onClick={() => handleViewChange("grid")}
               className="bj-chip w-8 h-8 rounded-lg flex items-center justify-center"
               data-active={view === "grid" || undefined}
               style={{
@@ -233,7 +244,7 @@ export default function SermonsPage() {
               <LayoutGrid size={14} />
             </button>
             <button
-              onClick={() => setView("list")}
+              onClick={() => handleViewChange("list")}
               className="bj-chip w-8 h-8 rounded-lg flex items-center justify-center"
               data-active={view === "list" || undefined}
               style={{
