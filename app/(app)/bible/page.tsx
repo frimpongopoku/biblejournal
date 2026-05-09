@@ -174,6 +174,14 @@ export default function BiblePage() {
             </button>
           </div>
 
+          {/* ── Mobile search row ────────────────── */}
+          <div
+            className="md:hidden px-3 py-2 border-b shrink-0"
+            style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}
+          >
+            <QuickRefInput onNavigate={handleQuickRef} fullWidth />
+          </div>
+
           {/* ── Reading area ─────────────────────── */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 md:px-12 lg:px-20 py-8">
             <div style={{ maxWidth: 660, margin: "0 auto" }}>

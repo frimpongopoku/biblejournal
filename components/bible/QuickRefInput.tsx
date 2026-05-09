@@ -93,9 +93,11 @@ function getSuggestions(input: string): Suggestion[] {
 
 interface Props {
   onNavigate: (book: string, chapter: number, verse?: number) => void;
+  /** When true the input stretches to fill its container (for mobile rows) */
+  fullWidth?: boolean;
 }
 
-export function QuickRefInput({ onNavigate }: Props) {
+export function QuickRefInput({ onNavigate, fullWidth = false }: Props) {
   const [value, setValue]       = useState("");
   const [open, setOpen]         = useState(false);
   const [selected, setSelected] = useState(0);
@@ -173,7 +175,7 @@ export function QuickRefInput({ onNavigate }: Props) {
   const borderColor = shake ? "var(--bj-ember)" : focused ? "var(--bj-gold)" : "var(--bj-line-soft)";
 
   return (
-    <div ref={wrapRef} className="hidden sm:block relative shrink-0">
+    <div ref={wrapRef} className={`relative ${fullWidth ? "w-full" : "hidden md:block shrink-0"}`}>
       <form onSubmit={handleSubmit}>
         <div
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl"
@@ -183,7 +185,7 @@ export function QuickRefInput({ onNavigate }: Props) {
             boxShadow: focused ? `0 0 0 2px color-mix(in oklch, var(--bj-gold) 16%, transparent)` : "none",
             animation: shake ? "bj-shake 0.4s ease" : "none",
             transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-            width: 152,
+            width: fullWidth ? "100%" : 152,
           }}
         >
           <Search size={11} style={{ color: "var(--bj-ink4)", flexShrink: 0 }} />
@@ -213,7 +215,8 @@ export function QuickRefInput({ onNavigate }: Props) {
             background: "var(--bj-bg-panel)",
             border: "1px solid var(--bj-line)",
             boxShadow: "0 8px 28px color-mix(in oklch, var(--bj-ink) 16%, transparent)",
-            minWidth: 200,
+            minWidth: fullWidth ? "100%" : 200,
+            width: fullWidth ? "100%" : undefined,
             zIndex: 9999,
           }}
         >

@@ -13,7 +13,7 @@ const FILTERS = ["All", "Pinned", "Favorites"];
 
 function formatDate(d: Date): string {
   const now = new Date();
-  const diff = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  const diff = Math.max(0, Math.floor((now.getTime() - d.getTime()) / 86400000));
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
   if (diff < 7) return `${diff} days ago`;
@@ -122,8 +122,10 @@ export default function JournalPage() {
     <div className="flex h-full" style={{ background: "var(--bj-bg)" }}>
 
       {/* ── Entry List ───────────────────────────────────── */}
+      {/* Mobile: full-screen list when no entry selected; hidden when editor open */}
+      {/* Desktop: always visible 300px sidebar */}
       <div
-        className="w-[300px] shrink-0 flex flex-col border-r h-full overflow-hidden"
+        className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[300px] shrink-0 flex-col border-r h-full overflow-hidden`}
         style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}
       >
         {/* Header */}
@@ -258,7 +260,8 @@ export default function JournalPage() {
       </div>
 
       {/* ── Entry Editor ────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+      {/* Mobile: full-screen when entry selected; hidden otherwise */}
+      <div className={`${selectedId ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0 h-full overflow-hidden`}>
         <AnimatePresence mode="wait">
           {selected ? (
             <motion.div
@@ -276,6 +279,17 @@ export default function JournalPage() {
               >
                 {/* Top row: meta + actions */}
                 <div className="flex items-center gap-2 mb-4" style={{ maxWidth: 680 }}>
+                  {/* Back to list — mobile only */}
+                  <button
+                    onClick={() => setSelectedId(null)}
+                    className="bj-btn-icon md:hidden w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                    style={{ color: "var(--bj-ink3)" }}
+                    title="Back to entries"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                  </button>
                   <span
                     className="font-sans text-xs px-2 py-0.5 rounded-full"
                     style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}
