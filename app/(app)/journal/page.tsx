@@ -411,30 +411,43 @@ export default function JournalPage() {
             key="es-sheet"
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
             transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.3 }}
-            className="fixed bottom-0 left-0 right-0 z-50 md:hidden rounded-t-2xl overflow-hidden flex flex-col"
+            className="fixed bottom-0 left-0 right-0 z-50 md:hidden flex flex-col"
             style={{
-              background: "var(--bj-bg-panel)",
-              borderTop: "1px solid var(--bj-line)",
+              height: "72vh",
               boxShadow: "0 -8px 40px color-mix(in oklch, var(--bj-ink) 16%, transparent)",
-              maxHeight: "75vh",
-              paddingBottom: "env(safe-area-inset-bottom)",
             }}
           >
-            {/* Sheet header */}
-            <div className="flex justify-center pt-3 pb-1 shrink-0">
-              <div className="w-8 h-1 rounded-full" style={{ background: "var(--bj-line)" }} />
-            </div>
-            <div className="flex items-center justify-between px-5 py-3 border-b shrink-0" style={{ borderColor: "var(--bj-line-soft)" }}>
-              <h3 className="font-display text-base" style={{ color: "var(--bj-ink)", fontWeight: 400 }}>
-                All Entries <span className="font-sans text-xs ml-1" style={{ color: "var(--bj-ink4)", fontFamily: "inherit", fontStyle: "normal" }}>({entries.length})</span>
-              </h3>
-              <button onClick={() => setShowEntrySheet(false)} className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
-                <X size={14} />
-              </button>
+            {/* Rounded header cap — overflow-hidden only here (doesn't scroll) */}
+            <div
+              className="rounded-t-2xl shrink-0"
+              style={{
+                background: "var(--bj-bg-panel)",
+                borderTop: "1px solid var(--bj-line)",
+              }}
+            >
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-8 h-1 rounded-full" style={{ background: "var(--bj-line)" }} />
+              </div>
+              <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
+                <h3 className="font-display text-base" style={{ color: "var(--bj-ink)", fontWeight: 400 }}>
+                  All Entries <span className="font-sans text-xs ml-1" style={{ color: "var(--bj-ink4)", fontFamily: "inherit", fontStyle: "normal" }}>({entries.length})</span>
+                </h3>
+                <button onClick={() => setShowEntrySheet(false)} className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
+                  <X size={14} />
+                </button>
+              </div>
             </div>
 
-            {/* Entry list — min-height:0 lets flex-1 shrink so overflow-y-auto works */}
-            <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
+            {/* Scroll area — direct child of fixed container, NO overflow:hidden ancestor */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                WebkitOverflowScrolling: "touch",
+                background: "var(--bj-bg-panel)",
+                paddingBottom: "env(safe-area-inset-bottom)",
+              }}
+            >
               {entries.map((entry) => {
                 const isSelected = entry.id === selectedId;
                 const excerpt = extractExcerpt(entry.content);
