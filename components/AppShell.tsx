@@ -68,7 +68,6 @@ export function AppShell({ children, rightRail }: AppShellProps) {
     setTheme(isDark ? "warm" : "midnight");
   }
 
-  // Close appearance popover on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (appearanceRef.current && !appearanceRef.current.contains(e.target as Node)) {
@@ -110,20 +109,16 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           <span className="font-display text-sm font-medium flex-1" style={{ color: "var(--bj-ink)", letterSpacing: "0.03em" }}>
             BibJournal
           </span>
-          {/* Search icon */}
           <button
             title="Search (⌘K)"
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors duration-150"
+            className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"
             style={{ color: "var(--bj-ink4)" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bj-bg-soft)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
           >
             <Search size={13} />
           </button>
-          {/* New entry */}
           <button
             title="New entry"
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors duration-150"
+            className="bj-btn-primary w-7 h-7 rounded-lg flex items-center justify-center"
             style={{ background: "var(--bj-gold)", boxShadow: "0 1px 6px color-mix(in oklch, var(--bj-gold) 35%, transparent)" }}
           >
             <Plus size={13} color="white" />
@@ -138,7 +133,8 @@ export function AppShell({ children, rightRail }: AppShellProps) {
               <Link
                 key={href}
                 href={href}
-                className="relative flex items-center gap-2.5 px-3 py-2 rounded-xl mb-0.5 text-sm transition-colors duration-150"
+                data-active={active || undefined}
+                className="bj-nav-item relative flex items-center gap-2.5 px-3 py-2 rounded-xl mb-0.5 text-sm font-sans"
                 style={{
                   color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)",
                   background: active ? "var(--bj-gold-tint)" : "transparent",
@@ -160,10 +156,10 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           })}
         </nav>
 
-        {/* Library: Collections + Tags merged */}
+        {/* Library */}
         <div className="px-2 py-2 border-b flex-1 overflow-y-auto" style={{ borderColor: "var(--bj-line-soft)" }}>
           <button
-            className="flex items-center gap-1.5 w-full px-3 py-1.5 rounded-lg mb-1"
+            className="bj-btn-ghost flex items-center gap-1.5 w-full px-3 py-1.5 rounded-lg mb-1"
             onClick={() => setLibraryOpen(!libraryOpen)}
           >
             <Folder size={11} style={{ color: "var(--bj-ink4)" }} />
@@ -182,14 +178,11 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                {/* Collections */}
                 {collections.map((c) => (
                   <button
                     key={c.id}
-                    className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-[13px] transition-colors duration-150"
+                    className="bj-list-row flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-[13px]"
                     style={{ color: "var(--bj-ink2)" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bj-bg-soft)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.color ?? "var(--bj-line)" }} />
                     <span className="flex-1 text-left truncate">{c.label}</span>
@@ -197,12 +190,11 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                   </button>
                 ))}
 
-                {/* Tags */}
                 <div className="flex flex-wrap gap-1 px-3 pt-2 pb-1">
                   {tags.map((t) => (
                     <button
                       key={t.id}
-                      className="px-2 py-0.5 rounded-full transition-colors duration-150"
+                      className="bj-chip px-2 py-0.5 rounded-full"
                       style={{
                         fontSize: 10,
                         background: "var(--bj-gold-tint)",
@@ -219,7 +211,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           </AnimatePresence>
         </div>
 
-        {/* Streak — compact single row */}
+        {/* Streak */}
         <div className="px-4 py-2.5 border-b flex items-center gap-2.5" style={{ borderColor: "var(--bj-line-soft)" }}>
           <Flame size={12} style={{ color: "var(--bj-gold)", flexShrink: 0 }} />
           <span className="font-sans text-xs font-medium" style={{ color: "var(--bj-gold-deep)" }}>{streak.days}d</span>
@@ -245,17 +237,14 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           <div className="relative" ref={appearanceRef}>
             <button
               onClick={() => setShowAppearance(!showAppearance)}
-              className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px] transition-colors duration-150"
+              className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]"
               style={{
                 color: showAppearance ? "var(--bj-gold-deep)" : "var(--bj-ink3)",
                 background: showAppearance ? "var(--bj-gold-tint)" : "transparent",
               }}
-              onMouseEnter={(e) => { if (!showAppearance) (e.currentTarget as HTMLButtonElement).style.background = "var(--bj-bg-soft)"; }}
-              onMouseLeave={(e) => { if (!showAppearance) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
             >
               <Palette size={13} />
               <span className="flex-1 text-left">Appearance</span>
-              {/* Active swatch preview */}
               <div className="flex items-center gap-1">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ background: THEME_COLORS[themeId] }} />
                 <span style={{ fontSize: 10, color: "var(--bj-ink4)", fontFamily: FONT_FAMILY[fontPairId], fontStyle: "italic" }}>Aa</span>
@@ -276,7 +265,6 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                     boxShadow: "0 8px 32px color-mix(in oklch, var(--bj-ink) 14%, transparent)",
                   }}
                 >
-                  {/* Theme palette */}
                   <div className="px-3 pt-3 pb-2 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
                     <p className="text-[9px] uppercase tracking-widest mb-2" style={{ color: "var(--bj-ink4)" }}>Theme</p>
                     <div className="flex gap-1.5">
@@ -285,14 +273,17 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                           key={t.id}
                           onClick={() => setTheme(t.id)}
                           title={t.label}
-                          className="flex flex-col items-center gap-1"
+                          className="bj-swatch flex flex-col items-center gap-1"
                         >
                           <div
-                            className="w-6 h-6 rounded-lg transition-all duration-150"
+                            className="w-6 h-6 rounded-lg"
                             style={{
                               background: THEME_COLORS[t.id],
-                              boxShadow: themeId === t.id ? `0 0 0 2px var(--bj-bg-panel), 0 0 0 3.5px ${THEME_COLORS[t.id]}` : "none",
+                              boxShadow: themeId === t.id
+                                ? `0 0 0 2px var(--bj-bg-panel), 0 0 0 3.5px ${THEME_COLORS[t.id]}`
+                                : "none",
                               transform: themeId === t.id ? "scale(1.1)" : "scale(1)",
+                              transition: "transform 0.15s ease, box-shadow 0.15s ease",
                             }}
                           />
                           <span style={{ fontSize: 9, color: themeId === t.id ? "var(--bj-gold-deep)" : "var(--bj-ink4)" }}>
@@ -303,7 +294,6 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                     </div>
                   </div>
 
-                  {/* Font pairs */}
                   <div className="px-3 py-2">
                     <p className="text-[9px] uppercase tracking-widest mb-2" style={{ color: "var(--bj-ink4)" }}>Font</p>
                     <div className="grid grid-cols-2 gap-1">
@@ -313,13 +303,12 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                           <button
                             key={pair.id}
                             onClick={() => setFontPair(pair.id as FontPairId)}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all duration-150"
+                            className="bj-chip flex items-center gap-2 px-2 py-1.5 rounded-lg text-left"
+                            data-active={active || undefined}
                             style={{
                               background: active ? "var(--bj-gold-tint)" : "transparent",
                               border: active ? "1px solid var(--bj-gold-soft)" : "1px solid transparent",
                             }}
-                            onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = "var(--bj-bg-soft)"; }}
-                            onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
                           >
                             <span
                               style={{
@@ -349,10 +338,8 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           {/* Dark / light toggle */}
           <button
             onClick={toggleTheme}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px] transition-colors duration-150"
+            className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]"
             style={{ color: "var(--bj-ink3)" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bj-bg-soft)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             {isDark ? <Sun size={13} /> : <Moon size={13} />}
             <span>{isDark ? "Light mode" : "Dark mode"}</span>
@@ -362,9 +349,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           <div className="relative">
             <button
               onClick={() => setShowProfile(!showProfile)}
-              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl transition-colors duration-150"
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bj-bg-soft)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              className="bj-btn-ghost flex items-center gap-2.5 w-full px-3 py-2 rounded-xl"
             >
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="" className="w-5 h-5 rounded-full shrink-0 object-cover" />
@@ -391,10 +376,8 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                 >
                   <button
                     onClick={() => signOutUser()}
-                    className="flex items-center gap-2 w-full px-4 py-3 text-xs transition-colors duration-150"
+                    className="bj-btn-ghost flex items-center gap-2 w-full px-4 py-3 text-xs"
                     style={{ color: "var(--bj-ember)" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bj-bg-soft)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
                     <LogOut size={12} />
                     Sign out
@@ -419,28 +402,33 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           }}
         >
           <div className="flex-1" />
-          <button className="p-1.5 rounded-lg transition-colors duration-150" style={{ color: "var(--bj-ink4)" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bj-bg-soft)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--bj-ink2)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "var(--bj-ink4)"; }}>
+          <button className="bj-btn-icon p-1.5 rounded-lg" style={{ color: "var(--bj-ink4)" }}>
             <Mic size={14} />
           </button>
-          <button className="p-1.5 rounded-lg transition-colors duration-150" style={{ color: "var(--bj-ink4)" }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bj-bg-soft)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--bj-ink2)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "var(--bj-ink4)"; }}>
+          <button className="bj-btn-icon p-1.5 rounded-lg" style={{ color: "var(--bj-ink4)" }}>
             <Bell size={14} />
           </button>
-          <button className="p-1.5 rounded-lg transition-colors duration-150" style={{ color: "var(--bj-ink4)" }}
-            onClick={toggleTheme}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "var(--bj-bg-soft)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--bj-ink2)"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; (e.currentTarget as HTMLButtonElement).style.color = "var(--bj-ink4)"; }}>
+          <button className="bj-btn-icon p-1.5 rounded-lg" style={{ color: "var(--bj-ink4)" }} onClick={toggleTheme}>
             {isDark ? <Sun size={14} /> : <Moon size={14} />}
           </button>
           {user?.photoURL ? (
-            <img src={user.photoURL} alt="" className="w-6 h-6 rounded-full object-cover cursor-pointer" onClick={() => setShowProfile(!showProfile)} />
+            <img
+              src={user.photoURL}
+              alt=""
+              className="w-6 h-6 rounded-full object-cover cursor-pointer"
+              style={{ transition: "transform 0.12s ease" }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.1)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+              onClick={() => setShowProfile(!showProfile)}
+            />
           ) : (
-            <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium cursor-pointer" style={{ background: "var(--bj-gold-soft)", color: "var(--bj-gold-deep)" }} onClick={() => setShowProfile(!showProfile)}>
+            <button
+              className="bj-btn-icon w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium"
+              style={{ background: "var(--bj-gold-soft)", color: "var(--bj-gold-deep)" }}
+              onClick={() => setShowProfile(!showProfile)}
+            >
               {user?.displayName?.[0] ?? "U"}
-            </div>
+            </button>
           )}
         </header>
 
@@ -479,7 +467,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
             return (
               <button
                 key="fab"
-                className="relative -top-5 w-14 h-14 rounded-2xl flex items-center justify-center"
+                className="bj-btn-primary relative -top-5 w-14 h-14 rounded-2xl flex items-center justify-center"
                 style={{ background: "var(--bj-gold)", boxShadow: "0 4px 20px color-mix(in oklch, var(--bj-gold) 50%, transparent)" }}
               >
                 <Plus size={22} color="white" />
@@ -492,7 +480,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
             <Link
               key={item.href}
               href={item.href}
-              className="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-colors duration-150"
+              className="bj-btn-icon flex flex-col items-center gap-1 py-1 px-3 rounded-xl"
               style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink4)" }}
             >
               <Icon size={20} />
