@@ -58,8 +58,10 @@ export const ScriptureBlock = Node.create({
     return {
       setScriptureBlock:
         () =>
-        ({ commands }) =>
-          commands.setNode(this.name),
+        ({ commands, editor }) =>
+          editor.isActive(this.name)
+            ? commands.setNode("paragraph")
+            : commands.setNode(this.name),
     };
   },
 

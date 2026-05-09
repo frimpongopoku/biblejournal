@@ -6,6 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { ScriptureBlock } from "@/extensions/ScriptureBlock";
 import { CalloutBlock } from "@/extensions/CalloutBlock";
+import { SlashCommands } from "@/extensions/SlashCommands";
 import {
   Bold,
   Italic,
@@ -56,9 +57,10 @@ export function TipTapEditor({ entryId, content, onChange }: Props) {
     immediatelyRender: false,
     extensions: [
       StarterKit,
-      Placeholder.configure({ placeholder: "Begin writing…" }),
+      Placeholder.configure({ placeholder: "Begin writing… (type / for commands)" }),
       ScriptureBlock,
       CalloutBlock,
+      SlashCommands,
     ],
     content: content ? JSON.parse(content) : undefined,
     onUpdate({ editor }) {
