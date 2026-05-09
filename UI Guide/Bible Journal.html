@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Lampstand — Bible Journal & Study</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Lora:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Sora:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=EB+Garamond:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://fonts.cdnfonts.com/css/opendyslexic" />
+<style>
+  html, body { margin: 0; padding: 0; background: #efece6; height: 100%; font-family: var(--bj-ui), Inter, sans-serif; }
+  * { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(60,50,40,0.18); border-radius: 999px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  /* Default font vars; tweaks panel overrides at runtime */
+  :root {
+    --bj-ui: 'Inter', -apple-system, system-ui, sans-serif;
+    --bj-display: 'Cormorant Garamond', Georgia, serif;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="app/data.js"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="app/icons.jsx"></script>
+<script type="text/babel" src="app/desktop-shell.jsx"></script>
+<script type="text/babel" src="app/desktop-dashboard.jsx"></script>
+<script type="text/babel" src="app/desktop-views.jsx"></script>
+<script type="text/babel" src="app/mobile-app.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "palette": "midnight",
+  "fontPair": "serif"
+}/*EDITMODE-END*/;
+
+const PALETTE_OPTIONS = [
+  { id: 'warm',     label: 'Warm cream',  swatch: ['#f6f3ec', '#c89a52', '#3a2e22'] },
+  { id: 'slate',    label: 'Cool slate',  swatch: ['#f1f4f8', '#5b8aa6', '#1b2536'] },
+  { id: 'forest',   label: 'Forest',      swatch: ['#f3f4ed', '#5b7a3f', '#1f2f1c'] },
+  { id: 'plum',     label: 'Plum & rose', swatch: ['#fbf2f3', '#b34e6b', '#3a1d2a'] },
+  { id: 'midnight', label: 'Midnight',    swatch: ['#1f2230', '#d8b76a', '#f0e8d6'] },
+];
+
+const FONT_OPTIONS = [
+  { id: 'classic',  label: 'Inter + Cormorant',         sample: 'Aa' },
+  { id: 'dyslexic', label: 'OpenDyslexic',              sample: 'Aa' },
+  { id: 'serif',    label: 'Lora + Playfair',           sample: 'Aa' },
+  { id: 'modern',   label: 'Sora + Fraunces',           sample: 'Aa' },
+  { id: 'humanist', label: 'Inter + EB Garamond',       sample: 'Aa' },
+];
+
+// Apply chosen fonts to CSS variables on document root.
+const applyFontVars = (fontPair) => {
+  const set = window.BJ.fontSets[fontPair] || window.BJ.fontSets.classic;
+  document.documentElement.style.setProperty('--bj-ui', set.ui);
+  document.documentElement.style.setProperty('--bj-display', set.display);
+};
+
+const DesktopAppPreset = ({ preset, palette }) => {
+  const map = {
+    journal:  { initialView: 'journal' },
+    bible:    { initialView: 'bible' },
+    prayer:   { initialView: 'prayer' },
+    research: { initialView: 'research' },
+    graph:    { initialView: 'graph' },
+    home:     { initialView: 'home' },
+  };
+  const props = map[preset] || map.home;
+  return <window.DesktopApp {...props} palette={palette} />;
+};
+
+const MobileAppPreset = ({ preset, palette }) => {
+  const map = {
+    bible:    { initialView: 'bible' },
+    entry:    { initialView: 'entry', initialEntry: 'morning-light' },
+    prayer:   { initialView: 'prayer' },
+    composer: { initialView: 'home', initialComposer: true },
+    home:     { initialView: 'home' },
+  };
+  const props = map[preset] || map.home;
+  return <window.MobileApp {...props} palette={palette} />;
+};
+
+// iOS frame should go dark when palette is midnight
+const FramedMobile = ({ palette, ...rest }) => (
+  <IOSDevice width={430} height={912} dark={palette === 'midnight'}>
+    <window.MobileApp palette={palette} {...rest} />
+  </IOSDevice>
+);
+
+const FramedMobilePreset = ({ palette, preset }) => (
+  <IOSDevice width={430} height={912} dark={palette === 'midnight'}>
+    <MobileAppPreset palette={palette} preset={preset} />
+  </IOSDevice>
+);
+
+const Root = () => {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  // Sync font vars whenever fontPair changes
+  React.useEffect(() => { applyFontVars(t.fontPair); }, [t.fontPair]);
+
+  const p = t.palette;
+
+  return (
+    <React.Fragment>
+      <DesignCanvas>
+        <DCSection
+          id="overview"
+          title="Lampstand — Bible Journal & Study"
+          subtitle="Open the Tweaks panel (toolbar) to switch palettes — including a high-contrast Midnight — and font pairings, including OpenDyslexic.">
+          <DCArtboard id="desktop" label="Desktop · 1440 × 900" width={1440} height={900}>
+            <window.DesktopApp palette={p} />
+          </DCArtboard>
+
+          <DCArtboard id="mobile" label="iPhone · 430 × 912" width={430} height={912}>
+            <FramedMobile palette={p} />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection
+          id="desktop-screens"
+          title="Desktop · key screens"
+          subtitle="Journal editor, Bible reader, prayer tracker, research canvas, knowledge graph.">
+          <DCArtboard id="d-journal"  label="Journal editor"   width={1440} height={900}><DesktopAppPreset palette={p} preset="journal"  /></DCArtboard>
+          <DCArtboard id="d-bible"    label="Bible reader"     width={1440} height={900}><DesktopAppPreset palette={p} preset="bible"    /></DCArtboard>
+          <DCArtboard id="d-prayer"   label="Prayer journal"   width={1440} height={900}><DesktopAppPreset palette={p} preset="prayer"   /></DCArtboard>
+          <DCArtboard id="d-research" label="Research canvas"  width={1440} height={900}><DesktopAppPreset palette={p} preset="research" /></DCArtboard>
+          <DCArtboard id="d-graph"    label="Knowledge graph"  width={1440} height={900}><DesktopAppPreset palette={p} preset="graph"    /></DCArtboard>
+        </DCSection>
+
+        <DCSection
+          id="mobile-screens"
+          title="Mobile · key screens"
+          subtitle="Bottom nav · centered FAB · sticky formatting bar · slash commands.">
+          <DCArtboard id="m-bible"    label="Bible reader"   width={430} height={912}><FramedMobilePreset palette={p} preset="bible"    /></DCArtboard>
+          <DCArtboard id="m-entry"    label="Journal entry"  width={430} height={912}><FramedMobilePreset palette={p} preset="entry"    /></DCArtboard>
+          <DCArtboard id="m-prayer"   label="Prayer journal" width={430} height={912}><FramedMobilePreset palette={p} preset="prayer"   /></DCArtboard>
+          <DCArtboard id="m-composer" label="Slash composer" width={430} height={912}><FramedMobilePreset palette={p} preset="composer" /></DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Palette" />
+        <TweakColor
+          label="Color theme"
+          value={(PALETTE_OPTIONS.find(o => o.id === t.palette) || PALETTE_OPTIONS[0]).swatch}
+          options={PALETTE_OPTIONS.map(o => o.swatch)}
+          onChange={(v) => {
+            const match = PALETTE_OPTIONS.find(o => o.swatch.join() === v.join());
+            if (match) setTweak('palette', match.id);
+          }}
+        />
+        <TweakSelect
+          label="Theme name"
+          value={t.palette}
+          options={PALETTE_OPTIONS.map(o => ({ value: o.id, label: o.label }))}
+          onChange={(v) => setTweak('palette', v)}
+        />
+
+        <TweakSection label="Typography" />
+        <TweakSelect
+          label="Font pairing"
+          value={t.fontPair}
+          options={FONT_OPTIONS.map(o => ({ value: o.id, label: o.label }))}
+          onChange={(v) => setTweak('fontPair', v)}
+        />
+        <div style={{ padding: '4px 12px 14px', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {FONT_OPTIONS.map(f => {
+            const isOn = t.fontPair === f.id;
+            const set = window.BJ.fontSets[f.id];
+            return (
+              <button key={f.id} onClick={() => setTweak('fontPair', f.id)} style={{
+                padding: '8px 10px',
+                background: isOn ? '#1f1d18' : '#fff',
+                color: isOn ? '#fff' : '#1f1d18',
+                border: '1px solid #e3dfd5', borderRadius: 9, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'inherit', fontSize: 11,
+              }}>
+                <span style={{ fontFamily: set.ui, fontSize: 14, fontWeight: 600 }}>Aa</span>
+                <span style={{ opacity: 0.7 }}>{f.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </TweaksPanel>
+    </React.Fragment>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+</script>
+</body>
+</html>
