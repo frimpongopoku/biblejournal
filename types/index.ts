@@ -51,6 +51,7 @@ export interface Prayer {
   body: string;
   status: "active" | "answered" | "archived";
   scriptures: ScriptureRef[];
+  testimony: string | null;
   answeredAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
