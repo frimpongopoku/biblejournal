@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pin, Star, Search, Plus, Trash2 } from "lucide-react";
+import { Pin, Star, Search, Plus, Trash2, ChevronLeft, List, X } from "lucide-react";
 import { useJournalEntries } from "@/hooks/useJournalEntries";
 import { createEntry, updateEntry, deleteEntry } from "@/services/journal.service";
 import { useAuthStore } from "@/store/auth.store";
@@ -44,6 +44,7 @@ export default function JournalPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localTitle, setLocalTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showEntrySheet, setShowEntrySheet] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selected = entries.find((e) => e.id === selectedId) ?? null;
@@ -119,6 +120,7 @@ export default function JournalPage() {
   };
 
   return (
+    <>
     <div className="flex h-full" style={{ background: "var(--bj-bg)" }}>
 
       {/* ── Entry List ───────────────────────────────────── */}
@@ -272,24 +274,37 @@ export default function JournalPage() {
               transition={{ duration: 0.25, ease: "easeOut" }}
               className="flex-1 flex flex-col h-full overflow-hidden"
             >
+              {/* ── Mobile nav bar (back + entries toggle) ── */}
+              <div
+                className="md:hidden flex items-center gap-1 px-3 border-b shrink-0"
+                style={{ height: 48, borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}
+              >
+                <button
+                  onClick={() => setSelectedId(null)}
+                  className="bj-btn-ghost flex items-center gap-1.5 px-3 py-2 rounded-xl"
+                  style={{ color: "var(--bj-ink2)", minHeight: 44 }}
+                >
+                  <ChevronLeft size={16} />
+                  <span className="font-sans text-sm">Entries</span>
+                </button>
+                <div className="flex-1" />
+                <button
+                  onClick={() => setShowEntrySheet(true)}
+                  className="bj-btn-icon w-9 h-9 rounded-xl flex items-center justify-center"
+                  style={{ color: "var(--bj-ink3)" }}
+                  title="Browse entries"
+                >
+                  <List size={17} />
+                </button>
+              </div>
+
               {/* Meta bar + title */}
               <div
-                className="px-8 md:px-16 pt-8 pb-4 border-b shrink-0"
+                className="px-5 md:px-16 pt-5 md:pt-8 pb-4 border-b shrink-0"
                 style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}
               >
                 {/* Top row: meta + actions */}
                 <div className="flex items-center gap-2 mb-4" style={{ maxWidth: 680 }}>
-                  {/* Back to list — mobile only */}
-                  <button
-                    onClick={() => setSelectedId(null)}
-                    className="bj-btn-icon md:hidden w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ color: "var(--bj-ink3)" }}
-                    title="Back to entries"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M15 18l-6-6 6-6"/>
-                    </svg>
-                  </button>
                   <span
                     className="font-sans text-xs px-2 py-0.5 rounded-full"
                     style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}
@@ -375,5 +390,84 @@ export default function JournalPage() {
         </AnimatePresence>
       </div>
     </div>
+
+    {/* ── Mobile entry list bottom sheet ──────────── */}
+    <AnimatePresence>
+      {showEntrySheet && (
+        <>
+          <motion.div
+            key="es-bd"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-40 md:hidden"
+            style={{ background: "color-mix(in oklch, var(--bj-ink) 30%, transparent)", cursor: "pointer" }}
+            onClick={() => setShowEntrySheet(false)}
+            onTouchEnd={(e) => { e.preventDefault(); setShowEntrySheet(false); }}
+          />
+          <motion.div
+            key="es-sheet"
+            initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+            transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.3 }}
+            className="fixed bottom-0 left-0 right-0 z-50 md:hidden rounded-t-2xl overflow-hidden flex flex-col"
+            style={{
+              background: "var(--bj-bg-panel)",
+              borderTop: "1px solid var(--bj-line)",
+              boxShadow: "0 -8px 40px color-mix(in oklch, var(--bj-ink) 16%, transparent)",
+              maxHeight: "75vh",
+              paddingBottom: "env(safe-area-inset-bottom)",
+            }}
+          >
+            {/* Sheet header */}
+            <div className="flex justify-center pt-3 pb-1 shrink-0">
+              <div className="w-8 h-1 rounded-full" style={{ background: "var(--bj-line)" }} />
+            </div>
+            <div className="flex items-center justify-between px-5 py-3 border-b shrink-0" style={{ borderColor: "var(--bj-line-soft)" }}>
+              <h3 className="font-display text-base" style={{ color: "var(--bj-ink)", fontWeight: 400 }}>
+                All Entries <span className="font-sans text-xs ml-1" style={{ color: "var(--bj-ink4)", fontFamily: "inherit", fontStyle: "normal" }}>({entries.length})</span>
+              </h3>
+              <button onClick={() => setShowEntrySheet(false)} className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Entry list */}
+            <div className="flex-1 overflow-y-auto">
+              {entries.map((entry) => {
+                const isSelected = entry.id === selectedId;
+                const excerpt = extractExcerpt(entry.content);
+                return (
+                  <div
+                    key={entry.id}
+                    onClick={() => { setSelectedId(entry.id); setShowEntrySheet(false); }}
+                    className="bj-list-row px-5 py-4 border-b"
+                    style={{
+                      borderColor: "var(--bj-line-soft)",
+                      background: isSelected ? "var(--bj-gold-tint)" : "transparent",
+                      borderLeft: isSelected ? "2px solid var(--bj-gold)" : "2px solid transparent",
+                    }}
+                  >
+                    <div className="flex items-start gap-2 mb-1">
+                      {entry.isPinned && <Pin size={10} className="mt-0.5 shrink-0" style={{ color: "var(--bj-gold)" }} />}
+                      <p className="font-sans text-sm font-medium leading-snug truncate" style={{ color: "var(--bj-ink)" }}>
+                        {entry.title || <span style={{ color: "var(--bj-ink4)" }}>Untitled</span>}
+                      </p>
+                    </div>
+                    {excerpt && (
+                      <p className="font-sans text-xs mb-1.5" style={{ color: "var(--bj-ink3)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                        {excerpt}
+                      </p>
+                    )}
+                    <span className="font-sans" style={{ fontSize: 10, color: "var(--bj-ink4)" }}>
+                      {formatDate(entry.updatedAt)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
