@@ -53,7 +53,7 @@ export function BookPickerSheet({ open, currentBook, currentChapter, onSelect, o
             transition={{ duration: 0.18 }}
             className="fixed inset-0 z-40"
             style={{
-              background: "color-mix(in oklch, var(--bj-ink) 28%, transparent)",
+              background: "color-mix(in oklch, var(--bj-ink) 14%, transparent)",
               cursor: "pointer",
             }}
             onClick={handleClose}

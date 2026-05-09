@@ -45,7 +45,7 @@ export function TestimonyDialog({ open, prayer, onClose, onConfirm }: Props) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             className="fixed inset-0 z-40"
-            style={{ background: "color-mix(in oklch, var(--bj-ink) 50%, transparent)" }}
+            style={{ background: "color-mix(in oklch, var(--bj-ink) 14%, transparent)" }}
             onClick={onClose}
           />
 
