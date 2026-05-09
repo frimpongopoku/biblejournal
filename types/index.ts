@@ -67,3 +67,25 @@ export interface Highlight {
 }
 
 export type BibleVersion = "KJV" | "NIV" | "ESV" | "NKJV" | "NLT";
+
+export interface ProclamationFolder {
+  id: string;
+  userId: string;
+  name: string;
+  description: string | null;
+  isPublic: boolean;
+  shareToken: string | null;
+  entryCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ProclamationEntry {
+  id: string;
+  userId: string;
+  folderId: string;
+  title: string;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
+}

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, NotebookPen, BookOpen, HeartHandshake,
-  Compass, Network, Search, Plus, Bell, Moon, Sun,
+  Megaphone, Compass, Network, Search, Plus, Bell, Moon, Sun,
   Settings, Mic, LogOut, Flame, Palette,
 } from "lucide-react";
 import { useThemeStore } from "@/store/theme.store";
@@ -19,10 +19,11 @@ import { fontPairs } from "@/lib/fonts";
 import type { FontPairId } from "@/lib/fonts";
 
 const navItems = [
-  { href: "/dashboard", label: "Today", icon: LayoutDashboard },
-  { href: "/journal", label: "Journal", icon: NotebookPen },
-  { href: "/bible", label: "Bible", icon: BookOpen },
-  { href: "/prayer", label: "Prayer", icon: HeartHandshake },
+  { href: "/dashboard",      label: "Today",          icon: LayoutDashboard },
+  { href: "/journal",        label: "Journal",         icon: NotebookPen },
+  { href: "/bible",          label: "Bible",           icon: BookOpen },
+  { href: "/prayer",         label: "Prayer",          icon: HeartHandshake },
+  { href: "/proclamations",  label: "Proclamations",   icon: Megaphone },
   // { href: "/research", label: "Research", icon: Compass },
   // { href: "/graph", label: "Graph", icon: Network },
 ];
@@ -435,29 +436,21 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           paddingRight: 8,
         }}
       >
-        {[navItems[0], navItems[1], null, navItems[2], navItems[3]].map((item, i) => {
-          if (!item) {
-            return (
-              <button
-                key="fab"
-                className="bj-btn-primary relative -top-5 w-14 h-14 rounded-2xl flex items-center justify-center"
-                style={{ background: "var(--bj-gold)", boxShadow: "0 4px 20px color-mix(in oklch, var(--bj-gold) 50%, transparent)" }}
-              >
-                <Plus size={22} color="white" />
-              </button>
-            );
-          }
+        {navItems.slice(0, 5).map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
+          const shortLabel: Record<string, string> = { Proclamations: "Declare" };
           return (
             <Link
               key={item.href}
               href={item.href}
-              className="bj-btn-icon flex flex-col items-center gap-1 py-1 px-3 rounded-xl"
+              className="bj-btn-icon flex flex-col items-center gap-1 py-1 flex-1 rounded-xl min-w-0"
               style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink4)" }}
             >
-              <Icon size={20} />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <Icon size={19} />
+              <span className="text-[9px] font-medium truncate w-full text-center">
+                {shortLabel[item.label] ?? item.label}
+              </span>
             </Link>
           );
         })}
