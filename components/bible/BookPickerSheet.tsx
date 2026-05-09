@@ -52,8 +52,12 @@ export function BookPickerSheet({ open, currentBook, currentChapter, onSelect, o
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             className="fixed inset-0 z-40"
-            style={{ background: "color-mix(in oklch, var(--bj-ink) 50%, transparent)" }}
+            style={{
+              background: "color-mix(in oklch, var(--bj-ink) 28%, transparent)",
+              cursor: "pointer",
+            }}
             onClick={handleClose}
+            onTouchEnd={(e) => { e.preventDefault(); handleClose(); }}
           />
 
           <motion.div
