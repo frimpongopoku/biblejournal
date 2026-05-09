@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react"; // eslint-disable-line @typescript-eslint/no-unused-vars
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -20,44 +20,10 @@ import { youTubeThumbnail } from "@/lib/youtube-parser";
 
 // ── Helpers ───────────────────────────────────────────────
 
-const WEEK = ["M", "T", "W", "T", "F", "S", "S"];
-
-const DAILY_VERSES = [
-  { ref: "Lamentations 3:22–23", version: "ESV", text: "The steadfast love of the Lord never ceases; his mercies never come to an end; they are new every morning; great is your faithfulness." },
-  { ref: "Jeremiah 29:11", version: "ESV", text: "For I know the plans I have for you, declares the Lord, plans for welfare and not for evil, to give you a future and a hope." },
-  { ref: "Philippians 4:13", version: "ESV", text: "I can do all things through him who strengthens me." },
-  { ref: "Romans 8:28", version: "ESV", text: "And we know that for those who love God all things work together for good, for those who are called according to his purpose." },
-  { ref: "John 3:16", version: "ESV", text: "For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life." },
-  { ref: "Psalm 23:1", version: "ESV", text: "The Lord is my shepherd; I shall not want." },
-  { ref: "Isaiah 40:31", version: "ESV", text: "But they who wait for the Lord shall renew their strength; they shall mount up with wings like eagles; they shall run and not be weary; they shall walk and not faint." },
-  { ref: "Proverbs 3:5–6", version: "ESV", text: "Trust in the Lord with all your heart, and do not lean on your own understanding. In all your ways acknowledge him, and he will make straight your paths." },
-  { ref: "Matthew 6:33", version: "ESV", text: "But seek first the kingdom of God and his righteousness, and all these things will be added to you." },
-  { ref: "Psalm 46:10", version: "ESV", text: "Be still, and know that I am God. I will be exalted among the nations, I will be exalted in the earth!" },
-  { ref: "John 15:5", version: "ESV", text: "I am the vine; you are the branches. Whoever abides in me and I in him, he it is that bears much fruit, for apart from me you can do nothing." },
-  { ref: "Romans 8:38–39", version: "ESV", text: "For I am sure that neither death nor life, nor angels nor rulers, nor things present nor things to come, will be able to separate us from the love of God in Christ Jesus our Lord." },
-  { ref: "2 Corinthians 12:9", version: "ESV", text: "But he said to me, 'My grace is sufficient for you, for my power is made perfect in weakness.' Therefore I will boast all the more gladly of my weaknesses, so that the power of Christ may rest upon me." },
-  { ref: "Psalm 119:105", version: "ESV", text: "Your word is a lamp to my feet and a light to my path." },
-  { ref: "Ephesians 2:8–9", version: "ESV", text: "For by grace you have been saved through faith. And this is not your own doing; it is the gift of God, not a result of works, so that no one may boast." },
-  { ref: "Joshua 1:9", version: "ESV", text: "Have I not commanded you? Be strong and courageous. Do not be frightened, and do not be dismayed, for the Lord your God is with you wherever you go." },
-  { ref: "Romans 5:8", version: "ESV", text: "But God shows his love for us in that while we were still sinners, Christ died for us." },
-  { ref: "Philippians 4:6–7", version: "ESV", text: "Do not be anxious about anything, but in everything by prayer and supplication with thanksgiving let your requests be made known to God. And the peace of God, which surpasses all understanding, will guard your hearts." },
-  { ref: "Psalm 37:4", version: "ESV", text: "Delight yourself in the Lord, and he will give you the desires of your heart." },
-  { ref: "Matthew 11:28", version: "ESV", text: "Come to me, all who labor and are heavy laden, and I will give you rest." },
-  { ref: "1 John 4:19", version: "ESV", text: "We love because he first loved us." },
-  { ref: "Hebrews 11:1", version: "ESV", text: "Now faith is the assurance of things hoped for, the conviction of things not seen." },
-  { ref: "James 1:2–4", version: "ESV", text: "Count it all joy, my brothers, when you meet trials of various kinds, for you know that the testing of your faith produces steadfastness." },
-  { ref: "Isaiah 41:10", version: "ESV", text: "Fear not, for I am with you; be not dismayed, for I am your God; I will strengthen you, I will help you, I will uphold you with my righteous right hand." },
-  { ref: "Galatians 2:20", version: "ESV", text: "I have been crucified with Christ. It is no longer I who live, but Christ who lives in me. And the life I now live in the flesh I live by faith in the Son of God." },
-  { ref: "Colossians 3:23", version: "ESV", text: "Whatever you do, work heartily, as for the Lord and not for men." },
-  { ref: "Romans 12:2", version: "ESV", text: "Do not be conformed to this world, but be transformed by the renewal of your mind, that by testing you may discern what is the will of God." },
-  { ref: "Psalm 27:1", version: "ESV", text: "The Lord is my light and my salvation; whom shall I fear? The Lord is the stronghold of my life; of whom shall I be afraid?" },
-  { ref: "John 14:6", version: "ESV", text: "Jesus said to him, 'I am the way, and the truth, and the life. No one comes to the Father except through me.'" },
-  { ref: "2 Timothy 1:7", version: "ESV", text: "For God gave us a spirit not of fear but of power and love and self-control." },
-];
-
-function getDailyVerse() {
-  const day = new Date().getDate();
-  return DAILY_VERSES[day % DAILY_VERSES.length];
+interface DailyVerse {
+  ref: string;
+  text: string;
+  version: string;
 }
 
 function getGreeting() {
@@ -87,28 +53,6 @@ function extractExcerpt(content: string, max = 90): string {
   } catch { return ""; }
 }
 
-function computeActivity(dates: Date[]) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const active = new Set(dates.map((d) => d.toISOString().slice(0, 10)));
-
-  let streak = 0;
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    if (active.has(d.toISOString().slice(0, 10))) streak++;
-    else break;
-  }
-
-  const weekDots = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - (6 - i));
-    const key = d.toISOString().slice(0, 10);
-    return { on: active.has(key), label: WEEK[d.getDay() === 0 ? 6 : d.getDay() - 1] };
-  });
-
-  return { streak, weekDots };
-}
 
 // ── Animation variants ────────────────────────────────────
 
@@ -225,7 +169,17 @@ export default function DashboardPage() {
   const authUser = useAuthStore((s) => s.user);
   const router = useRouter();
   const firstName = user?.displayName?.split(" ")[0] ?? "Friend";
-  const dailyVerse = getDailyVerse();
+  const [dailyVerse, setDailyVerse] = useState<DailyVerse | null>(null);
+
+  useEffect(() => {
+    fetch("/api/bible/daily")
+      .then((r) => r.json())
+      .then(setDailyVerse)
+      .catch(() => {
+        // Fallback so the hero never crashes
+        setDailyVerse({ ref: "Psalm 119:105", text: "Your word is a lamp to my feet and a light to my path.", version: "ESV" });
+      });
+  }, []);
 
   const { entries, loading: jLoading } = useJournalEntries();
   const { prayers, loading: pLoading } = usePrayers();
@@ -299,16 +253,27 @@ export default function DashboardPage() {
             <div className="relative z-10">
               <div className="flex items-center gap-2 mb-4">
                 <span className="font-sans text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--bj-gold-deep)" }}>Today's verse</span>
-                <span className="font-sans text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}>{dailyVerse.version}</span>
+                {dailyVerse && (
+                  <span className="font-sans text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}>{dailyVerse.version}</span>
+                )}
               </div>
 
-              <p className="font-sans mb-2" style={{ fontSize: "0.7rem", letterSpacing: "0.12em", color: "var(--bj-gold-deep)", fontWeight: 600, textTransform: "uppercase" }}>
-                {dailyVerse.ref}
-              </p>
-
-              <blockquote className="font-display italic mb-6" style={{ fontSize: "clamp(1.2rem, 2.8vw, 1.7rem)", color: "var(--bj-ink)", fontWeight: 300, maxWidth: 580, lineHeight: 1.35 }}>
-                &ldquo;{dailyVerse.text}&rdquo;
-              </blockquote>
+              {dailyVerse ? (
+                <>
+                  <p className="font-sans mb-2" style={{ fontSize: "0.7rem", letterSpacing: "0.12em", color: "var(--bj-gold-deep)", fontWeight: 600, textTransform: "uppercase" }}>
+                    {dailyVerse.ref}
+                  </p>
+                  <blockquote className="font-display italic mb-6" style={{ fontSize: "clamp(1.2rem, 2.8vw, 1.7rem)", color: "var(--bj-ink)", fontWeight: 300, maxWidth: 580, lineHeight: 1.35 }}>
+                    &ldquo;{dailyVerse.text}&rdquo;
+                  </blockquote>
+                </>
+              ) : (
+                <div className="mb-6 flex flex-col gap-2.5">
+                  <div className="h-3 rounded-lg animate-pulse w-32" style={{ background: "var(--bj-gold-soft)" }} />
+                  <div className="h-7 rounded-lg animate-pulse w-full max-w-lg" style={{ background: "var(--bj-gold-soft)" }} />
+                  <div className="h-7 rounded-lg animate-pulse w-3/4" style={{ background: "var(--bj-gold-soft)" }} />
+                </div>
+              )}
 
               {/* Streak */}
               <div className="flex items-center gap-4 pt-5 border-t" style={{ borderColor: "var(--bj-gold-soft)" }}>
