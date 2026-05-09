@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo } from "react"; // eslint-disable-line @typescript-eslint/no-unused-vars
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -9,6 +9,7 @@ import {
   ArrowRight, Flame, Plus, Play,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useStreakStore } from "@/store/streak.store";
 import { useJournalEntries } from "@/hooks/useJournalEntries";
 import { usePrayers } from "@/hooks/usePrayers";
 import { useSermons } from "@/hooks/useSermons";
@@ -238,13 +239,7 @@ export default function DashboardPage() {
   const recentJournal = entries.slice(0, 3);
   const recentSermons = sermons.slice(0, 2);
 
-  const { streak, weekDots } = useMemo(() => {
-    const dates: Date[] = [
-      ...entries.map((e) => e.updatedAt),
-      ...prayers.map((p) => p.updatedAt),
-    ];
-    return computeActivity(dates);
-  }, [entries, prayers]);
+  const { streak, weekDots } = useStreakStore();
 
   async function handleNewEntry() {
     if (!authUser) return;
@@ -324,10 +319,10 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <div className="flex gap-1.5">
-                  {weekDots.map(({ on, label }, i) => (
+                  {weekDots.map((dot, i) => (
                     <div key={i} className="flex flex-col items-center gap-1">
-                      <div className="w-5 h-5 rounded-md" style={{ background: on ? "var(--bj-gold)" : "var(--bj-gold-soft)", boxShadow: on ? "0 1px 6px color-mix(in oklch, var(--bj-gold) 40%, transparent)" : "none" }} />
-                      <span className="font-sans" style={{ fontSize: 9, color: "var(--bj-gold-deep)" }}>{label}</span>
+                      <div className="w-5 h-5 rounded-md" style={{ background: dot.on ? "var(--bj-gold)" : "var(--bj-gold-soft)", boxShadow: dot.on ? "0 1px 6px color-mix(in oklch, var(--bj-gold) 40%, transparent)" : "none" }} />
+                      <span className="font-sans" style={{ fontSize: 9, color: "var(--bj-gold-deep)" }}>{dot.label}</span>
                     </div>
                   ))}
                 </div>

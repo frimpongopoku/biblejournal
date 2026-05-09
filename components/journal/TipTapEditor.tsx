@@ -166,8 +166,8 @@ export function TipTapEditor({ entryId, content, onChange }: Props) {
       </div>
 
       {/* Editor area */}
-      <div className="flex-1 overflow-y-auto px-8 md:px-16 py-8">
-        <div style={{ maxWidth: 680, margin: "0 auto" }}>
+      <div className="flex-1 overflow-y-auto px-5 md:px-12 lg:px-16 py-10 md:py-12">
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
           <EditorContent editor={editor} />
         </div>
       </div>

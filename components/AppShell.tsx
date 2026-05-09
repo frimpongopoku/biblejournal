@@ -13,7 +13,7 @@ import { useThemeStore } from "@/store/theme.store";
 import { useFontStore } from "@/store/font.store";
 import { useAuth } from "@/hooks/useAuth";
 import { signOutUser } from "@/services/auth.service";
-import { streak } from "@/lib/mock-data";
+import { useStreakStore } from "@/store/streak.store";
 import type { ThemeId } from "@/lib/themes";
 import { fontPairs } from "@/lib/fonts";
 import type { FontPairId } from "@/lib/fonts";
@@ -57,6 +57,8 @@ export function AppShell({ children, rightRail }: AppShellProps) {
   const { themeId, setTheme } = useThemeStore();
   const { fontPairId, setFontPair } = useFontStore();
   const { user } = useAuth();
+
+  const { streak, weekDots } = useStreakStore();
 
   const [showProfile, setShowProfile] = useState(false);
   const [showAppearance, setShowAppearance] = useState(false);
@@ -189,16 +191,18 @@ export function AppShell({ children, rightRail }: AppShellProps) {
         {/* Streak */}
         <div className="px-4 py-2.5 border-b flex items-center gap-2.5" style={{ borderColor: "var(--bj-line-soft)" }}>
           <Flame size={12} style={{ color: "var(--bj-gold)", flexShrink: 0 }} />
-          <span className="font-sans text-xs font-medium" style={{ color: "var(--bj-gold-deep)" }}>{streak.days}d</span>
+          <span className="font-sans text-xs font-medium" style={{ color: "var(--bj-gold-deep)" }}>
+            {streak > 0 ? `${streak}d` : "—"}
+          </span>
           <div className="flex gap-1 ml-auto">
-            {streak.weekDots.map((on, i) => (
+            {weekDots.map((dot, i) => (
               <div
                 key={i}
-                title={WEEK_LABELS[i]}
+                title={dot.label}
                 className="w-3.5 h-3.5 rounded"
                 style={{
-                  background: on ? "var(--bj-gold)" : "var(--bj-gold-soft)",
-                  boxShadow: on ? "0 1px 4px color-mix(in oklch, var(--bj-gold) 40%, transparent)" : "none",
+                  background: dot.on ? "var(--bj-gold)" : "var(--bj-gold-soft)",
+                  boxShadow: dot.on ? "0 1px 4px color-mix(in oklch, var(--bj-gold) 40%, transparent)" : "none",
                 }}
               />
             ))}
