@@ -24,8 +24,8 @@ const navItems = [
   { href: "/journal", label: "Journal", icon: NotebookPen },
   { href: "/bible", label: "Bible", icon: BookOpen },
   { href: "/prayer", label: "Prayer", icon: HeartHandshake },
-  { href: "/research", label: "Research", icon: Compass },
-  { href: "/graph", label: "Graph", icon: Network },
+  // { href: "/research", label: "Research", icon: Compass },
+  // { href: "/graph", label: "Graph", icon: Network },
 ];
 
 const WEEK_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
