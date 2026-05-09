@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Highlighter, BookMarked, SlidersHorizontal }
 import { BookPickerSheet } from "@/components/bible/BookPickerSheet";
 import { QuickRefInput } from "@/components/bible/QuickRefInput";
 import { PROTESTANT_BOOKS, CHAPTER_COUNTS } from "@/lib/bible-books";
+import { useBibleStore } from "@/store/bible.store";
 
 const VERSIONS = ["ESV", "KJV", "NIV", "AMP", "MSG", "ASV", "NKJV", "NLT"];
 const DEFAULT_BOOK = "John";
@@ -32,7 +33,7 @@ function nextLoc(book: string, ch: number, total: number) {
 }
 
 export default function BiblePage() {
-  const [version, setVersion] = useState("ESV");
+  const { version, setVersion } = useBibleStore();
   const [book, setBook] = useState(DEFAULT_BOOK);
   const [chapter, setChapter] = useState(DEFAULT_CHAPTER);
   const [targetVerse, setTargetVerse] = useState<number | undefined>();
@@ -155,6 +156,7 @@ export default function BiblePage() {
                   onClick={() => setVersion(v)}
                   data-active={version === v || undefined}
                   className="bj-chip font-sans text-[11px] px-2.5 py-1 rounded-lg shrink-0"
+                  title={version === v ? `${v} — your default` : `Switch to ${v}`}
                   style={{
                     background: version === v ? "var(--bj-gold)" : "transparent",
                     color: version === v ? "white" : "var(--bj-ink4)",

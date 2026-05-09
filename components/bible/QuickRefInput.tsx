@@ -15,9 +15,12 @@ type Suggestion = BookSug | ChapterSug | VerseSug;
 function matchBooks(query: string): string[] {
   const q = query.toLowerCase().trim();
   if (!q) return [];
+
   const numMatch = q.match(/^(\d)\s*(.*)$/);
   let results: string[];
+
   if (numMatch) {
+    // Query starts with a digit: "1 cor", "2sa", etc.
     const num = numMatch[1];
     const rest = numMatch[2].trim();
     results = PROTESTANT_BOOKS.filter((b) => {
@@ -25,8 +28,21 @@ function matchBooks(query: string): string[] {
       return bl.startsWith(`${num} `) && (!rest || bl.slice(2).startsWith(rest));
     });
   } else {
-    results = PROTESTANT_BOOKS.filter((b) => b.toLowerCase().startsWith(q));
+    // Full-name prefix: "gen", "john", "rev"
+    const byPrefix = PROTESTANT_BOOKS.filter((b) => b.toLowerCase().startsWith(q));
+
+    // Word-part match for numbered books: "cor" → "1 Corinthians", "2 Corinthians"
+    // "sam" → "1 Samuel", "2 Samuel", "pet" → "1 Peter", "2 Peter", etc.
+    const byWordPart = PROTESTANT_BOOKS.filter((b) => {
+      const bl = b.toLowerCase();
+      if (!/^\d /.test(bl)) return false;          // only numbered books
+      const nameOnly = bl.replace(/^\d+ /, "");    // strip "1 ", "2 ", "3 "
+      return nameOnly.startsWith(q);
+    });
+
+    results = [...new Set([...byPrefix, ...byWordPart])];
   }
+
   return results.slice(0, 6);
 }
 
