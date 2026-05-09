@@ -46,15 +46,18 @@ export default function JournalPage() {
   const [creating, setCreating] = useState(false);
   const [showEntrySheet, setShowEntrySheet] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasAutoSelected = useRef(false);
 
   const selected = entries.find((e) => e.id === selectedId) ?? null;
 
-  // Auto-select first entry when loaded
+  // Auto-select first entry on initial load only — never re-fires when user
+  // manually clears the selection (back button), because hasAutoSelected guards it.
   useEffect(() => {
-    if (!loading && entries.length > 0 && !selectedId) {
+    if (!loading && entries.length > 0 && !hasAutoSelected.current) {
+      hasAutoSelected.current = true;
       setSelectedId(entries[0].id);
     }
-  }, [loading, entries, selectedId]);
+  }, [loading, entries]);
 
   // Sync local title when selection changes
   useEffect(() => {
@@ -430,8 +433,8 @@ export default function JournalPage() {
               </button>
             </div>
 
-            {/* Entry list */}
-            <div className="flex-1 overflow-y-auto">
+            {/* Entry list — min-height:0 lets flex-1 shrink so overflow-y-auto works */}
+            <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
               {entries.map((entry) => {
                 const isSelected = entry.id === selectedId;
                 const excerpt = extractExcerpt(entry.content);
