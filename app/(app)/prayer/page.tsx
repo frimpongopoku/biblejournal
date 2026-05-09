@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Flame, CheckCircle2, Clock, Pencil, Trash2 } from "lucide-react";
+import {
+  Plus, Flame, CheckCircle2, Clock, Pencil, Trash2, X,
+} from "lucide-react";
 import { usePrayers } from "@/hooks/usePrayers";
 import {
   createPrayer,
@@ -29,17 +31,124 @@ function formatDate(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+// ── Inline new-prayer card ──────────────────────────────────────────────────
+
+interface NewCardProps {
+  onSave: (title: string, body: string) => Promise<void>;
+  onCancel: () => void;
+}
+
+function NewPrayerCard({ onSave, onCancel }: NewCardProps) {
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [saving, setSaving] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
+
+  async function handleSave() {
+    if (!title.trim()) return;
+    setSaving(true);
+    await onSave(title.trim(), body.trim());
+  }
+
+  function handleKey(e: React.KeyboardEvent) {
+    if (e.key === "Escape") onCancel();
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.14, ease: "easeOut" }}
+      className="rounded-2xl overflow-hidden col-span-full md:col-span-1"
+      style={{
+        background: "var(--bj-bg-panel)",
+        border: "1px solid var(--bj-gold-soft)",
+        boxShadow: "0 0 0 3px color-mix(in oklch, var(--bj-gold) 12%, transparent), 0 4px 24px color-mix(in oklch, var(--bj-ink) 8%, transparent)",
+      }}
+    >
+      <div className="px-5 py-4">
+        {/* Icon + title input */}
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: "color-mix(in oklch, var(--bj-ember) 12%, var(--bj-bg))" }}
+          >
+            <Flame size={15} style={{ color: "var(--bj-ember)" }} />
+          </div>
+          <input
+            ref={titleRef}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="What are you praying about?"
+            className="flex-1 bg-transparent outline-none font-sans text-sm font-medium min-w-0"
+            style={{ color: "var(--bj-ink)" }}
+          />
+          <button
+            onClick={onCancel}
+            className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+            style={{ color: "var(--bj-ink4)" }}
+          >
+            <X size={13} />
+          </button>
+        </div>
+
+        {/* Body textarea */}
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="Write your prayer…"
+          rows={3}
+          className="w-full bg-transparent outline-none font-display italic text-base resize-none leading-relaxed ml-11"
+          style={{ color: "var(--bj-ink2)", fontWeight: 300, width: "calc(100% - 2.75rem)" }}
+        />
+
+        {/* Actions */}
+        <div
+          className="flex gap-2 mt-3 pt-3 border-t"
+          style={{ borderColor: "var(--bj-line-soft)" }}
+        >
+          <button
+            onClick={onCancel}
+            className="bj-btn-ghost font-sans text-sm px-4 py-2.5 rounded-xl"
+            style={{ color: "var(--bj-ink3)", border: "1px solid var(--bj-line-soft)" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !title.trim()}
+            className="bj-btn-primary font-sans text-sm px-5 py-2.5 rounded-xl disabled:opacity-50 flex-1"
+            style={{ background: "var(--bj-gold)", color: "white" }}
+          >
+            {saving ? "Saving…" : "Add Prayer"}
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
+
 export default function PrayerPage() {
   const user = useAuthStore((s) => s.user);
   const { prayers, loading } = usePrayers();
 
   const [tab, setTab] = useState("All");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [newCard, setNewCard] = useState(false);
 
-  const [prayerDialogOpen, setPrayerDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Prayer | null>(null);
 
-  const [testimonyDialogOpen, setTestimonyDialogOpen] = useState(false);
+  const [testimonyOpen, setTestimonyOpen] = useState(false);
   const [testimonyTarget, setTestimonyTarget] = useState<Prayer | null>(null);
 
   const active = prayers.filter((p) => p.status === "active");
@@ -52,31 +161,28 @@ export default function PrayerPage() {
       ? active
       : answered;
 
-  function openNew() {
-    setEditTarget(null);
-    setPrayerDialogOpen(true);
+  async function handleCreatePrayer(title: string, body: string) {
+    if (!user) return;
+    const id = await createPrayer(user.uid, title, body);
+    setNewCard(false);
+    setExpanded(id);
   }
 
   function openEdit(p: Prayer, e: React.MouseEvent) {
     e.stopPropagation();
     setEditTarget(p);
-    setPrayerDialogOpen(true);
+    setEditDialogOpen(true);
+  }
+
+  async function handleSaveEdit(title: string, body: string) {
+    if (!user || !editTarget) return;
+    await updatePrayer(user.uid, editTarget.id, { title, body });
   }
 
   function openTestimony(p: Prayer, e: React.MouseEvent) {
     e.stopPropagation();
     setTestimonyTarget(p);
-    setTestimonyDialogOpen(true);
-  }
-
-  async function handleSavePrayer(title: string, body: string) {
-    if (!user) return;
-    if (editTarget) {
-      await updatePrayer(user.uid, editTarget.id, { title, body });
-    } else {
-      const id = await createPrayer(user.uid, title, body);
-      setExpanded(id);
-    }
+    setTestimonyOpen(true);
   }
 
   async function handleMarkAnswered(testimony: string) {
@@ -94,19 +200,19 @@ export default function PrayerPage() {
   return (
     <>
       <div
-        className="min-h-full px-6 md:px-14 py-10"
+        className="min-h-full px-5 md:px-14 py-8 md:py-10"
         style={{ background: "var(--bj-bg)", maxWidth: 800, margin: "0 auto" }}
       >
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-start justify-between mb-10"
+          className="flex items-start justify-between mb-8"
         >
           <div>
             <h1
               className="font-display"
-              style={{ fontSize: "2.2rem", color: "var(--bj-ink)", fontWeight: 400 }}
+              style={{ fontSize: "clamp(1.6rem, 5vw, 2.2rem)", color: "var(--bj-ink)", fontWeight: 400 }}
             >
               Prayer Journal
             </h1>
@@ -115,37 +221,38 @@ export default function PrayerPage() {
             </p>
           </div>
           <button
-            onClick={openNew}
-            className="bj-btn-primary flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium mt-1"
+            onClick={() => { setNewCard(true); setTab("All"); }}
+            className="bj-btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium mt-1 shrink-0"
             style={{
               background: "var(--bj-gold)",
               color: "white",
               boxShadow: "0 2px 12px color-mix(in oklch, var(--bj-gold) 35%, transparent)",
             }}
           >
-            <Plus size={14} /> New Prayer
+            <Plus size={14} />
+            <span className="hidden sm:inline">New Prayer</span>
+            <span className="sm:hidden">New</span>
           </button>
         </motion.div>
 
         {/* Tabs */}
         <div
-          className="flex gap-1 mb-8 p-1 rounded-xl w-fit"
+          className="flex gap-1 mb-7 p-1 rounded-xl w-fit"
           style={{ background: "var(--bj-bg-soft)" }}
         >
           {TABS.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className="bj-chip font-sans text-sm px-4 py-1.5 rounded-lg"
               data-active={tab === t || undefined}
+              className="bj-chip font-sans text-sm px-4 py-2 rounded-lg min-h-[38px]"
               style={{
                 background: tab === t ? "var(--bj-bg-panel)" : "transparent",
                 color: tab === t ? "var(--bj-ink)" : "var(--bj-ink3)",
                 fontWeight: tab === t ? 500 : 400,
-                boxShadow:
-                  tab === t
-                    ? "0 1px 4px color-mix(in oklch, var(--bj-ink) 8%, transparent)"
-                    : "none",
+                boxShadow: tab === t
+                  ? "0 1px 4px color-mix(in oklch, var(--bj-ink) 8%, transparent)"
+                  : "none",
               }}
             >
               {t}
@@ -160,230 +267,238 @@ export default function PrayerPage() {
               Loading…
             </p>
           </div>
-        ) : filtered.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center py-24 gap-4"
-          >
-            <p className="font-display italic text-xl" style={{ color: "var(--bj-ink4)", fontWeight: 300 }}>
-              {prayers.length === 0
-                ? "No prayers yet"
-                : tab === "Praying"
-                ? "Nothing active"
-                : "No answered prayers yet"}
-            </p>
-            {prayers.length === 0 && (
-              <button
-                onClick={openNew}
-                className="bj-btn-primary font-sans text-sm px-4 py-2 rounded-xl flex items-center gap-2"
-                style={{ background: "var(--bj-gold)", color: "white" }}
-              >
-                <Plus size={13} /> Add your first prayer
-              </button>
-            )}
-          </motion.div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <AnimatePresence mode="popLayout">
-              {filtered.map((p, i) => {
-                const isExpanded = expanded === p.id;
-                const isAnswered = p.status === "answered";
-                const streak = isAnswered ? null : daysSince(p.createdAt);
+            <AnimatePresence mode="popLayout" initial={false}>
 
-                return (
-                  <motion.div
-                    key={p.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ delay: i * 0.05, duration: 0.3 }}
-                    onClick={() => setExpanded(isExpanded ? null : p.id)}
-                    className="bj-list-row rounded-2xl overflow-hidden group"
-                    style={{
-                      background: "var(--bj-bg-panel)",
-                      border: `1px solid ${
-                        isAnswered
-                          ? "color-mix(in oklch, var(--bj-sage) 30%, transparent)"
-                          : "var(--bj-line-soft)"
-                      }`,
-                      boxShadow: isExpanded
-                        ? "0 4px 24px color-mix(in oklch, var(--bj-ink) 8%, transparent)"
-                        : "0 1px 4px color-mix(in oklch, var(--bj-ink) 4%, transparent)",
-                    }}
+              {/* Inline new-prayer card */}
+              {newCard && (
+                <NewPrayerCard
+                  key="new-card"
+                  onSave={handleCreatePrayer}
+                  onCancel={() => setNewCard(false)}
+                />
+              )}
+
+              {filtered.length === 0 && !newCard ? (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="col-span-full flex flex-col items-center justify-center py-20 gap-4"
+                >
+                  <p
+                    className="font-display italic text-xl"
+                    style={{ color: "var(--bj-ink4)", fontWeight: 300 }}
                   >
-                    <div className="px-5 py-4">
-                      <div className="flex items-start gap-3">
-                        {/* Icon */}
-                        <div
-                          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-                          style={{
-                            background: isAnswered
-                              ? "var(--bj-sage-tint)"
-                              : "color-mix(in oklch, var(--bj-ember) 12%, var(--bj-bg))",
-                          }}
-                        >
-                          {isAnswered ? (
-                            <CheckCircle2 size={15} style={{ color: "var(--bj-sage)" }} />
-                          ) : (
-                            <Flame size={15} style={{ color: "var(--bj-ember)" }} />
-                          )}
-                        </div>
+                    {prayers.length === 0
+                      ? "No prayers yet"
+                      : tab === "Praying"
+                      ? "Nothing active"
+                      : "No answered prayers yet"}
+                  </p>
+                  {prayers.length === 0 && (
+                    <button
+                      onClick={() => setNewCard(true)}
+                      className="bj-btn-primary font-sans text-sm px-4 py-2.5 rounded-xl flex items-center gap-2"
+                      style={{ background: "var(--bj-gold)", color: "white" }}
+                    >
+                      <Plus size={13} /> Add your first prayer
+                    </button>
+                  )}
+                </motion.div>
+              ) : (
+                filtered.map((p, i) => {
+                  const isExpanded = expanded === p.id;
+                  const isAnswered = p.status === "answered";
+                  const streak = isAnswered ? null : daysSince(p.createdAt);
 
-                        {/* Title + meta */}
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className="font-sans text-sm font-medium mb-0.5"
-                            style={{ color: "var(--bj-ink)" }}
+                  return (
+                    <motion.div
+                      key={p.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.97 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ delay: i * 0.04, duration: 0.25 }}
+                      onClick={() => setExpanded(isExpanded ? null : p.id)}
+                      className="bj-list-row rounded-2xl overflow-hidden"
+                      style={{
+                        background: "var(--bj-bg-panel)",
+                        border: `1px solid ${
+                          isAnswered
+                            ? "color-mix(in oklch, var(--bj-sage) 30%, transparent)"
+                            : "var(--bj-line-soft)"
+                        }`,
+                        boxShadow: isExpanded
+                          ? "0 4px 24px color-mix(in oklch, var(--bj-ink) 8%, transparent)"
+                          : "0 1px 4px color-mix(in oklch, var(--bj-ink) 4%, transparent)",
+                      }}
+                    >
+                      <div className="px-5 py-4">
+                        {/* Card header */}
+                        <div className="flex items-start gap-3">
+                          <div
+                            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                            style={{
+                              background: isAnswered
+                                ? "var(--bj-sage-tint)"
+                                : "color-mix(in oklch, var(--bj-ember) 12%, var(--bj-bg))",
+                            }}
                           >
-                            {p.title}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            {isAnswered ? (
-                              <span className="font-sans text-xs" style={{ color: "var(--bj-sage)" }}>
-                                Answered · {formatDate(p.answeredAt ?? p.updatedAt)}
-                              </span>
-                            ) : (
-                              <>
-                                <Clock size={10} style={{ color: "var(--bj-ink4)" }} />
-                                <span className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>
-                                  Praying since {formatDate(p.createdAt)}
-                                </span>
-                              </>
-                            )}
+                            {isAnswered
+                              ? <CheckCircle2 size={16} style={{ color: "var(--bj-sage)" }} />
+                              : <Flame size={16} style={{ color: "var(--bj-ember)" }} />
+                            }
                           </div>
-                        </div>
 
-                        {/* Streak badge + card actions */}
-                        <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className="font-sans text-sm font-medium mb-0.5 leading-snug"
+                              style={{ color: "var(--bj-ink)" }}
+                            >
+                              {p.title}
+                            </p>
+                            <div className="flex items-center gap-1.5">
+                              {isAnswered ? (
+                                <span className="font-sans text-xs" style={{ color: "var(--bj-sage)" }}>
+                                  Answered · {formatDate(p.answeredAt ?? p.updatedAt)}
+                                </span>
+                              ) : (
+                                <>
+                                  <Clock size={10} style={{ color: "var(--bj-ink4)" }} />
+                                  <span className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>
+                                    Since {formatDate(p.createdAt)}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
                           {!isAnswered && streak !== null && (
                             <span
-                              className="font-sans text-[11px] px-2.5 py-1 rounded-full font-medium"
+                              className="font-sans text-[11px] px-2.5 py-1 rounded-full font-medium shrink-0"
                               style={{
-                                background:
-                                  "color-mix(in oklch, var(--bj-ember) 12%, var(--bj-bg))",
+                                background: "color-mix(in oklch, var(--bj-ember) 12%, var(--bj-bg))",
                                 color: "var(--bj-ember)",
-                                border:
-                                  "1px solid color-mix(in oklch, var(--bj-ember) 25%, transparent)",
+                                border: "1px solid color-mix(in oklch, var(--bj-ember) 25%, transparent)",
                               }}
                             >
                               {streak}d
                             </span>
                           )}
-
-                          {/* Delete — visible on card hover */}
-                          <button
-                            onClick={(e) => handleDelete(p, e)}
-                            className="bj-btn-action w-6 h-6 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100"
-                            data-danger
-                            style={{
-                              color: "var(--bj-ink4)",
-                              transition: "opacity 0.15s ease, transform 0.1s ease, background 0.12s ease, color 0.12s ease",
-                            }}
-                            title="Delete prayer"
-                          >
-                            <Trash2 size={11} />
-                          </button>
                         </div>
-                      </div>
 
-                      {/* Expanded content */}
-                      <AnimatePresence>
-                        {isExpanded && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: "auto", opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.25, ease: "easeInOut" }}
-                            className="overflow-hidden"
-                          >
-                            <p
-                              className="font-display italic text-base leading-relaxed mt-4 pt-4 border-t"
-                              style={{
-                                borderColor: isAnswered
-                                  ? "color-mix(in oklch, var(--bj-sage) 20%, transparent)"
-                                  : "var(--bj-line-soft)",
-                                color: "var(--bj-ink2)",
-                                fontWeight: 300,
-                              }}
+                        {/* Expanded body */}
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.22, ease: "easeInOut" }}
+                              className="overflow-hidden"
                             >
-                              {p.body}
-                            </p>
-
-                            {/* Testimony */}
-                            {isAnswered && p.testimony && (
-                              <div
-                                className="mt-3 px-4 py-3 rounded-xl"
+                              <p
+                                className="font-display italic text-base leading-relaxed mt-4 pt-4 border-t"
                                 style={{
-                                  background: "var(--bj-sage-tint)",
-                                  border: "1px solid color-mix(in oklch, var(--bj-sage) 25%, transparent)",
+                                  borderColor: isAnswered
+                                    ? "color-mix(in oklch, var(--bj-sage) 20%, transparent)"
+                                    : "var(--bj-line-soft)",
+                                  color: "var(--bj-ink2)",
+                                  fontWeight: 300,
                                 }}
                               >
-                                <p
-                                  className="font-sans text-[10px] uppercase tracking-widest mb-1"
-                                  style={{ color: "var(--bj-sage)" }}
-                                >
-                                  Testimony
-                                </p>
-                                <p
-                                  className="font-display italic text-sm leading-relaxed"
-                                  style={{ color: "var(--bj-ink2)", fontWeight: 300 }}
-                                >
-                                  {p.testimony}
-                                </p>
-                              </div>
-                            )}
+                                {p.body}
+                              </p>
 
-                            {/* Actions */}
-                            <div className="flex gap-2 mt-4">
-                              {!isAnswered && (
-                                <button
-                                  onClick={(e) => openTestimony(p, e)}
-                                  className="bj-chip font-sans text-xs px-3 py-1.5 rounded-lg flex-1 flex items-center justify-center gap-1.5"
+                              {/* Testimony block */}
+                              {isAnswered && p.testimony && (
+                                <div
+                                  className="mt-3 px-4 py-3 rounded-xl"
                                   style={{
-                                    background: "var(--bj-gold-tint)",
-                                    color: "var(--bj-gold-deep)",
-                                    border: "1px solid var(--bj-gold-soft)",
+                                    background: "var(--bj-sage-tint)",
+                                    border: "1px solid color-mix(in oklch, var(--bj-sage) 25%, transparent)",
                                   }}
                                 >
-                                  <CheckCircle2 size={11} /> Mark answered
-                                </button>
+                                  <p
+                                    className="font-sans text-[10px] uppercase tracking-widest mb-1"
+                                    style={{ color: "var(--bj-sage)" }}
+                                  >
+                                    Testimony
+                                  </p>
+                                  <p
+                                    className="font-display italic text-sm leading-relaxed"
+                                    style={{ color: "var(--bj-ink2)", fontWeight: 300 }}
+                                  >
+                                    {p.testimony}
+                                  </p>
+                                </div>
                               )}
-                              <button
-                                onClick={(e) => openEdit(p, e)}
-                                className="bj-chip font-sans text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5"
-                                style={{
-                                  color: "var(--bj-ink3)",
-                                  border: "1px solid var(--bj-line-soft)",
-                                }}
-                              >
-                                <Pencil size={11} /> Edit
-                              </button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </motion.div>
-                );
-              })}
+
+                              {/* Actions row — all on mobile, no hover needed */}
+                              <div className="flex flex-wrap gap-2 mt-4">
+                                {!isAnswered && (
+                                  <button
+                                    onClick={(e) => openTestimony(p, e)}
+                                    className="bj-chip font-sans text-xs px-3 py-2.5 rounded-xl flex-1 flex items-center justify-center gap-1.5 min-h-[40px]"
+                                    style={{
+                                      background: "var(--bj-gold-tint)",
+                                      color: "var(--bj-gold-deep)",
+                                      border: "1px solid var(--bj-gold-soft)",
+                                    }}
+                                  >
+                                    <CheckCircle2 size={12} /> Mark answered
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => openEdit(p, e)}
+                                  className="bj-chip font-sans text-xs px-3 py-2.5 rounded-xl flex items-center gap-1.5 min-h-[40px]"
+                                  style={{
+                                    color: "var(--bj-ink3)",
+                                    border: "1px solid var(--bj-line-soft)",
+                                  }}
+                                >
+                                  <Pencil size={12} /> Edit
+                                </button>
+                                <button
+                                  onClick={(e) => handleDelete(p, e)}
+                                  className="bj-chip font-sans text-xs px-3 py-2.5 rounded-xl flex items-center gap-1.5 min-h-[40px]"
+                                  style={{
+                                    color: "var(--bj-ember)",
+                                    border: "1px solid color-mix(in oklch, var(--bj-ember) 25%, transparent)",
+                                    background: "color-mix(in oklch, var(--bj-ember) 8%, transparent)",
+                                  }}
+                                >
+                                  <Trash2 size={12} /> Delete
+                                </button>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </motion.div>
+                  );
+                })
+              )}
             </AnimatePresence>
           </div>
         )}
       </div>
 
-      {/* Dialogs */}
+      {/* Edit dialog (bottom sheet) */}
       <PrayerDialog
-        open={prayerDialogOpen}
+        open={editDialogOpen}
         prayer={editTarget}
-        onClose={() => setPrayerDialogOpen(false)}
-        onSave={handleSavePrayer}
+        onClose={() => setEditDialogOpen(false)}
+        onSave={handleSaveEdit}
       />
+
+      {/* Testimony bottom sheet */}
       <TestimonyDialog
-        open={testimonyDialogOpen}
+        open={testimonyOpen}
         prayer={testimonyTarget}
-        onClose={() => setTestimonyDialogOpen(false)}
+        onClose={() => setTestimonyOpen(false)}
         onConfirm={handleMarkAnswered}
       />
     </>
