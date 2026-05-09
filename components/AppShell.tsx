@@ -7,14 +7,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, NotebookPen, BookOpen, HeartHandshake,
   Compass, Network, Search, Plus, Bell, Moon, Sun,
-  ChevronDown, Tag, Folder, Settings, Mic, LogOut,
-  Flame, Palette,
+  Settings, Mic, LogOut, Flame, Palette,
 } from "lucide-react";
 import { useThemeStore } from "@/store/theme.store";
 import { useFontStore } from "@/store/font.store";
 import { useAuth } from "@/hooks/useAuth";
 import { signOutUser } from "@/services/auth.service";
-import { collections, tags, streak } from "@/lib/mock-data";
+import { streak } from "@/lib/mock-data";
 import type { ThemeId } from "@/lib/themes";
 import { fontPairs } from "@/lib/fonts";
 import type { FontPairId } from "@/lib/fonts";
@@ -59,7 +58,6 @@ export function AppShell({ children, rightRail }: AppShellProps) {
 
   const [showProfile, setShowProfile] = useState(false);
   const [showAppearance, setShowAppearance] = useState(false);
-  const [libraryOpen, setLibraryOpen] = useState(true);
   const appearanceRef = useRef<HTMLDivElement>(null);
 
   const isDark = themeId === "midnight";
@@ -156,59 +154,34 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           })}
         </nav>
 
-        {/* Library */}
-        <div className="px-2 py-2 border-b flex-1 overflow-y-auto" style={{ borderColor: "var(--bj-line-soft)" }}>
-          <button
-            className="bj-btn-ghost flex items-center gap-1.5 w-full px-3 py-1.5 rounded-lg mb-1"
-            onClick={() => setLibraryOpen(!libraryOpen)}
-          >
-            <Folder size={11} style={{ color: "var(--bj-ink4)" }} />
-            <span className="text-[10px] uppercase tracking-widest font-medium flex-1 text-left" style={{ color: "var(--bj-ink4)" }}>Library</span>
-            <motion.div animate={{ rotate: libraryOpen ? 0 : -90 }} transition={{ duration: 0.18 }}>
-              <ChevronDown size={11} style={{ color: "var(--bj-ink4)" }} />
-            </motion.div>
-          </button>
-
-          <AnimatePresence initial={false}>
-            {libraryOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
+        {/* Shortcuts */}
+        <div className="px-2 py-3 border-b flex-1 overflow-y-auto" style={{ borderColor: "var(--bj-line-soft)" }}>
+          <p className="px-3 mb-2 text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--bj-ink4)" }}>
+            Shortcuts
+          </p>
+          {[
+            { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", desc: "Today's overview" },
+            { href: "/bible",     icon: BookOpen,        label: "Bible",     desc: "Read & highlight" },
+            { href: "/prayer",    icon: HeartHandshake,  label: "Prayer",    desc: "Your prayer journal" },
+          ].map(({ href, icon: Icon, label, desc }) => (
+            <Link
+              key={href}
+              href={href}
+              className="bj-nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5"
+              style={{ color: "var(--bj-ink2)" }}
+            >
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: "var(--bj-bg-soft)" }}
               >
-                {collections.map((c) => (
-                  <button
-                    key={c.id}
-                    className="bj-list-row flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-[13px]"
-                    style={{ color: "var(--bj-ink2)" }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.color ?? "var(--bj-line)" }} />
-                    <span className="flex-1 text-left truncate">{c.label}</span>
-                    <span style={{ fontSize: 10, color: "var(--bj-ink4)" }}>{c.count}</span>
-                  </button>
-                ))}
-
-                <div className="flex flex-wrap gap-1 px-3 pt-2 pb-1">
-                  {tags.map((t) => (
-                    <button
-                      key={t.id}
-                      className="bj-chip px-2 py-0.5 rounded-full"
-                      style={{
-                        fontSize: 10,
-                        background: "var(--bj-gold-tint)",
-                        color: "var(--bj-gold-deep)",
-                        border: "1px solid var(--bj-gold-soft)",
-                      }}
-                    >
-                      #{t.label}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <Icon size={13} style={{ color: "var(--bj-ink3)" }} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-sans text-[13px] font-medium leading-none mb-0.5" style={{ color: "var(--bj-ink)" }}>{label}</p>
+                <p className="font-sans text-[11px] leading-none" style={{ color: "var(--bj-ink4)" }}>{desc}</p>
+              </div>
+            </Link>
+          ))}
         </div>
 
         {/* Streak */}
