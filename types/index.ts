@@ -80,6 +80,33 @@ export interface ProclamationFolder {
   updatedAt: Date;
 }
 
+export interface SermonRef {
+  id: string;
+  book: string;
+  chapter: number;
+  verse?: number;
+  endVerse?: number;
+  text: string;
+  note: string;
+  version: string;
+  addedAt: string; // ISO date string
+}
+
+export interface Sermon {
+  id: string;
+  userId: string;
+  title: string;
+  speaker: string;
+  church: string;
+  videoUrl: string;
+  videoId: string;
+  content: string; // TipTap JSON
+  references: SermonRef[];
+  sermonDate: string; // YYYY-MM-DD
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface ProclamationEntry {
   id: string;
   userId: string;

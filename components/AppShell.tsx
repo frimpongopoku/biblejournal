@@ -6,8 +6,8 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, NotebookPen, BookOpen, HeartHandshake,
-  Megaphone, Compass, Network, Search, Plus, Bell, Moon, Sun,
-  Settings, Mic, LogOut, Flame, Palette,
+  Megaphone, Mic, Compass, Network, Search, Plus, Bell, Moon, Sun,
+  Settings, LogOut, Flame, Palette,
 } from "lucide-react";
 import { useThemeStore } from "@/store/theme.store";
 import { useFontStore } from "@/store/font.store";
@@ -23,6 +23,7 @@ const navItems = [
   { href: "/journal",        label: "Journal",         icon: NotebookPen },
   { href: "/bible",          label: "Bible",           icon: BookOpen },
   { href: "/prayer",         label: "Prayer",          icon: HeartHandshake },
+  { href: "/sermons",        label: "Sermons",         icon: Mic },
   { href: "/proclamations",  label: "Proclamations",   icon: Megaphone },
   // { href: "/research", label: "Research", icon: Compass },
   // { href: "/graph", label: "Graph", icon: Network },
@@ -439,7 +440,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
         {navItems.slice(0, 5).map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
-          const shortLabel: Record<string, string> = { Proclamations: "Declare" };
+          const shortLabel: Record<string, string> = { Proclamations: "Declare", Sermons: "Sermons" };
           return (
             <Link
               key={item.href}
