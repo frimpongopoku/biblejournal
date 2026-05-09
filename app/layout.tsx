@@ -25,7 +25,6 @@ const ebGaramond = EB_Garamond({ variable: "--font-eb-garamond", subsets: ["lati
 export const metadata: Metadata = {
   title: "BibJournal — Your Spiritual Study Space",
   description: "A peaceful, intelligent space to read scripture, write reflections, track prayers, and connect ideas.",
-  icons: { icon: "/favicon.ico" },
 };
 
 const fontVars = [
