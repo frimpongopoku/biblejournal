@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { AppShell } from "@/components/AppShell";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen, MessageSquare, Search, FlaskConical,
@@ -596,8 +595,7 @@ export default function ResearchPage() {
   const [tab, setTab] = useState<Tab>("compare");
 
   return (
-    <AppShell>
-      <div className="px-4 md:px-8 lg:px-12 py-8 max-w-3xl mx-auto">
+    <div className="px-4 md:px-8 lg:px-12 py-8 max-w-3xl mx-auto overflow-y-auto h-full">
 
         {/* Header */}
         <div className="mb-8">
@@ -658,6 +656,5 @@ export default function ResearchPage() {
           </motion.div>
         </AnimatePresence>
       </div>
-    </AppShell>
   );
 }
