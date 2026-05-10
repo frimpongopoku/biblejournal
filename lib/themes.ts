@@ -1,4 +1,4 @@
-export type ThemeId = "warm" | "slate" | "forest" | "plum" | "midnight";
+export type ThemeId = "warm" | "slate" | "forest" | "plum" | "midnight" | "dusk";
 
 export interface Theme {
   id: ThemeId;
@@ -121,6 +121,32 @@ export const themes: Theme[] = [
       "--bj-sage": "oklch(60% 0.08 152)",
       "--bj-sage-tint": "oklch(15% 0.025 150)",
       "--bj-ember": "oklch(64% 0.15 38)",
+    },
+  },
+  {
+    id: "dusk",
+    label: "Dusk",
+    isDark: true,
+    vars: {
+      // Deep slate-blue charcoal — not black, not warm. Inspired by the
+      // colour of the sky 20 minutes after sunset: dark but full of depth.
+      // Designed for long reading and writing sessions.
+      "--bj-bg":        "oklch(21% 0.018 252)",  // Dark slate — spacious, not claustrophobic
+      "--bj-bg-soft":   "oklch(25% 0.022 254)",  // Input fields, soft cards
+      "--bj-bg-panel":  "oklch(18% 0.015 250)",  // Sidebar, panels
+      "--bj-ink":       "oklch(91% 0.007 240)",  // Cool near-white — readable without eye strain
+      "--bj-ink2":      "oklch(74% 0.010 242)",  // Secondary — comfortable mid-gray
+      "--bj-ink3":      "oklch(57% 0.009 244)",  // Muted labels
+      "--bj-ink4":      "oklch(42% 0.009 246)",  // Placeholders, very muted
+      "--bj-line":      "oklch(30% 0.018 250)",  // Borders, dividers
+      "--bj-line-soft": "oklch(24% 0.014 248)",  // Subtle separators
+      "--bj-gold":      "oklch(72% 0.11 76)",    // Warm gold pops beautifully on dark slate
+      "--bj-gold-deep": "oklch(80% 0.12 78)",    // Brighter for dark bg — links, active states
+      "--bj-gold-soft": "oklch(46% 0.07 74)",    // Subtle gold for borders
+      "--bj-gold-tint": "oklch(24% 0.038 76)",   // Very subtle gold bg for highlights
+      "--bj-sage":      "oklch(62% 0.09 152)",
+      "--bj-sage-tint": "oklch(20% 0.028 150)",
+      "--bj-ember":     "oklch(66% 0.16 38)",
     },
   },
 ];

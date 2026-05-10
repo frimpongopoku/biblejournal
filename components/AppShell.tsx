@@ -40,6 +40,7 @@ const THEME_COLORS: Record<ThemeId, string> = {
   forest: "#6E9E8A",
   plum: "#B07BAC",
   midnight: "#4A5080",
+  dusk: "#5B6E9E",
 };
 
 const FONT_FAMILY: Record<string, string> = {
@@ -115,10 +116,11 @@ export function AppShell({ children, rightRail }: AppShellProps) {
     return () => window.removeEventListener("keydown", handler);
   }, [router]);
 
-  const isDark = themeId === "midnight";
+  const isDark = themeId === "midnight" || themeId === "dusk";
 
   function toggleTheme() {
-    setTheme(isDark ? "warm" : "midnight");
+    // Toggle uses Dusk (not Midnight) as the dark default — easier on the eyes
+    setTheme(isDark ? "warm" : "dusk");
   }
 
   useEffect(() => {
@@ -136,6 +138,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
     { id: "slate", label: "Slate" },
     { id: "forest", label: "Forest" },
     { id: "plum", label: "Plum" },
+    { id: "dusk", label: "Dusk" },
     { id: "midnight", label: "Midnight" },
   ];
 
@@ -412,6 +415,28 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                   className="absolute bottom-full left-0 right-0 mb-1.5 rounded-xl overflow-hidden border"
                   style={{ background: "var(--bj-bg-panel)", borderColor: "var(--bj-line)", boxShadow: "0 8px 24px color-mix(in oklch, var(--bj-ink) 12%, transparent)" }}
                 >
+                  {/* Account info */}
+                  <div className="px-4 py-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
+                    <div className="flex items-center gap-3">
+                      {user?.photoURL ? (
+                        <img src={user.photoURL} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center font-semibold text-sm"
+                          style={{ background: "var(--bj-gold-soft)", color: "var(--bj-gold-deep)" }}>
+                          {user?.displayName?.[0] ?? user?.email?.[0]?.toUpperCase() ?? "U"}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-sans text-sm font-medium truncate" style={{ color: "var(--bj-ink)" }}>
+                          {user?.displayName ?? "Account"}
+                        </p>
+                        <p className="font-sans text-xs truncate" style={{ color: "var(--bj-ink4)" }}>
+                          {user?.email ?? "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Sign out */}
                   <button
                     onClick={() => signOutUser()}
                     className="bj-btn-ghost flex items-center gap-2 w-full px-4 py-3 text-xs"
@@ -539,12 +564,6 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           <span className="text-[9px] font-medium">More</span>
         </button>
 
-        {/* Version — mobile nav */}
-        <div className="flex flex-col items-center justify-center py-1 px-2 min-w-0">
-          <span className="font-sans leading-none" style={{ fontSize: 8, color: "var(--bj-ink4)", letterSpacing: "0.05em" }}>
-            v{pkg.version}
-          </span>
-        </div>
       </nav>
 
       {/* ── Mobile Sidebar Drawer ─────────────────────── */}
@@ -577,16 +596,37 @@ export function AppShell({ children, rightRail }: AppShellProps) {
               transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.28 }}
             >
               {/* Drawer header */}
-              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--bj-gold)", boxShadow: "0 2px 8px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" />
-                  </svg>
+              <div className="px-4 pt-4 pb-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--bj-gold)", boxShadow: "0 2px 8px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" />
+                    </svg>
+                  </div>
+                  <span className="font-display text-sm font-medium flex-1" style={{ color: "var(--bj-ink)", letterSpacing: "0.03em" }}>BibJournal</span>
+                  <button onClick={() => setShowDrawer(false)} className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
+                    <X size={14} />
+                  </button>
                 </div>
-                <span className="font-display text-sm font-medium flex-1" style={{ color: "var(--bj-ink)", letterSpacing: "0.03em" }}>BibJournal</span>
-                <button onClick={() => setShowDrawer(false)} className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
-                  <X size={14} />
-                </button>
+                {/* Account info */}
+                <div className="flex items-center gap-3 px-1">
+                  {user?.photoURL ? (
+                    <img src={user.photoURL} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-semibold"
+                      style={{ fontSize: 13, background: "var(--bj-gold-soft)", color: "var(--bj-gold-deep)" }}>
+                      {user?.displayName?.[0] ?? user?.email?.[0]?.toUpperCase() ?? "U"}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-sans text-sm font-medium truncate" style={{ color: "var(--bj-ink)" }}>
+                      {user?.displayName ?? "Account"}
+                    </p>
+                    <p className="font-sans text-xs truncate" style={{ color: "var(--bj-ink4)" }}>
+                      {user?.email ?? "—"}
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Nav items */}

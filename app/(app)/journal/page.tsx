@@ -591,8 +591,8 @@ export default function JournalPage() {
       {/* Mobile: full-screen list when no entry selected; hidden when editor open */}
       {/* Desktop: always visible 300px sidebar */}
       <div
-        className={`${viewMode === "table" ? "hidden" : selectedId ? "hidden md:flex" : "flex"} w-full flex-col border-r h-full overflow-hidden shrink-0`}
-        style={{ maxWidth: listCompact ? 220 : 300, minWidth: listCompact ? 220 : 300, borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)", transition: "min-width 0.2s ease, max-width 0.2s ease" }}
+        className={`${viewMode === "table" ? "hidden" : selectedId ? "hidden md:flex" : "flex"} w-full ${listCompact ? "md:w-[220px]" : "md:w-[300px]"} flex-col border-r h-full overflow-hidden shrink-0`}
+        style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)", transition: "width 0.2s ease" }}
       >
         {/* Header */}
         <div className="px-4 pt-5 pb-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
