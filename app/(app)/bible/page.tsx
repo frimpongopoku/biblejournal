@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Highlighter, BookMarked, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, Highlighter, BookMarked } from "lucide-react";
 import { BookPickerSheet } from "@/components/bible/BookPickerSheet";
 import { QuickRefInput } from "@/components/bible/QuickRefInput";
 import { PROTESTANT_BOOKS, CHAPTER_COUNTS } from "@/lib/bible-books";
@@ -168,10 +168,6 @@ export default function BiblePage() {
               ))}
             </div>
 
-            <div className="h-4 w-px shrink-0" style={{ background: "var(--bj-line-soft)" }} />
-            <button className="bj-btn-icon p-1.5 rounded-lg shrink-0" style={{ color: "var(--bj-ink3)" }}>
-              <SlidersHorizontal size={15} />
-            </button>
           </div>
 
           {/* ── Mobile search row ────────────────── */}

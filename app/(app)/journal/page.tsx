@@ -37,6 +37,82 @@ function extractExcerpt(content: string, maxLen = 110): string {
   }
 }
 
+// ── Delete confirmation modal ─────────────────────────────
+
+function DeleteConfirmModal({ entry, onConfirm, onCancel }: {
+  entry: JournalEntry;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) onConfirm();
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onConfirm, onCancel]);
+
+  return (
+    <>
+      <motion.div key="del-bd" className="fixed inset-0 z-50"
+        style={{ background: "color-mix(in oklch, var(--bj-ink) 40%, transparent)", backdropFilter: "blur(3px)" }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        onClick={onCancel} />
+
+      <motion.div key="del-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ pointerEvents: "none" }}>
+        <motion.div
+          className="w-full rounded-2xl overflow-hidden"
+          style={{
+            maxWidth: 380, pointerEvents: "auto",
+            background: "var(--bj-bg-panel)",
+            border: "1px solid var(--bj-line)",
+            boxShadow: "0 24px 60px color-mix(in oklch, var(--bj-ink) 22%, transparent)",
+          }}
+          initial={{ opacity: 0, scale: 0.94, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.94, y: 10 }}
+          transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.2 }}
+        >
+          <div className="px-6 pt-6 pb-5">
+            {/* Icon */}
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
+              style={{ background: "color-mix(in oklch, var(--bj-ember) 12%, transparent)" }}>
+              <Trash2 size={18} style={{ color: "var(--bj-ember)" }} />
+            </div>
+
+            <h2 className="font-display text-xl mb-1" style={{ color: "var(--bj-ink)", fontWeight: 400 }}>
+              Delete this entry?
+            </h2>
+            <p className="font-sans text-sm mb-1" style={{ color: "var(--bj-ink2)", lineHeight: 1.6 }}>
+              <span style={{ fontWeight: 500 }}>{entry.title || "Untitled"}</span>
+            </p>
+            <p className="font-sans text-sm" style={{ color: "var(--bj-ink4)", lineHeight: 1.6 }}>
+              This can&apos;t be undone. All writing, tags, and feelings for this entry will be permanently deleted.
+            </p>
+          </div>
+
+          <div className="flex gap-2 px-6 pb-6">
+            <button onClick={onCancel}
+              className="bj-btn-ghost flex-1 font-sans text-sm py-2.5 rounded-xl"
+              style={{ color: "var(--bj-ink3)", border: "1px solid var(--bj-line-soft)" }}>
+              Cancel
+            </button>
+            <button onClick={onConfirm}
+              className="flex-1 font-sans text-sm py-2.5 rounded-xl font-medium transition-all duration-150"
+              style={{ background: "var(--bj-ember)", color: "white" }}
+              onMouseEnter={(e) => { e.currentTarget.style.filter = "brightness(1.1)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.filter = ""; e.currentTarget.style.transform = ""; }}>
+              Delete forever
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </>
+  );
+}
+
 // ── Feeling data ──────────────────────────────────────────
 
 const FEELINGS = [
@@ -311,6 +387,7 @@ export default function JournalPage() {
     typeof window !== "undefined" && localStorage.getItem("bj-journal-compact") === "true"
   );
   const [viewMode, setViewMode] = useState<"list" | "table">("list");
+  const [deleteTarget, setDeleteTarget] = useState<JournalEntry | null>(null);
 
   function toggleListCompact() {
     const next = !listCompact;
@@ -397,8 +474,32 @@ export default function JournalPage() {
     setCreating(false);
   };
 
-  const handleDelete = async () => {
+  function entryHasContent(entry: JournalEntry): boolean {
+    if (entry.title.trim()) return true;
+    try {
+      const doc = JSON.parse(entry.content);
+      const parts: string[] = [];
+      const walk = (node: { text?: string; content?: typeof node[] }) => {
+        if (node.text) parts.push(node.text);
+        if (node.content) node.content.forEach(walk);
+      };
+      walk(doc);
+      return parts.join("").trim().length > 0;
+    } catch { return false; }
+  }
+
+  function handleDeleteClick() {
+    if (!selected) return;
+    if (entryHasContent(selected)) {
+      setDeleteTarget(selected); // show confirmation
+    } else {
+      confirmDelete(); // empty entry — delete immediately
+    }
+  }
+
+  const confirmDelete = async () => {
     if (!user || !selectedId) return;
+    setDeleteTarget(null);
     await deleteEntry(user.uid, selectedId);
     setSelectedId(entries.find((e) => e.id !== selectedId)?.id ?? null);
   };
@@ -666,7 +767,7 @@ export default function JournalPage() {
                   </button>
                   {/* Delete */}
                   <button
-                    onClick={handleDelete}
+                    onClick={handleDeleteClick}
                     className="bj-btn-action w-7 h-7 rounded flex items-center justify-center"
                     data-danger
                     style={{ color: "var(--bj-ink4)" }}
@@ -826,6 +927,16 @@ export default function JournalPage() {
     {/* ── Floating windows ─────────────────────────── */}
     <AnimatePresence>
       {bibleOpen && <FloatingBible onClose={() => setBibleOpen(false)} />}
+
+      <AnimatePresence>
+        {deleteTarget && (
+          <DeleteConfirmModal
+            entry={deleteTarget}
+            onConfirm={confirmDelete}
+            onCancel={() => setDeleteTarget(null)}
+          />
+        )}
+      </AnimatePresence>
     </AnimatePresence>
     <AnimatePresence>
       {askOpen && <FloatingAsk onClose={() => setAskOpen(false)} />}

@@ -200,7 +200,7 @@ export default function PrayerPage() {
   return (
     <>
       <div
-        className="min-h-full px-5 md:px-14 py-8 md:py-10"
+        className="min-h-full px-4 md:px-14 py-8 md:py-10"
         style={{ background: "var(--bj-bg)", maxWidth: 800, margin: "0 auto" }}
       >
         {/* Header */}
