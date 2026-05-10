@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ShortcutsPanel } from "@/components/ShortcutsPanel";
+import pkg from "@/version.json";
 import { useThemeStore } from "@/store/theme.store";
 import { useFontStore } from "@/store/font.store";
 import { useAuth } from "@/hooks/useAuth";
@@ -424,6 +425,22 @@ export function AppShell({ children, rightRail }: AppShellProps) {
             </AnimatePresence>
           </div>
         </div>
+
+        {/* Version badge — desktop sidebar */}
+        {isCompact ? (
+          <div className="px-1 py-2 flex justify-center">
+            <span className="font-sans text-[9px] font-semibold tracking-widest uppercase"
+              style={{ color: "var(--bj-ink4)" }} title={`v${pkg.version} · ${pkg.codename}`}>
+              v{pkg.version.split(".")[0]}
+            </span>
+          </div>
+        ) : (
+          <div className="px-4 py-2 flex items-center gap-2">
+            <span className="font-sans text-[10px]" style={{ color: "var(--bj-ink4)" }}>v{pkg.version}</span>
+            <span style={{ color: "var(--bj-line)" }}>·</span>
+            <span className="font-sans text-[10px] italic" style={{ color: "var(--bj-ink4)" }}>{pkg.codename}</span>
+          </div>
+        )}
       </aside>
 
       {/* ── Main + Right ─────────────────────────────── */}
@@ -521,6 +538,13 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           <Menu size={19} />
           <span className="text-[9px] font-medium">More</span>
         </button>
+
+        {/* Version — mobile nav */}
+        <div className="flex flex-col items-center justify-center py-1 px-2 min-w-0">
+          <span className="font-sans leading-none" style={{ fontSize: 8, color: "var(--bj-ink4)", letterSpacing: "0.05em" }}>
+            v{pkg.version}
+          </span>
+        </div>
       </nav>
 
       {/* ── Mobile Sidebar Drawer ─────────────────────── */}
@@ -633,6 +657,15 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                   <LogOut size={13} />
                   <span>Sign out</span>
                 </button>
+              </div>
+
+              {/* Version — mobile drawer footer */}
+              <div className="px-5 py-3 border-t flex items-center gap-2" style={{ borderColor: "var(--bj-line-soft)" }}>
+                <span className="font-sans text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: "var(--bj-bg-soft)", color: "var(--bj-ink4)", border: "1px solid var(--bj-line-soft)" }}>
+                  v{pkg.version}
+                </span>
+                <span className="font-sans text-[11px] italic" style={{ color: "var(--bj-ink4)" }}>{pkg.codename}</span>
               </div>
             </motion.div>
           </>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { signInWithGoogle } from "@/services/auth.service";
+import pkg from "@/version.json";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -173,16 +174,21 @@ export default function LoginPage() {
           </blockquote>
         </motion.div>
 
-        {/* Tagline */}
-        <motion.p
+        {/* Tagline + version */}
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.75, duration: 0.8 }}
-          className="relative z-10 font-sans text-sm"
-          style={{ color: "var(--bj-ink3)", letterSpacing: "0.01em" }}
+          className="relative z-10 flex items-end justify-between gap-4"
         >
-          Your sacred space for scripture &amp; reflection
-        </motion.p>
+          <p className="font-sans text-sm" style={{ color: "var(--bj-ink3)", letterSpacing: "0.01em" }}>
+            Your sacred space for scripture &amp; reflection
+          </p>
+          <span className="font-sans text-xs shrink-0 px-2 py-0.5 rounded-full"
+            style={{ background: "color-mix(in oklch, var(--bj-gold) 12%, transparent)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)", letterSpacing: "0.04em" }}>
+            v{pkg.version}
+          </span>
+        </motion.div>
       </motion.div>
 
       {/* ── Right: Sign-in Panel ──────────────────────────────── */}
@@ -304,7 +310,7 @@ export default function LoginPage() {
             and Privacy Policy.
           </motion.p>
 
-          {/* Bottom ornament */}
+          {/* Bottom ornament + version */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -312,12 +318,18 @@ export default function LoginPage() {
             className="flex items-center justify-center gap-2 mt-12"
           >
             <div className="h-px w-6" style={{ background: "var(--bj-line-soft)" }} />
-            <div
-              className="w-1 h-1 rounded-full"
-              style={{ background: "var(--bj-gold-soft)" }}
-            />
+            <div className="w-1 h-1 rounded-full" style={{ background: "var(--bj-gold-soft)" }} />
             <div className="h-px w-6" style={{ background: "var(--bj-line-soft)" }} />
           </motion.div>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1, duration: 0.6 }}
+            className="mt-4 text-center font-sans"
+            style={{ fontSize: 11, color: "var(--bj-ink4)", letterSpacing: "0.06em" }}
+          >
+            v{pkg.version} · {pkg.codename}
+          </motion.p>
         </div>
       </motion.div>
     </div>
