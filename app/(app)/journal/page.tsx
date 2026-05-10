@@ -37,6 +37,65 @@ function extractExcerpt(content: string, maxLen = 110): string {
   }
 }
 
+// ── Tag editor ────────────────────────────────────────────
+
+function TagEditor({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+  const [input, setInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function commit(raw: string) {
+    const tag = raw.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    if (tag && !tags.includes(tag)) onChange([...tags, tag]);
+    setInput("");
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === "," || e.key === " ") {
+      e.preventDefault();
+      commit(input);
+    } else if (e.key === "Backspace" && !input && tags.length > 0) {
+      onChange(tags.slice(0, -1));
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 cursor-text" onClick={() => inputRef.current?.focus()}
+      style={{ maxWidth: 680 }}>
+      {tags.map((tag) => (
+        <span key={tag} className="flex items-center gap-1 px-2 py-0.5 rounded-full font-sans"
+          style={{ fontSize: 12, background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}>
+          #{tag}
+          <button
+            onMouseDown={(e) => { e.preventDefault(); onChange(tags.filter((t) => t !== tag)); }}
+            className="flex items-center justify-center rounded-full ml-0.5"
+            style={{ color: "var(--bj-gold-deep)", opacity: 0.6, lineHeight: 1 }}
+          >
+            <X size={9} />
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={() => { if (input.trim()) commit(input); }}
+        placeholder={tags.length === 0 ? "Add tags…" : "+tag"}
+        className="bg-transparent outline-none font-sans text-xs"
+        style={{
+          color: "var(--bj-ink4)",
+          caretColor: "var(--bj-gold)",
+          width: input ? `${Math.max(48, input.length * 8)}px` : tags.length === 0 ? "72px" : "42px",
+          minWidth: 32,
+          transition: "width 0.1s ease",
+        }}
+        autoComplete="off"
+        spellCheck={false}
+      />
+    </div>
+  );
+}
+
 // ── Delete confirmation modal ─────────────────────────────
 
 function DeleteConfirmModal({ entry, onConfirm, onCancel }: {
@@ -519,6 +578,11 @@ export default function JournalPage() {
     updateEntry(user.uid, selected.id, { feeling });
   };
 
+  const handleTagsChange = (tags: string[]) => {
+    if (!user || !selected) return;
+    updateEntry(user.uid, selected.id, { tags });
+  };
+
   return (
     <>
     <div className="flex h-full" style={{ background: "var(--bj-bg)" }}>
@@ -798,6 +862,11 @@ export default function JournalPage() {
                     maxWidth: 680,
                   }}
                 />
+
+                {/* Tags */}
+                <div className="mt-2.5">
+                  <TagEditor tags={selected.tags} onChange={handleTagsChange} />
+                </div>
               </div>
 
               {/* TipTap editor */}
