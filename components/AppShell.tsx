@@ -19,14 +19,13 @@ import { fontPairs } from "@/lib/fonts";
 import type { FontPairId } from "@/lib/fonts";
 
 const navItems = [
-  { href: "/dashboard",      label: "Today",          icon: LayoutDashboard },
-  { href: "/journal",        label: "Journal",         icon: NotebookPen },
-  { href: "/bible",          label: "Bible",           icon: BookOpen },
-  { href: "/prayer",         label: "Prayer",          icon: HeartHandshake },
-  { href: "/sermons",        label: "Sermons",         icon: Mic },
-  { href: "/proclamations",  label: "Proclamations",   icon: Megaphone },
-  // { href: "/research", label: "Research", icon: Compass },
-  // { href: "/graph", label: "Graph", icon: Network },
+  { href: "/dashboard",      label: "Today",           icon: LayoutDashboard },
+  { href: "/journal",        label: "Journal",          icon: NotebookPen },
+  { href: "/bible",          label: "Bible",            icon: BookOpen },
+  { href: "/prayer",         label: "Prayer",           icon: HeartHandshake },
+  { href: "/sermons",        label: "Sermons",          icon: Mic },
+  { href: "/proclamations",  label: "Proclamations",    icon: Megaphone },
+  { href: "/research",       label: "Research",         icon: Compass },
 ];
 
 const WEEK_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -168,9 +167,10 @@ export function AppShell({ children, rightRail }: AppShellProps) {
             Shortcuts
           </p>
           {[
-            { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", desc: "Today's overview" },
-            { href: "/bible",     icon: BookOpen,        label: "Bible",     desc: "Read & highlight" },
-            { href: "/prayer",    icon: HeartHandshake,  label: "Prayer",    desc: "Your prayer journal" },
+            { href: "/dashboard",     icon: LayoutDashboard, label: "Dashboard",     desc: "Today's overview" },
+            { href: "/bible",         icon: BookOpen,        label: "Bible",         desc: "Read & highlight" },
+            { href: "/prayer",        icon: HeartHandshake,  label: "Prayer",        desc: "Your prayer journal" },
+            { href: "/proclamations", icon: Megaphone,       label: "Proclamations", desc: "Declare what God says" },
           ].map(({ href, icon: Icon, label, desc }) => (
             <Link
               key={href}
@@ -543,9 +543,10 @@ export function AppShell({ children, rightRail }: AppShellProps) {
               <div className="px-2 py-3 border-b flex-1 overflow-y-auto" style={{ borderColor: "var(--bj-line-soft)" }}>
                 <p className="px-3 mb-2 text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--bj-ink4)" }}>Shortcuts</p>
                 {[
-                  { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", desc: "Today's overview" },
-                  { href: "/bible",     icon: BookOpen,        label: "Bible",     desc: "Read & highlight" },
-                  { href: "/prayer",    icon: HeartHandshake,  label: "Prayer",    desc: "Your prayer journal" },
+                  { href: "/dashboard",     icon: LayoutDashboard, label: "Dashboard",     desc: "Today's overview" },
+                  { href: "/bible",         icon: BookOpen,        label: "Bible",         desc: "Read & highlight" },
+                  { href: "/prayer",        icon: HeartHandshake,  label: "Prayer",        desc: "Your prayer journal" },
+                  { href: "/proclamations", icon: Megaphone,       label: "Proclamations", desc: "Declare what God says" },
                 ].map(({ href, icon: Icon, label, desc }) => (
                   <Link key={href} href={href} className="bj-nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5" style={{ color: "var(--bj-ink2)" }}>
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--bj-bg-soft)" }}>
