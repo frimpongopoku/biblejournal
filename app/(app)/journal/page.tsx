@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Pin, Star, Search, Plus, Trash2, ChevronLeft, List, X } from "lucide-react";
+import { FloatingBible, FloatingAsk, JournalFloatTriggers } from "@/components/journal/FloatingWindows";
 import { useJournalEntries } from "@/hooks/useJournalEntries";
 import { createEntry, updateEntry, deleteEntry } from "@/services/journal.service";
 import { useAuthStore } from "@/store/auth.store";
@@ -45,6 +46,8 @@ export default function JournalPage() {
   const [localTitle, setLocalTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [showEntrySheet, setShowEntrySheet] = useState(false);
+  const [bibleOpen, setBibleOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAutoSelected = useRef(false);
 
@@ -343,6 +346,12 @@ export default function JournalPage() {
                   >
                     <Trash2 size={13} />
                   </button>
+                  {/* Floating window triggers */}
+                  <JournalFloatTriggers
+                    bibleOpen={bibleOpen} askOpen={askOpen}
+                    onToggleBible={() => setBibleOpen((o) => !o)}
+                    onToggleAsk={() => setAskOpen((o) => !o)}
+                  />
                 </div>
 
                 {/* Editable title */}
@@ -483,6 +492,14 @@ export default function JournalPage() {
           </motion.div>
         </>
       )}
+    </AnimatePresence>
+
+    {/* ── Floating windows ─────────────────────────── */}
+    <AnimatePresence>
+      {bibleOpen && <FloatingBible onClose={() => setBibleOpen(false)} />}
+    </AnimatePresence>
+    <AnimatePresence>
+      {askOpen && <FloatingAsk onClose={() => setAskOpen(false)} />}
     </AnimatePresence>
     </>
   );
