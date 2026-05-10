@@ -35,7 +35,7 @@ const GROUPS: Group[] = [
     title: "Journal",
     shortcuts: [
       { keys: ["⌘", "⇧", "N"], desc: "New entry" },
-      { keys: ["⌘", "⇧", "B"], desc: "Toggle Bible panel" },
+      { keys: ["⌘", "⌥", "B"], desc: "Toggle Bible panel" },
       { keys: ["⌘", "⇧", "A"], desc: "Toggle Ask panel" },
     ],
   },

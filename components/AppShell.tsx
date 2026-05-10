@@ -436,9 +436,6 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           }}
         >
           <div className="flex-1" />
-          <button className="bj-btn-icon p-1.5 rounded-lg" style={{ color: "var(--bj-ink4)" }}>
-            <Bell size={14} />
-          </button>
           <button className="bj-btn-icon p-1.5 rounded-lg" style={{ color: "var(--bj-ink4)" }} onClick={toggleTheme}>
             {isDark ? <Sun size={14} /> : <Moon size={14} />}
           </button>

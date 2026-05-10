@@ -15,6 +15,7 @@ export interface JournalEntry {
   folderId: string | null;
   isPinned: boolean;
   isFavorite: boolean;
+  feeling?: string;
   scriptures: ScriptureRef[];
   createdAt: Date;
   updatedAt: Date;

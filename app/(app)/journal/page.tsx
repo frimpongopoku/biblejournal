@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pin, Star, Search, Plus, Trash2, ChevronLeft, List, X, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Pin, Star, Search, Plus, Trash2, ChevronLeft, List, X, PanelLeftClose, PanelLeftOpen, Table2, Smile } from "lucide-react";
 import { FloatingBible, FloatingAsk, JournalFloatTriggers } from "@/components/journal/FloatingWindows";
 import { useJournalEntries } from "@/hooks/useJournalEntries";
 import { createEntry, updateEntry, deleteEntry } from "@/services/journal.service";
@@ -37,6 +37,215 @@ function extractExcerpt(content: string, maxLen = 110): string {
   }
 }
 
+// ── Feeling data ──────────────────────────────────────────
+
+const FEELINGS = [
+  { emoji: "😊", label: "Grateful" },
+  { emoji: "🙏", label: "Prayerful" },
+  { emoji: "✨", label: "Inspired" },
+  { emoji: "😌", label: "Peaceful" },
+  { emoji: "🔥", label: "Excited" },
+  { emoji: "🤔", label: "Reflective" },
+  { emoji: "😔", label: "Heavy" },
+  { emoji: "😢", label: "Sad" },
+  { emoji: "😤", label: "Frustrated" },
+  { emoji: "💪", label: "Determined" },
+];
+
+function feelingByLabel(label?: string) {
+  return FEELINGS.find((f) => f.label === label);
+}
+
+// ── Feeling picker ────────────────────────────────────────
+
+function FeelingPicker({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const active = feelingByLabel(value);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title={active ? `Feeling: ${active.label}` : "Set feeling"}
+        className="bj-btn-action flex items-center gap-1 px-2 py-1 rounded-lg"
+        style={{
+          background: open || active ? "var(--bj-gold-tint)" : "transparent",
+          color: active ? "var(--bj-gold-deep)" : "var(--bj-ink4)",
+          border: `1px solid ${active ? "var(--bj-gold-soft)" : "transparent"}`,
+          fontSize: 13,
+          transition: "all 0.12s ease",
+        }}
+      >
+        {active ? <span>{active.emoji}</span> : <Smile size={13} />}
+        {active && <span className="font-sans text-xs hidden sm:inline">{active.label}</span>}
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 4 }}
+            transition={{ duration: 0.14 }}
+            className="absolute z-50 rounded-2xl overflow-hidden"
+            style={{
+              top: "calc(100% + 6px)", left: 0,
+              background: "var(--bj-bg-panel)",
+              border: "1px solid var(--bj-line)",
+              boxShadow: "0 8px 28px color-mix(in oklch, var(--bj-ink) 14%, transparent)",
+              minWidth: 200,
+            }}
+          >
+            <p className="px-3 pt-2.5 pb-1 font-sans text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--bj-ink4)" }}>
+              How are you feeling?
+            </p>
+            <div className="grid grid-cols-2 gap-px p-1.5">
+              {FEELINGS.map((f) => {
+                const isActive = value === f.label;
+                return (
+                  <button
+                    key={f.label}
+                    onClick={() => { onChange(isActive ? undefined : f.label); setOpen(false); }}
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-left"
+                    style={{
+                      background: isActive ? "var(--bj-gold-tint)" : "transparent",
+                      transition: "background 0.1s ease",
+                    }}
+                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--bj-bg-soft)"; }}
+                    onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <span style={{ fontSize: 16, lineHeight: 1 }}>{f.emoji}</span>
+                    <span className="font-sans text-xs" style={{ color: isActive ? "var(--bj-gold-deep)" : "var(--bj-ink2)", fontWeight: isActive ? 500 : 400 }}>
+                      {f.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {value && (
+              <button
+                onClick={() => { onChange(undefined); setOpen(false); }}
+                className="w-full text-center font-sans text-xs py-2 border-t"
+                style={{ color: "var(--bj-ink4)", borderColor: "var(--bj-line-soft)" }}
+              >
+                Clear feeling
+              </button>
+            )}
+            <div className="h-1" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Table view ────────────────────────────────────────────
+
+function TableView({ entries, onSelect }: { entries: JournalEntry[]; onSelect: (id: string) => void }) {
+  const [hovered, setHovered] = useState<string | null>(null);
+
+  if (entries.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 gap-2">
+        <p className="font-display italic text-xl" style={{ color: "var(--bj-ink4)", fontWeight: 300 }}>No entries match</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b" style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-soft)" }}>
+            {["Title", "Feeling", "Date", "Tags"].map((h) => (
+              <th key={h} className="text-left font-sans text-[10px] uppercase tracking-widest font-semibold px-4 py-2.5"
+                style={{ color: "var(--bj-ink4)", whiteSpace: "nowrap" }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((entry) => {
+            const feeling = feelingByLabel(entry.feeling);
+            const isHov = hovered === entry.id;
+            return (
+              <tr
+                key={entry.id}
+                onClick={() => onSelect(entry.id)}
+                onMouseEnter={() => setHovered(entry.id)}
+                onMouseLeave={() => setHovered(null)}
+                className="border-b cursor-pointer"
+                style={{
+                  borderColor: "var(--bj-line-soft)",
+                  background: isHov ? "var(--bj-bg-soft)" : "transparent",
+                  transition: "background 0.1s ease",
+                }}
+              >
+                {/* Title */}
+                <td className="px-4 py-3" style={{ maxWidth: 360 }}>
+                  <div className="flex items-center gap-2">
+                    {entry.isPinned && <Pin size={10} style={{ color: "var(--bj-gold)", flexShrink: 0 }} />}
+                    <span className="font-sans text-sm font-medium truncate" style={{ color: "var(--bj-ink)" }}>
+                      {entry.title || <span style={{ color: "var(--bj-ink4)", fontWeight: 400 }}>Untitled</span>}
+                    </span>
+                  </div>
+                  <p className="font-sans text-xs mt-0.5 truncate" style={{ color: "var(--bj-ink4)", maxWidth: 320 }}>
+                    {extractExcerpt(entry.content, 60)}
+                  </p>
+                </td>
+
+                {/* Feeling */}
+                <td className="px-4 py-3 whitespace-nowrap">
+                  {feeling ? (
+                    <span className="flex items-center gap-1.5">
+                      <span style={{ fontSize: 14 }}>{feeling.emoji}</span>
+                      <span className="font-sans text-xs" style={{ color: "var(--bj-ink3)" }}>{feeling.label}</span>
+                    </span>
+                  ) : (
+                    <span style={{ color: "var(--bj-line)" }}>—</span>
+                  )}
+                </td>
+
+                {/* Date */}
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>{formatDate(entry.updatedAt)}</span>
+                </td>
+
+                {/* Tags */}
+                <td className="px-4 py-3">
+                  <div className="flex gap-1 flex-wrap">
+                    {entry.tags.slice(0, 3).map((t) => (
+                      <span key={t} className="font-sans px-1.5 py-0.5 rounded-md"
+                        style={{ fontSize: 10, background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)" }}>
+                        #{t}
+                      </span>
+                    ))}
+                    {entry.tags.length > 3 && (
+                      <span className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>+{entry.tags.length - 3}</span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────
+
 export default function JournalPage() {
   const user = useAuthStore((s) => s.user);
   const { entries, loading } = useJournalEntries();
@@ -51,6 +260,7 @@ export default function JournalPage() {
   const [listCompact, setListCompact] = useState(() =>
     typeof window !== "undefined" && localStorage.getItem("bj-journal-compact") === "true"
   );
+  const [viewMode, setViewMode] = useState<"list" | "table">("list");
 
   function toggleListCompact() {
     const next = !listCompact;
@@ -62,10 +272,12 @@ export default function JournalPage() {
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
-      if (!mod || !e.shiftKey) return;
+      if (!mod) return;
+      // ⌘⌥B — Bible panel (changed from ⌘⇧B which conflicted with browser bookmark bar)
+      if (e.altKey && e.key.toLowerCase() === "b") { e.preventDefault(); setBibleOpen((o) => !o); return; }
+      if (!e.shiftKey) return;
       switch (e.key.toLowerCase()) {
         case "n": e.preventDefault(); handleNew(); break;
-        case "b": e.preventDefault(); setBibleOpen((o) => !o); break;
         case "a": e.preventDefault(); setAskOpen((o) => !o); break;
       }
     }
@@ -98,7 +310,9 @@ export default function JournalPage() {
       const q = search.toLowerCase();
       return (
         e.title.toLowerCase().includes(q) ||
-        extractExcerpt(e.content).toLowerCase().includes(q)
+        extractExcerpt(e.content).toLowerCase().includes(q) ||
+        (e.feeling ?? "").toLowerCase().includes(q) ||
+        e.tags.some((t) => t.toLowerCase().includes(q))
       );
     }
     return true;
@@ -149,6 +363,11 @@ export default function JournalPage() {
     updateEntry(user.uid, selected.id, { isFavorite: !selected.isFavorite });
   };
 
+  const handleFeelingChange = (feeling: string | undefined) => {
+    if (!user || !selected) return;
+    updateEntry(user.uid, selected.id, { feeling });
+  };
+
   return (
     <>
     <div className="flex h-full" style={{ background: "var(--bj-bg)" }}>
@@ -165,6 +384,12 @@ export default function JournalPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-display text-xl" style={{ color: "var(--bj-ink)", fontWeight: 500 }}>Journal</h2>
             <div className="flex items-center gap-1">
+              <button onClick={() => setViewMode((v) => v === "table" ? "list" : "table")}
+                title={viewMode === "table" ? "List view" : "Table view"}
+                className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{ color: viewMode === "table" ? "var(--bj-gold-deep)" : "var(--bj-ink4)", background: viewMode === "table" ? "var(--bj-gold-tint)" : "transparent" }}>
+                {viewMode === "table" ? <List size={13} /> : <Table2 size={13} />}
+              </button>
               <button onClick={toggleListCompact} title={listCompact ? "Expand list" : "Compact list"}
                 className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
                 {listCompact ? <PanelLeftOpen size={13} /> : <PanelLeftClose size={13} />}
@@ -255,6 +480,7 @@ export default function JournalPage() {
                       <p className="font-sans text-xs font-medium truncate flex-1" style={{ color: "var(--bj-ink)" }}>
                         {entry.title || <span style={{ color: "var(--bj-ink4)" }}>Untitled</span>}
                       </p>
+                      {entry.feeling && <span style={{ fontSize: 11 }} title={entry.feeling}>{feelingByLabel(entry.feeling)?.emoji}</span>}
                       <span className="font-sans shrink-0" style={{ fontSize: 10, color: "var(--bj-ink4)" }}>
                         {formatDate(entry.updatedAt)}
                       </span>
@@ -263,9 +489,10 @@ export default function JournalPage() {
                     <>
                       <div className="flex items-start gap-2 mb-1.5">
                         {entry.isPinned && <Pin size={11} className="mt-0.5 shrink-0" style={{ color: "var(--bj-gold)" }} />}
-                        <p className="font-sans text-sm font-medium leading-snug" style={{ color: "var(--bj-ink)" }}>
+                        <p className="font-sans text-sm font-medium leading-snug flex-1" style={{ color: "var(--bj-ink)" }}>
                           {entry.title || <span style={{ color: "var(--bj-ink4)" }}>Untitled</span>}
                         </p>
+                        {entry.feeling && <span style={{ fontSize: 13 }} title={entry.feeling}>{feelingByLabel(entry.feeling)?.emoji}</span>}
                       </div>
                       {excerpt && (
                         <p className="font-sans text-xs mb-2"
@@ -293,9 +520,33 @@ export default function JournalPage() {
         </div>
       </div>
 
+      {/* ── Table view (full-width, replaces editor) ────── */}
+      {viewMode === "table" && (
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden" style={{ background: "var(--bj-bg)" }}>
+          <div className="px-6 pt-5 pb-3 border-b shrink-0" style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-display text-xl" style={{ color: "var(--bj-ink)", fontWeight: 500 }}>
+                All Entries <span className="font-sans text-sm ml-2" style={{ color: "var(--bj-ink4)", fontStyle: "normal" }}>({filtered.length})</span>
+              </h2>
+              <button onClick={() => setViewMode("list")} className="flex items-center gap-1.5 font-sans text-xs px-3 py-1.5 rounded-lg"
+                style={{ background: "var(--bj-bg-soft)", color: "var(--bj-ink3)", border: "1px solid var(--bj-line-soft)" }}>
+                <List size={12} /> List view
+              </button>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl max-w-md" style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
+              <Search size={12} style={{ color: "var(--bj-ink4)" }} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by title, feeling, tag…"
+                className="bg-transparent outline-none font-sans text-xs flex-1" style={{ color: "var(--bj-ink)" }} />
+              {search && <button onClick={() => setSearch("")} className="bj-btn-icon" style={{ color: "var(--bj-ink4)" }}><X size={10} /></button>}
+            </div>
+          </div>
+          <TableView entries={filtered} onSelect={(id) => { setSelectedId(id); setViewMode("list"); }} />
+        </div>
+      )}
+
       {/* ── Entry Editor ────────────────────────────────── */}
       {/* Mobile: full-screen when entry selected; hidden otherwise */}
-      <div className={`${selectedId ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0 h-full overflow-hidden`}>
+      <div className={`${viewMode === "table" ? "hidden" : selectedId ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0 h-full overflow-hidden`}>
         <AnimatePresence mode="wait">
           {selected ? (
             <motion.div
@@ -343,6 +594,7 @@ export default function JournalPage() {
                   >
                     {formatDate(selected.updatedAt)}
                   </span>
+                  <FeelingPicker value={selected.feeling} onChange={handleFeelingChange} />
                   <div className="flex-1" />
                   {/* Pin */}
                   <button
