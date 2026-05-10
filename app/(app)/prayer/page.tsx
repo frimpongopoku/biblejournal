@@ -200,9 +200,10 @@ export default function PrayerPage() {
   return (
     <>
       <div
-        className="min-h-full px-4 md:px-14 py-8 md:py-10"
-        style={{ background: "var(--bj-bg)", maxWidth: 800, margin: "0 auto" }}
+        className="min-h-full w-full px-4 md:px-14 py-8 md:py-10"
+        style={{ background: "var(--bj-bg)" }}
       >
+        <div className="max-w-3xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -237,7 +238,7 @@ export default function PrayerPage() {
 
         {/* Tabs */}
         <div
-          className="flex gap-1 mb-7 p-1 rounded-xl w-fit"
+          className="flex gap-1 mb-7 p-1 rounded-xl w-full sm:w-fit"
           style={{ background: "var(--bj-bg-soft)" }}
         >
           {TABS.map((t) => (
@@ -245,7 +246,7 @@ export default function PrayerPage() {
               key={t}
               onClick={() => setTab(t)}
               data-active={tab === t || undefined}
-              className="bj-chip font-sans text-sm px-4 py-2 rounded-lg min-h-[38px]"
+              className="bj-chip font-sans text-sm px-4 py-2 rounded-lg min-h-[38px] flex-1 sm:flex-none"
               style={{
                 background: tab === t ? "var(--bj-bg-panel)" : "transparent",
                 color: tab === t ? "var(--bj-ink)" : "var(--bj-ink3)",
@@ -484,6 +485,7 @@ export default function PrayerPage() {
             </AnimatePresence>
           </div>
         )}
+        </div>{/* end max-w-3xl */}
       </div>
 
       {/* Edit dialog (bottom sheet) */}
