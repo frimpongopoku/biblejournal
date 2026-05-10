@@ -62,6 +62,7 @@ export interface ParsedRef {
   book: string;
   chapter: number;
   verse?: number;
+  verseEnd?: number;
 }
 
 export function parseRef(raw: string): ParsedRef | null {
@@ -69,21 +70,22 @@ export function parseRef(raw: string): ParsedRef | null {
   if (!s) return null;
 
   // Regex: optional leading digit (for "1 John", "2 Cor" etc),
-  // book name, then chapter, then optional :verse
-  const m = s.match(/^(\d\s*)?([a-z\s.]+?)\s+(\d+)(?::(\d+))?$/i);
+  // book name, then chapter, then optional :verse or :verse-verseEnd
+  const m = s.match(/^(\d\s*)?([a-z\s.]+?)\s+(\d+)(?::(\d+)(?:-(\d+))?)?$/i);
   if (!m) return null;
 
   const prefix = (m[1] ?? "").replace(/\s/, "");
   const rawBook = (prefix ? `${prefix} ` : "") + m[2].trim();
   const chapter = parseInt(m[3], 10);
   const verse = m[4] ? parseInt(m[4], 10) : undefined;
+  const verseEnd = m[5] ? parseInt(m[5], 10) : undefined;
 
   if (isNaN(chapter) || chapter < 1) return null;
 
   const book = resolveBook(rawBook);
   if (!book) return null;
 
-  return { book, chapter, verse };
+  return { book, chapter, verse, ...(verseEnd !== undefined && { verseEnd }) };
 }
 
 function resolveBook(raw: string): string | null {

@@ -11,7 +11,8 @@ import {
 } from "@/services/sermon.service";
 import { useAuthStore } from "@/store/auth.store";
 import { TipTapEditor } from "@/components/journal/TipTapEditor";
-import { FloatingVideo, InlineVideo } from "@/components/sermons/FloatingVideo";
+import { InlineVideo } from "@/components/sermons/FloatingVideo";
+import { useVideoStore } from "@/store/video.store";
 import { VerseRefPanel } from "@/components/sermons/VerseRefPanel";
 import { FloatingBible, FloatingAsk, JournalFloatTriggers } from "@/components/journal/FloatingWindows";
 import { extractYouTubeId } from "@/lib/youtube-parser";
@@ -33,8 +34,8 @@ export default function SermonDetailPage() {
   const [videoUrl, setVideoUrl] = useState("");
   const [sermonDate, setSermonDate] = useState("");
   const [videoId, setVideoId] = useState("");
-  const [showVideo, setShowVideo] = useState(false);
   const [showPanel, setShowPanel] = useState(false); // mobile ref sheet
+  const videoStore = useVideoStore();
   const [showDesktopPanel, setShowDesktopPanel] = useState(true);
   const [bibleOpen, setBibleOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
@@ -52,7 +53,6 @@ export default function SermonDetailPage() {
     setVideoUrl(sermon.videoUrl);
     setSermonDate(sermon.sermonDate);
     setVideoId(sermon.videoId);
-    if (sermon.videoId) setShowVideo(true);
   }, [sermon]);
 
   const scheduleSave = useCallback((patch: object) => {
@@ -81,7 +81,7 @@ export default function SermonDetailPage() {
     setVideoUrl(v);
     const vid = extractYouTubeId(v);
     setVideoId(vid ?? "");
-    if (vid) setShowVideo(true);
+    if (vid) videoStore.setVideo(vid, id, title);
     scheduleSave({ videoUrl: v, videoId: vid ?? "" });
   }
   function handleContentChange(json: string) {
@@ -167,10 +167,17 @@ export default function SermonDetailPage() {
 
             {/* Video toggle */}
             <button
-              onClick={() => videoId ? setShowVideo((v) => !v) : setEditingUrl(true)}
+              onClick={() => {
+                if (!videoId) { setEditingUrl(true); return; }
+                if (videoStore.videoId === videoId) {
+                  videoStore.setVisible(!videoStore.isVisible);
+                } else {
+                  videoStore.setVideo(videoId, id, title);
+                }
+              }}
               title={videoId ? "Toggle video" : "Add video link"}
               className="bj-btn-icon w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-              style={{ color: videoId && showVideo ? "var(--bj-gold)" : "var(--bj-ink4)" }}
+              style={{ color: videoId && videoStore.videoId === videoId && videoStore.isVisible ? "var(--bj-gold)" : "var(--bj-ink4)" }}
             >
               <Tv2 size={15} />
             </button>
@@ -342,7 +349,7 @@ export default function SermonDetailPage() {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
               className="fixed inset-0 z-40 md:hidden"
-              style={{ background: "color-mix(in oklch, var(--bj-ink) 14%, transparent)", cursor: "pointer" }}
+              style={{ background: "rgba(0,0,0,0.3)", cursor: "pointer" }}
               onClick={() => setShowPanel(false)}
               onTouchEnd={(e) => { e.preventDefault(); setShowPanel(false); }}
             />
@@ -380,18 +387,7 @@ export default function SermonDetailPage() {
       {bibleOpen && <FloatingBible onClose={() => setBibleOpen(false)} />}
       {askOpen && <FloatingAsk onClose={() => setAskOpen(false)} />}
 
-      {/* Desktop floating video */}
-      <AnimatePresence>
-        {videoId && showVideo && (
-          <div className="hidden md:block">
-            <FloatingVideo
-              videoId={videoId}
-              title={title}
-              onClose={() => setShowVideo(false)}
-            />
-          </div>
-        )}
-      </AnimatePresence>
+      {/* Desktop floating video is handled by PersistentVideo in layout */}
     </div>
   );
 }

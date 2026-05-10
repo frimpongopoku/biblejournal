@@ -6,7 +6,18 @@ import { Search, Plus, X, BookOpen, Hash, ChevronLeft, ChevronRight, Maximize2, 
 import { parseRef } from "@/lib/bible-ref-parser";
 import { PROTESTANT_BOOKS, CHAPTER_COUNTS } from "@/lib/bible-books";
 import { useBibleStore } from "@/store/bible.store";
+import { fontPairs } from "@/lib/fonts";
+import type { FontPairId } from "@/lib/fonts";
 import type { SermonRef } from "@/types";
+
+const REF_FONT_KEY = "bj-ref-font";
+const REF_SIZE_KEY = "bj-ref-size";
+const REF_SIZES = [
+  { label: "S", value: 13 },
+  { label: "M", value: 15 },
+  { label: "L", value: 18 },
+  { label: "XL", value: 22 },
+];
 
 const VERSIONS = ["ESV", "KJV", "NIV", "AMP", "MSG", "ASV", "NKJV", "NLT"];
 
@@ -14,7 +25,7 @@ const VERSIONS = ["ESV", "KJV", "NIV", "AMP", "MSG", "ASV", "NKJV", "NLT"];
 
 type BookSug    = { type: "book";    book: string; label: string };
 type ChapterSug = { type: "chapter"; book: string; chapter: number; label: string };
-type VerseSug   = { type: "verse";   book: string; chapter: number; verse: number; label: string };
+type VerseSug   = { type: "verse";   book: string; chapter: number; verse: number; verseEnd?: number; label: string };
 type Suggestion = BookSug | ChapterSug | VerseSug;
 
 function matchBooks(query: string): string[] {
@@ -49,10 +60,14 @@ function getSuggestions(input: string): Suggestion[] {
   if (trimmed.includes(":")) {
     const parsed = parseRef(trimmed);
     if (parsed?.verse !== undefined) {
+      const label = parsed.verseEnd
+        ? `${parsed.book} ${parsed.chapter}:${parsed.verse}-${parsed.verseEnd}`
+        : `${parsed.book} ${parsed.chapter}:${parsed.verse}`;
       return [{
         type: "verse",
         book: parsed.book, chapter: parsed.chapter, verse: parsed.verse,
-        label: `${parsed.book} ${parsed.chapter}:${parsed.verse}`,
+        verseEnd: parsed.verseEnd,
+        label,
       }];
     }
     return [];
@@ -88,6 +103,7 @@ interface PreviewVerse {
   book: string;
   chapter: number;
   verse?: number;
+  verseEnd?: number;
   version: string;
 }
 
@@ -118,6 +134,24 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
 
   const suggestions = getSuggestions(value);
   const sortedRefs = [...refs].sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+
+  const [refFontId, setRefFontId] = useState<FontPairId>(() =>
+    typeof window !== "undefined" ? (localStorage.getItem(REF_FONT_KEY) as FontPairId) ?? "classic" : "classic"
+  );
+  const [refFontSize, setRefFontSize] = useState<number>(() =>
+    typeof window !== "undefined" ? Number(localStorage.getItem(REF_SIZE_KEY)) || 15 : 15
+  );
+
+  function chooseRefFont(id: FontPairId) {
+    setRefFontId(id);
+    localStorage.setItem(REF_FONT_KEY, id);
+  }
+  function chooseRefSize(size: number) {
+    setRefFontSize(size);
+    localStorage.setItem(REF_SIZE_KEY, String(size));
+  }
+
+  const refFontPair = fontPairs.find((f) => f.id === refFontId) ?? fontPairs[0];
 
   // Sync dropdown open state
   useEffect(() => {
@@ -155,16 +189,34 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
         );
         if (!res.ok) { setPreview(null); return; }
         const data = await res.json();
-        const verse = parsed.verse
-          ? data.verses?.find((v: { n: number }) => v.n === parsed.verse)
-          : data.verses?.[0];
-        if (!verse) { setPreview(null); return; }
-        const refLabel = parsed.verse
-          ? `${parsed.book} ${parsed.chapter}:${parsed.verse}`
-          : `${parsed.book} ${parsed.chapter}`;
+        let text: string;
+        let refLabel: string;
+
+        if (parsed.verse !== undefined) {
+          if (parsed.verseEnd !== undefined) {
+            // Range: collect verses and embed verse-number markers [N]
+            const rangeVerses: { n: number; text: string }[] = (data.verses ?? [])
+              .filter((v: { n: number }) => v.n >= parsed.verse! && v.n <= parsed.verseEnd!);
+            if (!rangeVerses.length) { setPreview(null); return; }
+            text = rangeVerses.map((v) => `[${v.n}] ${v.text}`).join(" ");
+            refLabel = `${parsed.book} ${parsed.chapter}:${parsed.verse}-${parsed.verseEnd}`;
+          } else {
+            const verse = data.verses?.find((v: { n: number }) => v.n === parsed.verse);
+            if (!verse) { setPreview(null); return; }
+            text = verse.text;
+            refLabel = `${parsed.book} ${parsed.chapter}:${parsed.verse}`;
+          }
+        } else {
+          const verse = data.verses?.[0];
+          if (!verse) { setPreview(null); return; }
+          text = verse.text;
+          refLabel = `${parsed.book} ${parsed.chapter}`;
+        }
+
         setPreview({
-          ref: refLabel, text: verse.text,
-          book: parsed.book, chapter: parsed.chapter, verse: parsed.verse,
+          ref: refLabel, text,
+          book: parsed.book, chapter: parsed.chapter,
+          verse: parsed.verse, verseEnd: parsed.verseEnd,
           version,
         });
       } finally {
@@ -211,6 +263,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
       id: crypto.randomUUID(),
       book: preview.book, chapter: preview.chapter,
       ...(preview.verse !== undefined && { verse: preview.verse }),
+      ...(preview.verseEnd !== undefined && { endVerse: preview.verseEnd }),
       text: preview.text, note: "", version: preview.version,
       addedAt: new Date().toISOString(),
     };
@@ -226,9 +279,13 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
       <div className="px-4 py-3 border-b shrink-0" style={{ borderColor: "var(--bj-line-soft)" }}>
         <div className="flex items-center gap-2 mb-2">
           <BookOpen size={13} style={{ color: "var(--bj-gold)" }} />
-          <h3 className="font-sans text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--bj-ink4)" }}>
+          <h3 className="font-sans text-xs font-semibold uppercase tracking-wider flex-1" style={{ color: "var(--bj-ink4)" }}>
             Verse References
           </h3>
+          <RefFontPicker
+            fontId={refFontId} fontSize={refFontSize}
+            onFont={chooseRefFont} onSize={chooseRefSize}
+          />
         </div>
 
         {/* Search with suggestions */}
@@ -368,8 +425,14 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
                     <p className="font-sans font-semibold uppercase tracking-wider mb-1" style={{ fontSize: 10, color: "var(--bj-gold-deep)" }}>
                       {preview.ref} · {version}
                     </p>
-                    <p className="font-display italic text-sm leading-snug mb-2" style={{ color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.55 }}>
-                      "{preview.text.length > 120 ? preview.text.slice(0, 120) + "…" : preview.text}"
+                    <p className="mb-2" style={{
+                      fontFamily: `var(${refFontPair.displayVar})`,
+                      fontStyle: refFontId === "dyslexic" ? "normal" : "italic",
+                      fontSize: 13, color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.6,
+                      display: "-webkit-box", WebkitLineClamp: 4,
+                      WebkitBoxOrient: "vertical", overflow: "hidden",
+                    }}>
+                      &ldquo;<VerseText text={preview.text} />&rdquo;
                     </p>
                     <button
                       onClick={handleAdd}
@@ -405,6 +468,8 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
                 onUpdateNote={onUpdateNote}
                 onRemove={onRemove}
                 onExpand={() => setExpandedIndex(i)}
+                fontId={refFontId}
+                fontSize={refFontSize}
               />
             ))}
           </AnimatePresence>
@@ -419,6 +484,8 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
           index={expandedIndex}
           onClose={() => setExpandedIndex(null)}
           onNavigate={setExpandedIndex}
+          fontId={refFontId}
+          fontSize={refFontSize}
         />
       )}
     </AnimatePresence>
@@ -434,14 +501,19 @@ interface RefCardProps {
   onUpdateNote: (id: string, note: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onExpand: () => void;
+  fontId: FontPairId;
+  fontSize: number;
 }
 
-function RefCard({ ref_, index, onUpdateNote, onRemove, onExpand }: RefCardProps) {
+function RefCard({ ref_, index, onUpdateNote, onRemove, onExpand, fontId, fontSize }: RefCardProps) {
+  const pair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
   const [note, setNote] = useState(ref_.note);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refLabel = ref_.verse
-    ? `${ref_.book} ${ref_.chapter}:${ref_.verse}`
+    ? ref_.endVerse
+      ? `${ref_.book} ${ref_.chapter}:${ref_.verse}-${ref_.endVerse}`
+      : `${ref_.book} ${ref_.chapter}:${ref_.verse}`
     : `${ref_.book} ${ref_.chapter}`;
 
   function handleNoteChange(val: string) {
@@ -486,8 +558,14 @@ function RefCard({ ref_, index, onUpdateNote, onRemove, onExpand }: RefCardProps
         </div>
       </div>
 
-      <p className="font-display italic leading-relaxed mb-2" style={{ color: "var(--bj-ink2)", fontWeight: 400, lineHeight: 1.6, fontSize: 12 }}>
-        "{ref_.text.length > 100 ? ref_.text.slice(0, 100) + "…" : ref_.text}"
+      <p className="mb-2" style={{
+        fontFamily: `var(${pair.displayVar})`,
+        fontStyle: fontId === "dyslexic" ? "normal" : "italic",
+        fontSize, color: "var(--bj-ink2)", fontWeight: 400, lineHeight: 1.65,
+        display: "-webkit-box", WebkitLineClamp: 4,
+        WebkitBoxOrient: "vertical", overflow: "hidden",
+      }}>
+        &ldquo;<VerseText text={ref_.text} />&rdquo;
       </p>
 
       <input
@@ -513,14 +591,19 @@ interface RefExpandModalProps {
   index: number;
   onClose: () => void;
   onNavigate: (i: number) => void;
+  fontId: FontPairId;
+  fontSize: number;
 }
 
-function RefExpandModal({ refs, index, onClose, onNavigate }: RefExpandModalProps) {
+function RefExpandModal({ refs, index, onClose, onNavigate, fontId, fontSize }: RefExpandModalProps) {
+  const pair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
   const ref_ = refs[index];
   const [copied, setCopied] = useState(false);
 
   const refLabel = ref_.verse
-    ? `${ref_.book} ${ref_.chapter}:${ref_.verse}`
+    ? ref_.endVerse
+      ? `${ref_.book} ${ref_.chapter}:${ref_.verse}-${ref_.endVerse}`
+      : `${ref_.book} ${ref_.chapter}:${ref_.verse}`
     : `${ref_.book} ${ref_.chapter}`;
 
   useEffect(() => { setCopied(false); }, [index]);
@@ -593,11 +676,13 @@ function RefExpandModal({ refs, index, onClose, onNavigate }: RefExpandModalProp
 
         {/* Verse text */}
         <div className="px-1">
-          <p
-            className="font-display italic leading-relaxed"
-            style={{ fontSize: "clamp(1.1rem, 3vw, 1.35rem)", color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.75 }}
-          >
-            &ldquo;{ref_.text}&rdquo;
+          <p style={{
+            fontFamily: `var(${pair.displayVar})`,
+            fontStyle: fontId === "dyslexic" ? "normal" : "italic",
+            fontSize: Math.max(fontSize, 16),
+            color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.8,
+          }}>
+            &ldquo;<VerseText text={ref_.text} />&rdquo;
           </p>
           {ref_.note && (
             <p
@@ -638,5 +723,150 @@ function RefExpandModal({ refs, index, onClose, onNavigate }: RefExpandModalProp
         )}
       </motion.div>
     </motion.div>
+  );
+}
+
+// ── VerseText — renders [N] verse-number markers as superscripts ──
+
+function VerseText({ text }: { text: string }) {
+  const parts = text.split(/(\[\d+\])/);
+  if (parts.length <= 1) return <>{text}</>;
+  return (
+    <>
+      {parts.map((part, i) => {
+        const num = part.match(/^\[(\d+)\]$/);
+        if (num) {
+          return (
+            <span
+              key={i}
+              style={{
+                fontSize: "0.62em",
+                verticalAlign: "super",
+                lineHeight: 0,
+                color: "var(--bj-gold-deep)",
+                fontWeight: 700,
+                fontStyle: "normal",
+                fontFamily: "var(--bj-ui)",
+                marginRight: 2,
+                marginLeft: i === 0 ? 0 : 4,
+                letterSpacing: 0,
+              }}
+            >
+              {num[1]}
+            </span>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+// ── RefFontPicker ─────────────────────────────────────────
+
+function RefFontPicker({ fontId, fontSize, onFont, onSize }: {
+  fontId: FontPairId;
+  fontSize: number;
+  onFont: (id: FontPairId) => void;
+  onSize: (s: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const activePair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title="Font & size"
+        className="bj-btn-icon h-6 px-1.5 rounded flex items-center gap-1"
+        style={{
+          fontFamily: `var(${activePair.displayVar})`,
+          fontSize: 13,
+          fontStyle: fontId === "dyslexic" ? "normal" : "italic",
+          background: open ? "var(--bj-gold-tint)" : "transparent",
+          color: open ? "var(--bj-gold-deep)" : "var(--bj-ink4)",
+        }}
+      >
+        Aa
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 rounded-xl overflow-hidden z-50"
+          style={{
+            top: "calc(100% + 4px)",
+            background: "var(--bj-bg-panel)",
+            border: "1px solid var(--bj-line)",
+            boxShadow: "0 8px 28px rgba(0,0,0,0.18)",
+            minWidth: 168,
+          }}
+        >
+          <p className="px-3 pt-2.5 pb-1 font-sans text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--bj-ink4)" }}>
+            Font
+          </p>
+          {fontPairs.map((pair) => {
+            const active = fontId === pair.id;
+            return (
+              <button
+                key={pair.id}
+                onClick={() => onFont(pair.id)}
+                className="flex items-center gap-2.5 w-full px-3 py-1.5"
+                style={{ background: active ? "var(--bj-gold-tint)" : "transparent", transition: "background 0.1s ease" }}
+              >
+                <span style={{
+                  fontFamily: `var(${pair.displayVar})`,
+                  fontSize: 16,
+                  fontStyle: pair.id === "dyslexic" ? "normal" : "italic",
+                  color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)",
+                  lineHeight: 1, width: 24, textAlign: "center", display: "block",
+                }}>
+                  Aa
+                </span>
+                <span className="font-sans text-xs flex-1 text-left" style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink)", fontWeight: active ? 500 : 400 }}>
+                  {pair.label}
+                </span>
+                {active && <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--bj-gold)" }} />}
+              </button>
+            );
+          })}
+
+          <div className="px-3 py-2.5 border-t" style={{ borderColor: "var(--bj-line-soft)" }}>
+            <p className="font-sans text-[9px] uppercase tracking-widest font-semibold mb-2" style={{ color: "var(--bj-ink4)" }}>
+              Size
+            </p>
+            <div className="flex gap-1">
+              {REF_SIZES.map((s) => {
+                const active = fontSize === s.value;
+                return (
+                  <button
+                    key={s.value}
+                    onClick={() => onSize(s.value)}
+                    className="flex-1 py-1 rounded-lg font-sans text-xs font-medium"
+                    style={{
+                      background: active ? "var(--bj-gold)" : "var(--bj-bg-soft)",
+                      color: active ? "white" : "var(--bj-ink3)",
+                      border: `1px solid ${active ? "transparent" : "var(--bj-line-soft)"}`,
+                      transition: "all 0.12s ease",
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
