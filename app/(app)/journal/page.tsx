@@ -157,8 +157,8 @@ export default function JournalPage() {
       {/* Mobile: full-screen list when no entry selected; hidden when editor open */}
       {/* Desktop: always visible 300px sidebar */}
       <div
-        className={`${selectedId ? "hidden md:flex" : "flex"} shrink-0 flex-col border-r h-full overflow-hidden`}
-        style={{ width: listCompact ? 220 : 300, borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)", transition: "width 0.2s ease" }}
+        className={`${selectedId ? "hidden md:flex" : "flex"} w-full flex-col border-r h-full overflow-hidden shrink-0`}
+        style={{ maxWidth: listCompact ? 220 : 300, minWidth: listCompact ? 220 : 300, borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)", transition: "min-width 0.2s ease, max-width 0.2s ease" }}
       >
         {/* Header */}
         <div className="px-4 pt-5 pb-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
@@ -213,7 +213,7 @@ export default function JournalPage() {
         </div>
 
         {/* Entries */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto w-full">
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <p className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>Loading…</p>
@@ -242,7 +242,7 @@ export default function JournalPage() {
                   key={entry.id}
                   onClick={() => setSelectedId(entry.id)}
                   data-active={isSelected || undefined}
-                  className="bj-list-row px-5 py-4 border-b"
+                  className="bj-list-row w-full px-5 py-4 border-b"
                   style={{
                     borderColor: "var(--bj-line-soft)",
                     background: isSelected ? "var(--bj-gold-tint)" : "transparent",
@@ -491,7 +491,7 @@ export default function JournalPage() {
                   <div
                     key={entry.id}
                     onClick={() => { setSelectedId(entry.id); setShowEntrySheet(false); }}
-                    className="bj-list-row px-5 py-4 border-b"
+                    className="bj-list-row w-full px-5 py-4 border-b"
                     style={{
                       borderColor: "var(--bj-line-soft)",
                       background: isSelected ? "var(--bj-gold-tint)" : "transparent",
