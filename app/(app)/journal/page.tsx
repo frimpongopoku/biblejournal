@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pin, Star, Search, Plus, Trash2, ChevronLeft, List, X } from "lucide-react";
+import { Pin, Star, Search, Plus, Trash2, ChevronLeft, List, X, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { FloatingBible, FloatingAsk, JournalFloatTriggers } from "@/components/journal/FloatingWindows";
 import { useJournalEntries } from "@/hooks/useJournalEntries";
 import { createEntry, updateEntry, deleteEntry } from "@/services/journal.service";
@@ -48,6 +48,15 @@ export default function JournalPage() {
   const [showEntrySheet, setShowEntrySheet] = useState(false);
   const [bibleOpen, setBibleOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
+  const [listCompact, setListCompact] = useState(() =>
+    typeof window !== "undefined" && localStorage.getItem("bj-journal-compact") === "true"
+  );
+
+  function toggleListCompact() {
+    const next = !listCompact;
+    setListCompact(next);
+    localStorage.setItem("bj-journal-compact", String(next));
+  }
 
   // Journal-specific keyboard shortcuts (work even inside the editor)
   useEffect(() => {
@@ -148,24 +157,24 @@ export default function JournalPage() {
       {/* Mobile: full-screen list when no entry selected; hidden when editor open */}
       {/* Desktop: always visible 300px sidebar */}
       <div
-        className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[300px] shrink-0 flex-col border-r h-full overflow-hidden`}
-        style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}
+        className={`${selectedId ? "hidden md:flex" : "flex"} shrink-0 flex-col border-r h-full overflow-hidden`}
+        style={{ width: listCompact ? 220 : 300, borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)", transition: "width 0.2s ease" }}
       >
         {/* Header */}
-        <div className="px-5 pt-6 pb-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
-          <div className="flex items-center justify-between mb-4">
+        <div className="px-4 pt-5 pb-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
+          <div className="flex items-center justify-between mb-3">
             <h2 className="font-display text-xl" style={{ color: "var(--bj-ink)", fontWeight: 500 }}>Journal</h2>
-            <button
-              onClick={handleNew}
-              disabled={creating}
-              className="bj-btn-primary w-7 h-7 rounded-lg flex items-center justify-center disabled:opacity-50"
-              style={{
-                background: "var(--bj-gold)",
-                boxShadow: "0 2px 8px color-mix(in oklch, var(--bj-gold) 35%, transparent)",
-              }}
-            >
-              <Plus size={14} color="white" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button onClick={toggleListCompact} title={listCompact ? "Expand list" : "Compact list"}
+                className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
+                {listCompact ? <PanelLeftOpen size={13} /> : <PanelLeftClose size={13} />}
+              </button>
+              <button onClick={handleNew} disabled={creating}
+                className="bj-btn-primary w-7 h-7 rounded-lg flex items-center justify-center disabled:opacity-50"
+                style={{ background: "var(--bj-gold)", boxShadow: "0 2px 8px color-mix(in oklch, var(--bj-gold) 35%, transparent)" }}>
+                <Plus size={14} color="white" />
+              </button>
+            </div>
           </div>
           {/* Search */}
           <div
@@ -240,41 +249,43 @@ export default function JournalPage() {
                     borderLeft: isSelected ? "2px solid var(--bj-gold)" : "2px solid transparent",
                   }}
                 >
-                  <div className="flex items-start gap-2 mb-1.5">
-                    {entry.isPinned && <Pin size={11} className="mt-0.5 shrink-0" style={{ color: "var(--bj-gold)" }} />}
-                    <p className="font-sans text-sm font-medium leading-snug" style={{ color: "var(--bj-ink)" }}>
-                      {entry.title || <span style={{ color: "var(--bj-ink4)" }}>Untitled</span>}
-                    </p>
-                  </div>
-                  {excerpt && (
-                    <p
-                      className="font-sans text-xs mb-2"
-                      style={{
-                        color: "var(--bj-ink3)",
-                        lineHeight: 1.5,
-                        overflow: "hidden",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                      }}
-                    >
-                      {excerpt}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {entry.tags.map((t) => (
-                      <span
-                        key={t}
-                        className="font-sans px-1.5 py-0.5 rounded-md"
-                        style={{ fontSize: 10, background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)" }}
-                      >
-                        #{t}
+                  {listCompact ? (
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {entry.isPinned && <Pin size={9} className="shrink-0" style={{ color: "var(--bj-gold)" }} />}
+                      <p className="font-sans text-xs font-medium truncate flex-1" style={{ color: "var(--bj-ink)" }}>
+                        {entry.title || <span style={{ color: "var(--bj-ink4)" }}>Untitled</span>}
+                      </p>
+                      <span className="font-sans shrink-0" style={{ fontSize: 10, color: "var(--bj-ink4)" }}>
+                        {formatDate(entry.updatedAt)}
                       </span>
-                    ))}
-                    <span className="font-sans ml-auto" style={{ fontSize: 10, color: "var(--bj-ink4)" }}>
-                      {formatDate(entry.updatedAt)}
-                    </span>
-                  </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start gap-2 mb-1.5">
+                        {entry.isPinned && <Pin size={11} className="mt-0.5 shrink-0" style={{ color: "var(--bj-gold)" }} />}
+                        <p className="font-sans text-sm font-medium leading-snug" style={{ color: "var(--bj-ink)" }}>
+                          {entry.title || <span style={{ color: "var(--bj-ink4)" }}>Untitled</span>}
+                        </p>
+                      </div>
+                      {excerpt && (
+                        <p className="font-sans text-xs mb-2"
+                          style={{ color: "var(--bj-ink3)", lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                          {excerpt}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {entry.tags.map((t) => (
+                          <span key={t} className="font-sans px-1.5 py-0.5 rounded-md"
+                            style={{ fontSize: 10, background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)" }}>
+                            #{t}
+                          </span>
+                        ))}
+                        <span className="font-sans ml-auto" style={{ fontSize: 10, color: "var(--bj-ink4)" }}>
+                          {formatDate(entry.updatedAt)}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })

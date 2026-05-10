@@ -48,16 +48,28 @@ function ToolbarButton({ active, onClick, title, children }: ToolbarButtonProps)
   );
 }
 
-// ── Font picker ───────────────────────────────────────────
+// ── Font + size picker ────────────────────────────────────
+
+const SIZES = [
+  { label: "S",  value: 14 },
+  { label: "M",  value: 17 },
+  { label: "L",  value: 20 },
+  { label: "XL", value: 24 },
+];
 
 function FontPickerBtn({ fontKey }: { fontKey?: string }) {
-  const storageKey = `bj-font-editor-${fontKey ?? "default"}`;
-  const [fontId, setFontId] = useState<FontPairId>(() => {
-    if (typeof window === "undefined") return "classic";
-    return (localStorage.getItem(storageKey) as FontPairId) ?? "classic";
-  });
+  const fKey  = `bj-font-editor-${fontKey ?? "default"}`;
+  const szKey = `bj-font-size-editor-${fontKey ?? "default"}`;
+
+  const [fontId, setFontId] = useState<FontPairId>(() =>
+    typeof window !== "undefined" ? ((localStorage.getItem(fKey) as FontPairId) ?? "classic") : "classic"
+  );
+  const [fontSize, setFontSize] = useState<number>(() =>
+    typeof window !== "undefined" ? (Number(localStorage.getItem(szKey)) || 17) : 17
+  );
   const [open, setOpen] = useState(false);
-  const [hov, setHov] = useState<FontPairId | null>(null);
+  const [hovFont, setHovFont] = useState<FontPairId | null>(null);
+  const [hovSize, setHovSize] = useState<number | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const activePair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
 
@@ -69,22 +81,33 @@ function FontPickerBtn({ fontKey }: { fontKey?: string }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  function choose(id: FontPairId) {
-    setFontId(id);
-    localStorage.setItem(storageKey, id);
-    // Push to editor DOM directly — works even across re-renders
+  function applyToDOM(pair: typeof fontPairs[0], size: number) {
     const editors = document.querySelectorAll<HTMLElement>(`.bj-editor-${fontKey ?? "default"}`);
+    editors.forEach((el) => {
+      el.style.fontFamily = `var(${pair.displayVar})`;
+      el.style.fontSize = `${size}px`;
+    });
+  }
+
+  function chooseFont(id: FontPairId) {
+    setFontId(id);
+    localStorage.setItem(fKey, id);
     const pair = fontPairs.find((f) => f.id === id) ?? fontPairs[0];
-    editors.forEach((el) => { el.style.fontFamily = `var(${pair.displayVar})`; });
-    setOpen(false);
+    applyToDOM(pair, fontSize);
+  }
+
+  function chooseSize(size: number) {
+    setFontSize(size);
+    localStorage.setItem(szKey, String(size));
+    applyToDOM(activePair, size);
   }
 
   return (
     <div ref={wrapRef} className="relative">
       <button
         onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
-        title="Writing font"
-        className="bj-btn-icon w-7 h-7 rounded flex items-center justify-center"
+        title="Font & size"
+        className="bj-btn-icon h-7 px-2 rounded flex items-center gap-1 justify-center"
         style={{
           fontFamily: `var(${activePair.displayVar})`,
           background: open ? "var(--bj-gold-tint)" : "transparent",
@@ -93,6 +116,9 @@ function FontPickerBtn({ fontKey }: { fontKey?: string }) {
         }}
       >
         Aa
+        <span className="font-sans not-italic text-[9px]" style={{ fontFamily: "var(--bj-ui)", color: "var(--bj-ink4)", fontStyle: "normal" }}>
+          {SIZES.find((s) => s.value === fontSize)?.label ?? "M"}
+        </span>
       </button>
 
       {open && (
@@ -103,46 +129,62 @@ function FontPickerBtn({ fontKey }: { fontKey?: string }) {
             background: "var(--bj-bg-panel)",
             border: "1px solid var(--bj-line)",
             boxShadow: "0 8px 28px color-mix(in oklch, var(--bj-ink) 14%, transparent)",
-            minWidth: 180,
+            minWidth: 192,
           }}
         >
+          {/* Font section */}
           <p className="px-3 pt-2.5 pb-1 font-sans text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--bj-ink4)" }}>
-            Writing font
+            Font
           </p>
           {fontPairs.map((pair) => {
             const active = fontId === pair.id;
-            const isHov = hov === pair.id && !active;
+            const isHov = hovFont === pair.id && !active;
             return (
-              <button
-                key={pair.id}
-                onMouseDown={(e) => { e.preventDefault(); choose(pair.id); }}
-                onMouseEnter={() => setHov(pair.id)}
-                onMouseLeave={() => setHov(null)}
-                className="flex items-center gap-3 w-full px-3 py-2"
-                style={{
-                  background: active ? "var(--bj-gold-tint)" : isHov ? "var(--bj-bg-soft)" : "transparent",
-                  transition: "background 0.1s ease",
-                }}
+              <button key={pair.id}
+                onMouseDown={(e) => { e.preventDefault(); chooseFont(pair.id); }}
+                onMouseEnter={() => setHovFont(pair.id)} onMouseLeave={() => setHovFont(null)}
+                className="flex items-center gap-3 w-full px-3 py-1.5"
+                style={{ background: active ? "var(--bj-gold-tint)" : isHov ? "var(--bj-bg-soft)" : "transparent", transition: "background 0.1s ease" }}
               >
-                <span
-                  style={{
-                    fontFamily: `var(${pair.displayVar})`,
-                    fontSize: 18, fontStyle: "italic",
-                    color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)",
-                    lineHeight: 1, width: 28, textAlign: "center",
-                    transition: "color 0.1s ease",
-                  }}
-                >
+                <span style={{ fontFamily: `var(${pair.displayVar})`, fontSize: 17, fontStyle: "italic", color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)", lineHeight: 1, width: 26, textAlign: "center" }}>
                   Aa
                 </span>
-                <span className="font-sans text-xs" style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink)", fontWeight: active ? 500 : 400 }}>
+                <span className="font-sans text-xs flex-1" style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink)", fontWeight: active ? 500 : 400 }}>
                   {pair.label}
                 </span>
-                {active && <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: "var(--bj-gold)" }} />}
+                {active && <div className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--bj-gold)" }} />}
               </button>
             );
           })}
-          <div className="h-2" />
+
+          {/* Size section */}
+          <div className="px-3 pt-3 pb-2.5 border-t mt-1" style={{ borderColor: "var(--bj-line-soft)" }}>
+            <p className="font-sans text-[9px] uppercase tracking-widest font-semibold mb-2" style={{ color: "var(--bj-ink4)" }}>
+              Size
+            </p>
+            <div className="flex gap-1.5">
+              {SIZES.map((s) => {
+                const active = fontSize === s.value;
+                const isHov = hovSize === s.value && !active;
+                return (
+                  <button key={s.value}
+                    onMouseDown={(e) => { e.preventDefault(); chooseSize(s.value); }}
+                    onMouseEnter={() => setHovSize(s.value)} onMouseLeave={() => setHovSize(null)}
+                    className="flex-1 py-1.5 rounded-lg font-sans text-xs font-medium"
+                    style={{
+                      background: active ? "var(--bj-gold)" : isHov ? "var(--bj-bg-soft)" : "var(--bj-bg-soft)",
+                      color: active ? "white" : isHov ? "var(--bj-ink)" : "var(--bj-ink3)",
+                      border: `1px solid ${active ? "transparent" : "var(--bj-line-soft)"}`,
+                      transform: isHov ? "translateY(-1px)" : "none",
+                      transition: "all 0.12s ease",
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -170,13 +212,15 @@ export function TipTapEditor({ entryId, content, onChange, fontKey }: Props) {
     },
   });
 
-  // Apply the persisted font to the editor DOM element
+  // Apply persisted font + size to the editor DOM on mount
   useEffect(() => {
     if (!editor) return;
-    const storageKey = `bj-font-editor-${fontKey ?? "default"}`;
-    const savedId = (localStorage.getItem(storageKey) as FontPairId) ?? "classic";
+    const savedId   = (localStorage.getItem(`bj-font-editor-${fontKey ?? "default"}`) as FontPairId) ?? "classic";
+    const savedSize = Number(localStorage.getItem(`bj-font-size-editor-${fontKey ?? "default"}`)) || 17;
     const pair = fontPairs.find((f) => f.id === savedId) ?? fontPairs[0];
-    (editor.view.dom as HTMLElement).style.fontFamily = `var(${pair.displayVar})`;
+    const dom = editor.view.dom as HTMLElement;
+    dom.style.fontFamily = `var(${pair.displayVar})`;
+    dom.style.fontSize   = `${savedSize}px`;
   }, [editor, fontKey]);
 
   // Sync content when switching entries (entryId change)

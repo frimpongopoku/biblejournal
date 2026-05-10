@@ -8,6 +8,7 @@ import {
   LayoutDashboard, NotebookPen, BookOpen, HeartHandshake,
   Megaphone, Mic, Compass, Network, Search, Plus, Bell, Moon, Sun,
   Settings, LogOut, Flame, Palette, Menu, X, Keyboard,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ShortcutsPanel } from "@/components/ShortcutsPanel";
@@ -66,6 +67,15 @@ export function AppShell({ children, rightRail }: AppShellProps) {
   const [showAppearance, setShowAppearance] = useState(false);
   const [showDrawer, setShowDrawer] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [isCompact, setIsCompact] = useState(() =>
+    typeof window !== "undefined" && localStorage.getItem("bj-sidebar-compact") === "true"
+  );
+
+  function toggleCompact() {
+    const next = !isCompact;
+    setIsCompact(next);
+    localStorage.setItem("bj-sidebar-compact", String(next));
+  }
   const appearanceRef = useRef<HTMLDivElement>(null);
 
   // Close mobile drawer on navigation
@@ -130,64 +140,58 @@ export function AppShell({ children, rightRail }: AppShellProps) {
 
       {/* ── Desktop Left Sidebar ─────────────────────── */}
       <aside
-        className="hidden md:flex flex-col w-[240px] shrink-0 h-full border-r"
-        style={{ background: "var(--bj-bg-panel)", borderColor: "var(--bj-line-soft)" }}
+        className="hidden md:flex flex-col shrink-0 h-full border-r overflow-hidden"
+        style={{
+          width: isCompact ? 64 : 240,
+          background: "var(--bj-bg-panel)",
+          borderColor: "var(--bj-line-soft)",
+          transition: "width 0.2s ease",
+        }}
       >
-
-        {/* Brand + Search row */}
-        <div className="flex items-center gap-2 px-4 pt-4 pb-3">
-          <div
-            className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: "var(--bj-gold)", boxShadow: "0 2px 8px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" />
-              <path d="M12 10c0 0-2 2.5-2 4a2 2 0 004 0c0-1.5-2-4-2-4z" fill="white" fillOpacity="0.5" />
-            </svg>
+        {/* Brand row */}
+        {isCompact ? (
+          <div className="flex flex-col items-center gap-1.5 pt-4 pb-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--bj-gold)", boxShadow: "0 2px 8px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" />
+                <path d="M12 10c0 0-2 2.5-2 4a2 2 0 004 0c0-1.5-2-4-2-4z" fill="white" fillOpacity="0.5" />
+              </svg>
+            </div>
+            <button onClick={toggleCompact} title="Expand sidebar" className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
+              <ChevronRight size={13} />
+            </button>
           </div>
-          <span className="font-display text-sm font-medium flex-1" style={{ color: "var(--bj-ink)", letterSpacing: "0.03em" }}>
-            BibJournal
-          </span>
-          <button
-            title="Search (⌘K)"
-            className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ color: "var(--bj-ink4)" }}
-          >
-            <Search size={13} />
-          </button>
-          <button
-            title="New entry"
-            className="bj-btn-primary w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: "var(--bj-gold)", boxShadow: "0 1px 6px color-mix(in oklch, var(--bj-gold) 35%, transparent)" }}
-          >
-            <Plus size={13} color="white" />
-          </button>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2 px-4 pt-4 pb-3">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--bj-gold)", boxShadow: "0 2px 8px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" />
+                <path d="M12 10c0 0-2 2.5-2 4a2 2 0 004 0c0-1.5-2-4-2-4z" fill="white" fillOpacity="0.5" />
+              </svg>
+            </div>
+            <span className="font-display text-sm font-medium flex-1" style={{ color: "var(--bj-ink)", letterSpacing: "0.03em" }}>BibJournal</span>
+            <button onClick={toggleCompact} title="Collapse sidebar" className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
+              <ChevronLeft size={13} />
+            </button>
+          </div>
+        )}
 
         {/* Nav */}
-        <nav className="px-2 pb-2 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
+        <nav className={`${isCompact ? "px-1" : "px-2"} pb-2 border-b`} style={{ borderColor: "var(--bj-line-soft)" }}>
           {navItems.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
-            return (
-              <Link
-                key={href}
-                href={href}
-                data-active={active || undefined}
+            return isCompact ? (
+              <Link key={href} href={href} title={label}
+                className="bj-nav-item relative flex items-center justify-center w-10 h-10 rounded-xl mb-0.5 mx-auto"
+                style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink3)", background: active ? "var(--bj-gold-tint)" : "transparent" }}>
+                {active && <motion.div layoutId="sidebar-indicator" className="absolute inset-0 rounded-xl" style={{ background: "var(--bj-gold-tint)" }} transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
+                <Icon size={16} className="relative z-10 shrink-0" />
+              </Link>
+            ) : (
+              <Link key={href} href={href} data-active={active || undefined}
                 className="bj-nav-item relative flex items-center gap-2.5 px-3 py-2 rounded-xl mb-0.5 text-sm font-sans"
-                style={{
-                  color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)",
-                  background: active ? "var(--bj-gold-tint)" : "transparent",
-                  fontWeight: active ? 500 : 400,
-                }}
-              >
-                {active && (
-                  <motion.div
-                    layoutId="sidebar-indicator"
-                    className="absolute inset-0 rounded-xl"
-                    style={{ background: "var(--bj-gold-tint)" }}
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
+                style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)", background: active ? "var(--bj-gold-tint)" : "transparent", fontWeight: active ? 500 : 400 }}>
+                {active && <motion.div layoutId="sidebar-indicator" className="absolute inset-0 rounded-xl" style={{ background: "var(--bj-gold-tint)" }} transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
                 <Icon size={14} className="relative z-10 shrink-0" />
                 <span className="relative z-10 text-[13px]">{label}</span>
               </Link>
@@ -195,78 +199,72 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           })}
         </nav>
 
-        {/* Shortcuts */}
-        <div className="px-2 py-3 border-b flex-1 overflow-y-auto" style={{ borderColor: "var(--bj-line-soft)" }}>
-          <p className="px-3 mb-2 text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--bj-ink4)" }}>
-            Shortcuts
-          </p>
-          {[
-            { href: "/dashboard",     icon: LayoutDashboard, label: "Dashboard",     desc: "Today's overview" },
-            { href: "/bible",         icon: BookOpen,        label: "Bible",         desc: "Read & highlight" },
-            { href: "/prayer",        icon: HeartHandshake,  label: "Prayer",        desc: "Your prayer journal" },
-            { href: "/proclamations", icon: Megaphone,       label: "Proclamations", desc: "Declare what God says" },
-          ].map(({ href, icon: Icon, label, desc }) => (
-            <Link
-              key={href}
-              href={href}
-              className="bj-nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5"
-              style={{ color: "var(--bj-ink2)" }}
-            >
-              <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: "var(--bj-bg-soft)" }}
-              >
-                <Icon size={13} style={{ color: "var(--bj-ink3)" }} />
-              </div>
-              <div className="min-w-0">
-                <p className="font-sans text-[13px] font-medium leading-none mb-0.5" style={{ color: "var(--bj-ink)" }}>{label}</p>
-                <p className="font-sans text-[11px] leading-none" style={{ color: "var(--bj-ink4)" }}>{desc}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {/* Streak */}
-        <div className="px-4 py-2.5 border-b flex items-center gap-2.5" style={{ borderColor: "var(--bj-line-soft)" }}>
-          <Flame size={12} style={{ color: "var(--bj-gold)", flexShrink: 0 }} />
-          <span className="font-sans text-xs font-medium" style={{ color: "var(--bj-gold-deep)" }}>
-            {streak > 0 ? `${streak}d` : "—"}
-          </span>
-          <div className="flex gap-1 ml-auto">
-            {weekDots.map((dot, i) => (
-              <div
-                key={i}
-                title={dot.label}
-                className="w-3.5 h-3.5 rounded"
-                style={{
-                  background: dot.on ? "var(--bj-gold)" : "var(--bj-gold-soft)",
-                  boxShadow: dot.on ? "0 1px 4px color-mix(in oklch, var(--bj-gold) 40%, transparent)" : "none",
-                }}
-              />
+        {/* Shortcuts (hidden in compact) */}
+        {!isCompact && (
+          <div className="px-2 py-3 border-b flex-1 overflow-y-auto" style={{ borderColor: "var(--bj-line-soft)" }}>
+            <p className="px-3 mb-2 text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--bj-ink4)" }}>Shortcuts</p>
+            {[
+              { href: "/dashboard",     icon: LayoutDashboard, label: "Dashboard",     desc: "Today's overview" },
+              { href: "/bible",         icon: BookOpen,        label: "Bible",         desc: "Read & highlight" },
+              { href: "/prayer",        icon: HeartHandshake,  label: "Prayer",        desc: "Your prayer journal" },
+              { href: "/proclamations", icon: Megaphone,       label: "Proclamations", desc: "Declare what God says" },
+            ].map(({ href, icon: Icon, label, desc }) => (
+              <Link key={href} href={href} className="bj-nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5" style={{ color: "var(--bj-ink2)" }}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--bj-bg-soft)" }}>
+                  <Icon size={13} style={{ color: "var(--bj-ink3)" }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-sans text-[13px] font-medium leading-none mb-0.5" style={{ color: "var(--bj-ink)" }}>{label}</p>
+                  <p className="font-sans text-[11px] leading-none" style={{ color: "var(--bj-ink4)" }}>{desc}</p>
+                </div>
+              </Link>
             ))}
           </div>
-        </div>
+        )}
+        {isCompact && <div className="flex-1" />}
+
+        {/* Streak */}
+        {isCompact ? (
+          <div className="flex flex-col items-center py-2.5 border-b gap-1" style={{ borderColor: "var(--bj-line-soft)" }}>
+            <Flame size={12} style={{ color: "var(--bj-gold)" }} />
+            <span className="font-sans text-[10px] font-semibold" style={{ color: "var(--bj-gold-deep)" }}>{streak > 0 ? `${streak}d` : "—"}</span>
+          </div>
+        ) : (
+          <div className="px-4 py-2.5 border-b flex items-center gap-2.5" style={{ borderColor: "var(--bj-line-soft)" }}>
+            <Flame size={12} style={{ color: "var(--bj-gold)", flexShrink: 0 }} />
+            <span className="font-sans text-xs font-medium" style={{ color: "var(--bj-gold-deep)" }}>{streak > 0 ? `${streak}d` : "—"}</span>
+            <div className="flex gap-1 ml-auto">
+              {weekDots.map((dot, i) => (
+                <div key={i} title={dot.label} className="w-3.5 h-3.5 rounded"
+                  style={{ background: dot.on ? "var(--bj-gold)" : "var(--bj-gold-soft)", boxShadow: dot.on ? "0 1px 4px color-mix(in oklch, var(--bj-gold) 40%, transparent)" : "none" }} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Bottom actions */}
-        <div className="px-2 py-2">
+        <div className={`${isCompact ? "px-1 py-2 flex flex-col items-center gap-0.5" : "px-2 py-2"}`}>
 
-          {/* Appearance popover */}
+          {/* Appearance popover — compact: icon only */}
           <div className="relative" ref={appearanceRef}>
-            <button
-              onClick={() => setShowAppearance(!showAppearance)}
-              className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]"
-              style={{
-                color: showAppearance ? "var(--bj-gold-deep)" : "var(--bj-ink3)",
-                background: showAppearance ? "var(--bj-gold-tint)" : "transparent",
-              }}
-            >
-              <Palette size={13} />
-              <span className="flex-1 text-left">Appearance</span>
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: THEME_COLORS[themeId] }} />
-                <span style={{ fontSize: 10, color: "var(--bj-ink4)", fontFamily: FONT_FAMILY[fontPairId], fontStyle: "italic" }}>Aa</span>
-              </div>
-            </button>
+            {isCompact ? (
+              <button onClick={() => setShowAppearance(!showAppearance)} title="Appearance"
+                className="bj-btn-icon w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ color: showAppearance ? "var(--bj-gold-deep)" : "var(--bj-ink3)", background: showAppearance ? "var(--bj-gold-tint)" : "transparent" }}>
+                <Palette size={15} />
+              </button>
+            ) : (
+              <button onClick={() => setShowAppearance(!showAppearance)}
+                className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]"
+                style={{ color: showAppearance ? "var(--bj-gold-deep)" : "var(--bj-ink3)", background: showAppearance ? "var(--bj-gold-tint)" : "transparent" }}>
+                <Palette size={13} />
+                <span className="flex-1 text-left">Appearance</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ background: THEME_COLORS[themeId] }} />
+                  <span style={{ fontSize: 10, color: "var(--bj-ink4)", fontFamily: FONT_FAMILY[fontPairId], fontStyle: "italic" }}>Aa</span>
+                </div>
+              </button>
+            )}
 
             <AnimatePresence>
               {showAppearance && (
@@ -353,31 +351,37 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           </div>
 
           {/* Dark / light toggle */}
-          <button
-            onClick={toggleTheme}
-            className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]"
-            style={{ color: "var(--bj-ink3)" }}
-          >
-            {isDark ? <Sun size={13} /> : <Moon size={13} />}
-            <span>{isDark ? "Light mode" : "Dark mode"}</span>
-          </button>
+          {isCompact ? (
+            <button onClick={toggleTheme} title={isDark ? "Light mode" : "Dark mode"}
+              className="bj-btn-icon w-10 h-10 rounded-xl flex items-center justify-center" style={{ color: "var(--bj-ink3)" }}>
+              {isDark ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+          ) : (
+            <button onClick={toggleTheme} className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]" style={{ color: "var(--bj-ink3)" }}>
+              {isDark ? <Sun size={13} /> : <Moon size={13} />}
+              <span>{isDark ? "Light mode" : "Dark mode"}</span>
+            </button>
+          )}
 
           {/* Keyboard shortcuts */}
-          <button
-            onClick={() => setShowShortcuts(true)}
-            className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]"
-            style={{ color: "var(--bj-ink3)" }}
-          >
-            <Keyboard size={13} />
-            <span className="flex-1 text-left">Shortcuts</span>
-            <span className="font-sans text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: "var(--bj-bg-soft)", color: "var(--bj-ink4)", border: "1px solid var(--bj-line-soft)" }}>⌘/</span>
-          </button>
+          {isCompact ? (
+            <button onClick={() => setShowShortcuts(true)} title="Shortcuts (⌘/)"
+              className="bj-btn-icon w-10 h-10 rounded-xl flex items-center justify-center" style={{ color: "var(--bj-ink3)" }}>
+              <Keyboard size={15} />
+            </button>
+          ) : (
+            <button onClick={() => setShowShortcuts(true)} className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]" style={{ color: "var(--bj-ink3)" }}>
+              <Keyboard size={13} />
+              <span className="flex-1 text-left">Shortcuts</span>
+              <span className="font-sans text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: "var(--bj-bg-soft)", color: "var(--bj-ink4)", border: "1px solid var(--bj-line-soft)" }}>⌘/</span>
+            </button>
+          )}
 
           {/* Profile */}
           <div className="relative">
-            <button
-              onClick={() => setShowProfile(!showProfile)}
-              className="bj-btn-ghost flex items-center gap-2.5 w-full px-3 py-2 rounded-xl"
+            <button onClick={() => setShowProfile(!showProfile)}
+              className={isCompact ? "bj-btn-icon w-10 h-10 rounded-xl flex items-center justify-center" : "bj-btn-ghost flex items-center gap-2.5 w-full px-3 py-2 rounded-xl"}
+              title={isCompact ? (user?.displayName ?? "Account") : undefined}
             >
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="" className="w-5 h-5 rounded-full shrink-0 object-cover" />
@@ -386,10 +390,12 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                   {user?.displayName?.[0] ?? "U"}
                 </div>
               )}
-              <span className="text-[13px] flex-1 text-left truncate" style={{ color: "var(--bj-ink2)" }}>
-                {user?.displayName ?? user?.email ?? "Account"}
-              </span>
-              <Settings size={11} style={{ color: "var(--bj-ink4)" }} />
+              {!isCompact && <>
+                <span className="text-[13px] flex-1 text-left truncate" style={{ color: "var(--bj-ink2)" }}>
+                  {user?.displayName ?? user?.email ?? "Account"}
+                </span>
+                <Settings size={11} style={{ color: "var(--bj-ink4)" }} />
+              </>}
             </button>
 
             <AnimatePresence>
@@ -430,9 +436,6 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           }}
         >
           <div className="flex-1" />
-          <button className="bj-btn-icon p-1.5 rounded-lg" style={{ color: "var(--bj-ink4)" }}>
-            <Mic size={14} />
-          </button>
           <button className="bj-btn-icon p-1.5 rounded-lg" style={{ color: "var(--bj-ink4)" }}>
             <Bell size={14} />
           </button>
