@@ -97,7 +97,7 @@ function CompareTab() {
 
   async function handleCompare() {
     const parsed = parseRef(ref);
-    if (!parsed) { setError("Enter a valid reference like "John 3" or "Ps 23:1""); return; }
+    if (!parsed) { setError('Enter a valid reference like "John 3" or "Ps 23:1"'); return; }
     setError(""); setLoading(true); setResults(null);
 
     try {
@@ -236,7 +236,7 @@ function CommentaryTab() {
 
   async function handleGenerate() {
     const parsed = parseRef(ref);
-    if (!parsed) { setError("Enter a valid chapter reference like "Romans 8""); return; }
+    if (!parsed) { setError('Enter a valid chapter reference like "Romans 8"'); return; }
     setError(""); setLoading(true); setResult(null);
 
     try {
