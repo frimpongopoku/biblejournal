@@ -21,5 +21,9 @@ npm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Embedding checkpoint (temporary file, only exists mid-run)
+# Embedding checkpoint (temporary, only exists mid-run)
 data/embed-progress.json
+
+# Bible embeddings binary — un-ignored, committed for Vercel deployment
+# If bundle size becomes an issue, migrate to Vercel Blob Storage
+# data/bible-embeddings.bin
