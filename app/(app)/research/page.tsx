@@ -8,6 +8,7 @@ import {
   FileText, Copy, Trash2, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { parseRef } from "@/lib/bible-ref-parser";
+import { useBibleStore } from "@/store/bible.store";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -233,7 +234,7 @@ function CompareTab({ onSave }: { onSave: (p: SavePayload) => void }) {
 
 // ── Commentary Tab ─────────────────────────────────────────
 
-function CommentaryTab({ onSave }: { onSave: (p: SavePayload) => void }) {
+function CommentaryTab({ onSave, version }: { onSave: (p: SavePayload) => void; version: string }) {
   const [ref, setRef] = useState("");
   const [result, setResult] = useState<CommentaryResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -249,7 +250,7 @@ function CommentaryTab({ onSave }: { onSave: (p: SavePayload) => void }) {
     try {
       const res = await fetch("/api/research/commentary", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ book: parsed.book, chapter: parsed.chapter }),
+        body: JSON.stringify({ book: parsed.book, chapter: parsed.chapter, version }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed"); return; }
@@ -345,7 +346,7 @@ function CommentaryTab({ onSave }: { onSave: (p: SavePayload) => void }) {
 
 // ── Ask Tab ────────────────────────────────────────────────
 
-function AskTab({ onSave }: { onSave: (p: SavePayload) => void }) {
+function AskTab({ onSave, version }: { onSave: (p: SavePayload) => void; version: string }) {
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<AskResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -358,7 +359,7 @@ function AskTab({ onSave }: { onSave: (p: SavePayload) => void }) {
     try {
       const res = await fetch("/api/research/ask", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ question, version }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed"); return; }
@@ -754,8 +755,10 @@ function NoteCard({ note, index, onUpdate, onRemove }: {
 // ── Page ───────────────────────────────────────────────────
 
 export default function ResearchPage() {
+  const { version, setVersion } = useBibleStore();
   const [tab, setTab] = useState<Tab>("compare");
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
+  const [hoveredVersion, setHoveredVersion] = useState<string | null>(null);
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [notesOpen, setNotesOpen] = useState(false);
   const [mobileNotesOpen, setMobileNotesOpen] = useState(false);
@@ -817,6 +820,42 @@ export default function ResearchPage() {
             </button>
           </div>
 
+          {/* Version picker — applies to Commentary and Ask */}
+          <div className="mb-6">
+            <p className="font-sans text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: "var(--bj-ink4)" }}>
+              Translation
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {VERSIONS.map((v) => {
+                const active = version === v;
+                const hovered = hoveredVersion === v && !active;
+                return (
+                  <button
+                    key={v}
+                    onClick={() => setVersion(v)}
+                    onMouseEnter={() => setHoveredVersion(v)}
+                    onMouseLeave={() => setHoveredVersion(null)}
+                    className="font-sans text-xs px-2.5 py-1 rounded-lg"
+                    style={{
+                      background: active ? "var(--bj-gold)" : hovered ? "var(--bj-line)" : "var(--bj-bg-soft)",
+                      color: active ? "white" : hovered ? "var(--bj-ink)" : "var(--bj-ink3)",
+                      fontWeight: active ? 600 : 400,
+                      border: `1px solid ${active ? "transparent" : "var(--bj-line-soft)"}`,
+                      transform: hovered ? "translateY(-1px)" : "none",
+                      boxShadow: hovered ? "0 2px 6px color-mix(in oklch, var(--bj-ink) 8%, transparent)" : "none",
+                      transition: "all 0.13s ease",
+                    }}
+                  >
+                    {v}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="font-sans text-[10px] mt-1.5" style={{ color: "var(--bj-ink4)" }}>
+              Used by Commentary and Ask. Compare has its own per-translation toggle.
+            </p>
+          </div>
+
           {/* Tabs */}
           <div className="flex gap-1.5 mb-2 flex-wrap">
             {TABS.map(({ id, label, icon: Icon }) => {
@@ -851,8 +890,8 @@ export default function ResearchPage() {
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
               {tab === "compare"    && <CompareTab    onSave={handleSave} />}
-              {tab === "commentary" && <CommentaryTab onSave={handleSave} />}
-              {tab === "ask"        && <AskTab        onSave={handleSave} />}
+              {tab === "commentary" && <CommentaryTab onSave={handleSave} version={version} />}
+              {tab === "ask"        && <AskTab        onSave={handleSave} version={version} />}
               {tab === "word"       && <WordStudyTab  onSave={handleSave} />}
             </motion.div>
           </AnimatePresence>

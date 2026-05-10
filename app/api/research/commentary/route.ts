@@ -17,12 +17,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
   }
 
-  const { book, chapter } = await req.json();
+  const { book, chapter, version = "ESV" } = await req.json();
   if (!book || !chapter) {
     return NextResponse.json({ error: "book and chapter are required" }, { status: 400 });
   }
 
-  const verses = getChapter("ESV", book, Number(chapter));
+  const ver = String(version).toUpperCase();
+  const verses = getChapter(ver, book, Number(chapter));
   if (!verses?.length) {
     return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
   }
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
       system: [
         { type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } },
       ] as Parameters<typeof client.messages.create>[0]["system"],
-      messages: [{ role: "user", content: `${book} ${chapter} (ESV):\n${chapterText}` }],
+      messages: [{ role: "user", content: `${book} ${chapter} (${ver}):\n${chapterText}` }],
     });
 
     const raw = (message.content[0] as { type: string; text: string }).text;

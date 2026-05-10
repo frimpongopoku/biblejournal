@@ -16,6 +16,10 @@ export interface SearchResult {
   ref: string;
   text: string;
   score: number;
+  book: string;
+  chapter: number;
+  startVerse: number;
+  endVerse: number;
 }
 
 // Module-level cache — loaded once per server process
@@ -93,9 +97,13 @@ export async function vectorSearch(query: string, topK = 8): Promise<SearchResul
   scores.sort((a, b) => b.score - a.score);
 
   return scores.slice(0, topK).map(({ i, score }) => ({
-    ref:   index![i].ref,
-    text:  index![i].text,
+    ref:        index![i].ref,
+    text:       index![i].text,
     score,
+    book:       index![i].book,
+    chapter:    index![i].chapter,
+    startVerse: index![i].startVerse,
+    endVerse:   index![i].endVerse,
   }));
 }
 
