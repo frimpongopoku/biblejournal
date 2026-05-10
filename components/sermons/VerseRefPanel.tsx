@@ -2,9 +2,82 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Plus, X, BookOpen } from "lucide-react";
+import { Search, Plus, X, BookOpen, Hash } from "lucide-react";
 import { parseRef } from "@/lib/bible-ref-parser";
+import { PROTESTANT_BOOKS, CHAPTER_COUNTS } from "@/lib/bible-books";
 import type { SermonRef } from "@/types";
+
+// ── Suggestion types & helpers (mirrors QuickRefInput) ────
+
+type BookSug    = { type: "book";    book: string; label: string };
+type ChapterSug = { type: "chapter"; book: string; chapter: number; label: string };
+type VerseSug   = { type: "verse";   book: string; chapter: number; verse: number; label: string };
+type Suggestion = BookSug | ChapterSug | VerseSug;
+
+function matchBooks(query: string): string[] {
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+
+  const numMatch = q.match(/^(\d)\s*(.*)$/);
+  let results: string[];
+  if (numMatch) {
+    const num = numMatch[1];
+    const rest = numMatch[2].trim();
+    results = PROTESTANT_BOOKS.filter((b) => {
+      const bl = b.toLowerCase();
+      return bl.startsWith(`${num} `) && (!rest || bl.slice(2).startsWith(rest));
+    });
+  } else {
+    const byPrefix = PROTESTANT_BOOKS.filter((b) => b.toLowerCase().startsWith(q));
+    const byWordPart = PROTESTANT_BOOKS.filter((b) => {
+      const bl = b.toLowerCase();
+      if (!/^\d /.test(bl)) return false;
+      return bl.replace(/^\d+ /, "").startsWith(q);
+    });
+    results = [...new Set([...byPrefix, ...byWordPart])];
+  }
+  return results.slice(0, 6);
+}
+
+function getSuggestions(input: string): Suggestion[] {
+  const trimmed = input.trim();
+  if (!trimmed) return [];
+
+  if (trimmed.includes(":")) {
+    const parsed = parseRef(trimmed);
+    if (parsed?.verse !== undefined) {
+      return [{
+        type: "verse",
+        book: parsed.book, chapter: parsed.chapter, verse: parsed.verse,
+        label: `${parsed.book} ${parsed.chapter}:${parsed.verse}`,
+      }];
+    }
+    return [];
+  }
+
+  const parsed = parseRef(trimmed);
+  if (parsed) {
+    const totalCh = CHAPTER_COUNTS[parsed.book] ?? 1;
+    const ch = Math.min(parsed.chapter, totalCh);
+    return [ch - 1, ch, ch + 1]
+      .filter((c) => c >= 1 && c <= totalCh)
+      .map((c) => ({ type: "chapter" as const, book: parsed.book, chapter: c, label: `${parsed.book} ${c}` }));
+  }
+
+  if (input.endsWith(" ")) {
+    const book = PROTESTANT_BOOKS.find((b) => b.toLowerCase() === trimmed.toLowerCase());
+    if (book) {
+      const total = CHAPTER_COUNTS[book] ?? 1;
+      return Array.from({ length: Math.min(total, 8) }, (_, i) => ({
+        type: "chapter" as const, book, chapter: i + 1, label: `${book} ${i + 1}`,
+      }));
+    }
+  }
+
+  return matchBooks(trimmed).map((b) => ({ type: "book" as const, book: b, label: b }));
+}
+
+// ── Preview state ─────────────────────────────────────────
 
 interface PreviewVerse {
   ref: string;
@@ -14,6 +87,8 @@ interface PreviewVerse {
   verse?: number;
 }
 
+// ── Props ─────────────────────────────────────────────────
+
 interface Props {
   refs: SermonRef[];
   onAdd: (ref: SermonRef) => Promise<void>;
@@ -21,15 +96,42 @@ interface Props {
   onRemove: (id: string) => Promise<void>;
 }
 
+// ── Main component ────────────────────────────────────────
+
 export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
-  const [query, setQuery] = useState("");
-  const [preview, setPreview] = useState<PreviewVerse | null>(null);
+  const [value, setValue]       = useState("");
+  const [open, setOpen]         = useState(false);
+  const [selected, setSelected] = useState(0);
+  const [preview, setPreview]   = useState<PreviewVerse | null>(null);
   const [fetching, setFetching] = useState(false);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding]     = useState(false);
+
+  const inputRef  = useRef<HTMLInputElement>(null);
+  const wrapRef   = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const suggestions = getSuggestions(value);
+
+  // Sync dropdown open state
   useEffect(() => {
-    const parsed = parseRef(query);
+    setSelected(0);
+    setOpen(suggestions.length > 0 && value.trim().length > 0);
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Fetch verse preview when value resolves to a valid ref
+  useEffect(() => {
+    const parsed = parseRef(value);
     if (!parsed) { setPreview(null); return; }
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -55,20 +157,52 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
       } finally {
         setFetching(false);
       }
-    }, 500);
-  }, [query]);
+    }, 400);
+  }, [value]);
+
+  function commit(sug: Suggestion) {
+    if (sug.type === "book") {
+      setValue(sug.book + " ");
+      inputRef.current?.focus();
+      return;
+    }
+    // Chapter or verse — fill input and let the fetch effect run
+    setValue(sug.label);
+    setOpen(false);
+    inputRef.current?.focus();
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Escape") {
+      setValue(""); setOpen(false); setPreview(null);
+      inputRef.current?.blur();
+      return;
+    }
+    if (!open || !suggestions.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelected((s) => Math.min(s + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelected((s) => Math.max(s - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      commit(suggestions[selected]);
+    }
+  }
 
   async function handleAdd() {
     if (!preview) return;
     setAdding(true);
     const newRef: SermonRef = {
       id: crypto.randomUUID(),
-      book: preview.book, chapter: preview.chapter, verse: preview.verse,
+      book: preview.book, chapter: preview.chapter,
+      ...(preview.verse !== undefined && { verse: preview.verse }),
       text: preview.text, note: "", version: "ESV",
       addedAt: new Date().toISOString(),
     };
     await onAdd(newRef);
-    setQuery(""); setPreview(null);
+    setValue(""); setPreview(null);
     setAdding(false);
   }
 
@@ -83,29 +217,103 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
           </h3>
         </div>
 
-        {/* Search */}
-        <div
-          className="flex items-center gap-2 px-3 py-2 rounded-xl"
-          style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}
-        >
-          <Search size={11} style={{ color: "var(--bj-ink4)", flexShrink: 0 }} />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="John 3:16, Ps 23…"
-            className="flex-1 bg-transparent outline-none font-sans text-xs"
-            style={{ color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          {query && (
-            <button onClick={() => { setQuery(""); setPreview(null); }} className="bj-btn-icon w-4 h-4 rounded flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
-              <X size={9} />
-            </button>
+        {/* Search with suggestions */}
+        <div ref={wrapRef} className="relative">
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-xl"
+            style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}
+          >
+            <Search size={11} style={{ color: "var(--bj-ink4)", flexShrink: 0 }} />
+            <input
+              ref={inputRef}
+              value={value}
+              onChange={(e) => { setValue(e.target.value); setPreview(null); }}
+              onKeyDown={handleKeyDown}
+              onBlur={() => setTimeout(() => setOpen(false), 160)}
+              onFocus={() => {
+                if (suggestions.length > 0 && value.trim()) setOpen(true);
+              }}
+              placeholder="John 3:16, Ps 23…"
+              className="flex-1 bg-transparent outline-none font-sans text-xs"
+              style={{ color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {value && (
+              <button
+                onClick={() => { setValue(""); setPreview(null); setOpen(false); }}
+                className="bj-btn-icon w-4 h-4 rounded flex items-center justify-center"
+                style={{ color: "var(--bj-ink4)" }}
+              >
+                <X size={9} />
+              </button>
+            )}
+          </div>
+
+          {/* Suggestions dropdown */}
+          {open && suggestions.length > 0 && (
+            <div
+              className="absolute left-0 right-0 rounded-xl overflow-hidden"
+              style={{
+                top: "calc(100% + 4px)",
+                background: "var(--bj-bg-panel)",
+                border: "1px solid var(--bj-line)",
+                boxShadow: "0 8px 28px color-mix(in oklch, var(--bj-ink) 16%, transparent)",
+                zIndex: 9999,
+              }}
+            >
+              {suggestions.map((sug, i) => {
+                const isSelected = i === selected;
+                return (
+                  <button
+                    key={sug.label}
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); commit(sug); }}
+                    onMouseEnter={() => setSelected(i)}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-left"
+                    style={{
+                      background: isSelected ? "var(--bj-gold-tint)" : "transparent",
+                      transition: "background 0.08s ease",
+                    }}
+                  >
+                    <span
+                      className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                      style={{ background: isSelected ? "var(--bj-gold)" : "var(--bj-bg-soft)" }}
+                    >
+                      {sug.type === "book"    && <BookOpen size={9} style={{ color: isSelected ? "white" : "var(--bj-ink3)" }} />}
+                      {sug.type === "chapter" && <span style={{ fontSize: 8, fontWeight: 600, color: isSelected ? "white" : "var(--bj-ink3)" }}>{sug.chapter}</span>}
+                      {sug.type === "verse"   && <Hash size={9} style={{ color: isSelected ? "white" : "var(--bj-ink3)" }} />}
+                    </span>
+                    <span
+                      className="font-sans text-xs flex-1"
+                      style={{
+                        color: isSelected ? "var(--bj-gold-deep)" : "var(--bj-ink)",
+                        fontWeight: isSelected ? 500 : 400,
+                      }}
+                    >
+                      {sug.label}
+                    </span>
+                    <span className="font-sans shrink-0" style={{ fontSize: 10, color: "var(--bj-ink4)" }}>
+                      {sug.type === "book" ? `${CHAPTER_COUNTS[sug.book] ?? "?"} ch` : "↵"}
+                    </span>
+                  </button>
+                );
+              })}
+              <div className="px-3 py-1.5 border-t" style={{ borderColor: "var(--bj-line-soft)" }}>
+                <p className="font-sans" style={{ fontSize: 10, color: "var(--bj-ink4)" }}>
+                  Try{" "}
+                  <span style={{ color: "var(--bj-ink3)" }}>John 3:16</span>
+                  {" · "}
+                  <span style={{ color: "var(--bj-ink3)" }}>Ps 23</span>
+                  {" · "}
+                  <span style={{ color: "var(--bj-ink3)" }}>1 Cor 13</span>
+                </p>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Preview */}
+        {/* Verse preview */}
         <AnimatePresence>
           {(fetching || preview) && (
             <motion.div
@@ -121,7 +329,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
                   <p className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>Looking up…</p>
                 ) : preview ? (
                   <>
-                    <p className="font-sans text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--bj-gold-deep)" }}>
+                    <p className="font-sans font-semibold uppercase tracking-wider mb-1" style={{ fontSize: 10, color: "var(--bj-gold-deep)" }}>
                       {preview.ref} · ESV
                     </p>
                     <p className="font-display italic text-sm leading-snug mb-2" style={{ color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.55 }}>
@@ -202,8 +410,8 @@ function RefCard({ ref_, index, onUpdateNote, onRemove }: RefCardProps) {
     >
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <span
-          className="font-sans text-[10px] font-semibold px-2 py-0.5 rounded-full"
-          style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}
+          className="font-sans font-semibold px-2 py-0.5 rounded-full"
+          style={{ fontSize: 10, background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}
         >
           {refLabel}
         </span>
@@ -218,7 +426,7 @@ function RefCard({ ref_, index, onUpdateNote, onRemove }: RefCardProps) {
         </button>
       </div>
 
-      <p className="font-display italic text-xs leading-relaxed mb-2" style={{ color: "var(--bj-ink2)", fontWeight: 400, lineHeight: 1.6, fontSize: 12 }}>
+      <p className="font-display italic leading-relaxed mb-2" style={{ color: "var(--bj-ink2)", fontWeight: 400, lineHeight: 1.6, fontSize: 12 }}>
         "{ref_.text.length > 100 ? ref_.text.slice(0, 100) + "…" : ref_.text}"
       </p>
 
