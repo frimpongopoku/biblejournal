@@ -1,15 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { signInWithGoogle } from "@/services/auth.service";
+import { useAuth } from "@/hooks/useAuth";
 import pkg from "@/version.json";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  const [signing, setSigning] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Already signed in → redirect immediately
+  useEffect(() => {
+    if (!authLoading && user) {
+      setRedirecting(true);
+      router.replace("/dashboard");
+    }
+  }, [user, authLoading, router]);
 
   const isConfigured = typeof window !== "undefined" &&
     !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
@@ -17,19 +28,51 @@ export default function LoginPage() {
 
   async function handleGoogleSignIn() {
     setError(null);
-    setLoading(true);
+    setSigning(true);
     if (!isConfigured) {
-      // Demo mode — skip Firebase, go straight in
+      setRedirecting(true);
       router.push("/dashboard");
       return;
     }
     try {
       await signInWithGoogle();
+      setRedirecting(true);
       router.push("/dashboard");
     } catch {
       setError("Could not sign in. Please try again.");
-      setLoading(false);
+      setSigning(false);
     }
+  }
+
+  const loading = signing || redirecting;
+
+  // Show loading screen while auth state resolves or redirect is in progress
+  if (authLoading || redirecting) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
+        className="min-h-screen flex flex-col items-center justify-center gap-5"
+        style={{ background: "var(--bj-bg)" }}
+      >
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+          style={{ background: "var(--bj-gold)", boxShadow: "0 4px 24px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}>
+          <svg className="animate-spin" width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" strokeOpacity="0.3" />
+            <path d="M12 2a10 10 0 0110 10" stroke="white" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </div>
+        <div className="text-center">
+          <p className="font-display text-lg" style={{ color: "var(--bj-ink)", fontWeight: 400 }}>
+            {redirecting ? "Opening your journal…" : "Loading…"}
+          </p>
+          {redirecting && (
+            <p className="font-sans text-sm mt-1" style={{ color: "var(--bj-ink4)" }}>
+              Taking you to your dashboard
+            </p>
+          )}
+        </div>
+      </motion.div>
+    );
   }
 
   return (
