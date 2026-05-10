@@ -7,8 +7,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, NotebookPen, BookOpen, HeartHandshake,
   Megaphone, Mic, Compass, Network, Search, Plus, Bell, Moon, Sun,
-  Settings, LogOut, Flame, Palette, Menu, X,
+  Settings, LogOut, Flame, Palette, Menu, X, Keyboard,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ShortcutsPanel } from "@/components/ShortcutsPanel";
 import { useThemeStore } from "@/store/theme.store";
 import { useFontStore } from "@/store/font.store";
 import { useAuth } from "@/hooks/useAuth";
@@ -59,13 +61,45 @@ export function AppShell({ children, rightRail }: AppShellProps) {
 
   const { streak, weekDots } = useStreakStore();
 
+  const router = useRouter();
   const [showProfile, setShowProfile] = useState(false);
   const [showAppearance, setShowAppearance] = useState(false);
   const [showDrawer, setShowDrawer] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const appearanceRef = useRef<HTMLDivElement>(null);
 
   // Close mobile drawer on navigation
   useEffect(() => { setShowDrawer(false); }, [pathname]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+
+      // ⌘/ → shortcuts panel (always, even in editors)
+      if (e.key === "/") { e.preventDefault(); setShowShortcuts((o) => !o); return; }
+
+      // Don't fire nav shortcuts when typing in an input / editor
+      const target = e.target as HTMLElement;
+      const inEditable = target.isContentEditable || target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+      if (inEditable) return;
+
+      const NAV: Record<string, string> = {
+        j: "/journal",
+        k: "/prayer",
+        p: "/proclamations",
+        b: "/bible",
+        d: "/dashboard",
+        s: "/sermons",
+        e: "/research",
+      };
+      const dest = NAV[e.key.toLowerCase()];
+      if (dest) { e.preventDefault(); router.push(dest); }
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [router]);
 
   const isDark = themeId === "midnight";
 
@@ -328,6 +362,17 @@ export function AppShell({ children, rightRail }: AppShellProps) {
             <span>{isDark ? "Light mode" : "Dark mode"}</span>
           </button>
 
+          {/* Keyboard shortcuts */}
+          <button
+            onClick={() => setShowShortcuts(true)}
+            className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]"
+            style={{ color: "var(--bj-ink3)" }}
+          >
+            <Keyboard size={13} />
+            <span className="flex-1 text-left">Shortcuts</span>
+            <span className="font-sans text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: "var(--bj-bg-soft)", color: "var(--bj-ink4)", border: "1px solid var(--bj-line-soft)" }}>⌘/</span>
+          </button>
+
           {/* Profile */}
           <div className="relative">
             <button
@@ -577,6 +622,10 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                   {isDark ? <Sun size={13} /> : <Moon size={13} />}
                   <span>{isDark ? "Light mode" : "Dark mode"}</span>
                 </button>
+                <button onClick={() => { setShowDrawer(false); setShowShortcuts(true); }} className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]" style={{ color: "var(--bj-ink3)" }}>
+                  <Keyboard size={13} />
+                  <span>Shortcuts</span>
+                </button>
                 <button onClick={() => signOutUser()} className="bj-btn-ghost flex items-center gap-2 w-full px-3 py-2 rounded-xl text-[13px]" style={{ color: "var(--bj-ember)" }}>
                   <LogOut size={13} />
                   <span>Sign out</span>
@@ -586,6 +635,8 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           </>
         )}
       </AnimatePresence>
+
+      <ShortcutsPanel open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   );
 }

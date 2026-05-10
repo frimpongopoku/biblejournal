@@ -48,6 +48,21 @@ export default function JournalPage() {
   const [showEntrySheet, setShowEntrySheet] = useState(false);
   const [bibleOpen, setBibleOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
+
+  // Journal-specific keyboard shortcuts (work even inside the editor)
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod || !e.shiftKey) return;
+      switch (e.key.toLowerCase()) {
+        case "n": e.preventDefault(); handleNew(); break;
+        case "b": e.preventDefault(); setBibleOpen((o) => !o); break;
+        case "a": e.preventDefault(); setAskOpen((o) => !o); break;
+      }
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAutoSelected = useRef(false);
 
