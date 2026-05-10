@@ -464,8 +464,8 @@ export function AppShell({ children, rightRail }: AppShellProps) {
         </header>
 
         <div className="flex flex-1 min-h-0">
-          <main className="flex-1 overflow-y-auto">
-            <div className="pb-20 md:pb-0">{children}</div>
+          <main className="flex-1 overflow-y-auto flex flex-col min-h-0">
+            <div className="pb-20 md:pb-0 flex-1 flex flex-col min-h-0">{children}</div>
           </main>
 
           {rightRail && (
