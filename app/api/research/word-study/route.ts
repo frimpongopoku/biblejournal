@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const SYSTEM = `You are a biblical scholar specialising in original languages. Respond with only valid JSON — no markdown fences — with these keys:
+- "word": the word as given
+- "original": {language: "Hebrew"|"Greek"|"Aramaic", term: string, transliteration: string, strongsNumber: string}
+- "definition": 1–2 sentence definition
+- "usageCount": approximate occurrences in the Bible (number)
+- "nuances": array of 2–3 short strings describing shades of meaning
+- "keyOccurrences": array of 3 {ref: string, note: string} — notable uses
+- "insight": 1 sentence devotional insight`;
+
 export async function POST(req: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
   }
 
@@ -16,34 +26,20 @@ export async function POST(req: Request) {
     ? ` as used in ${book} ${chapter}${verse ? `:${verse}` : ""}`
     : "";
 
-  const client = new Anthropic({ apiKey });
-
-  const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1024,
-    messages: [
-      {
-        role: "user",
-        content: `Provide a biblical word study for the word "${word}"${contextNote}.
-
-Respond as JSON with keys:
-- "word": the word as given
-- "original": { "language": "Hebrew" | "Greek" | "Aramaic", "term": string, "transliteration": string, "strongsNumber": string }
-- "definition": concise definition (1–2 sentences)
-- "usageCount": approximate number of times this word/root appears in the Bible
-- "nuances": array of 2–4 strings describing shades of meaning or translation nuances
-- "keyOccurrences": array of 3–5 { ref: string, note: string } showing notable uses
-- "insight": 1–2 sentences of devotional/theological insight
-
-Respond with only valid JSON, no markdown fences.`,
-      },
-    ],
-  });
-
-  const raw = (message.content[0] as { type: string; text: string }).text;
   try {
+    const message = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 650,
+      system: [
+        { type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } },
+      ] as Parameters<typeof client.messages.create>[0]["system"],
+      messages: [{ role: "user", content: `Word study: "${word}"${contextNote}` }],
+    });
+
+    const raw = (message.content[0] as { type: string; text: string }).text;
     return NextResponse.json(JSON.parse(raw));
-  } catch {
-    return NextResponse.json({ error: "Failed to parse AI response", raw }, { status: 500 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
