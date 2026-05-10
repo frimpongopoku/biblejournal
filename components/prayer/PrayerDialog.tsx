@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { fontPairs, type FontPairId } from "@/lib/fonts";
 import type { Prayer } from "@/types";
+
+const PRAYER_FONT_KEY = "bj-prayer-font";
+const PRAYER_SIZE_KEY = "bj-prayer-size";
 
 interface Props {
   open: boolean;
@@ -19,7 +23,23 @@ export function PrayerDialog({ open, prayer, onClose, onSave }: Props) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fontId, setFontId] = useState<FontPairId>(() =>
+    typeof window !== "undefined" ? (localStorage.getItem(PRAYER_FONT_KEY) as FontPairId) ?? "classic" : "classic"
+  );
+  const [fontSize, setFontSize] = useState<number>(() =>
+    typeof window !== "undefined" ? Number(localStorage.getItem(PRAYER_SIZE_KEY)) || 16 : 16
+  );
   const titleRef = useRef<HTMLInputElement>(null);
+  const pair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
+
+  function handleFontChange(id: FontPairId) {
+    setFontId(id);
+    localStorage.setItem(PRAYER_FONT_KEY, id);
+  }
+  function handleSizeChange(s: number) {
+    setFontSize(s);
+    localStorage.setItem(PRAYER_SIZE_KEY, String(s));
+  }
 
   useEffect(() => {
     if (open) {
@@ -142,12 +162,15 @@ export function PrayerDialog({ open, prayer, onClose, onSave }: Props) {
                       onChange={(e) => setBody(e.target.value)}
                       placeholder="Write your prayer…"
                       rows={4}
-                      className="w-full font-display italic text-base px-4 py-3 rounded-xl outline-none resize-none leading-relaxed"
+                      className="w-full px-4 py-3 rounded-xl outline-none resize-none leading-relaxed"
                       style={{
+                        fontFamily: `var(${pair.displayVar})`,
+                        fontStyle: fontId === "dyslexic" ? "normal" : "italic",
+                        fontSize,
                         background: "var(--bj-bg-soft)",
                         border: "1px solid var(--bj-line-soft)",
                         color: "var(--bj-ink2)",
-                        fontWeight: 300,
+                        fontWeight: 400,
                         transition: "border-color 0.15s ease",
                       }}
                       onFocus={(e) => (e.currentTarget.style.borderColor = "var(--bj-gold)")}

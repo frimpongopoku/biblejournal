@@ -7,6 +7,7 @@ import {
   ArrowLeft, Globe, Lock, Link2, Check, Plus, X, Pencil, Trash2,
 } from "lucide-react";
 import { fontPairs, type FontPairId } from "@/lib/fonts";
+import { FontSizePopover } from "@/components/shared/FontSizePopover";
 import { useProclamationFolders } from "@/hooks/useProclamationFolders";
 import { useProclamationEntries } from "@/hooks/useProclamationEntries";
 import {
@@ -18,52 +19,18 @@ import { useAuthStore } from "@/store/auth.store";
 import { NewFolderSheet } from "@/components/proclamations/NewFolderSheet";
 import type { ProclamationEntry } from "@/types";
 
-// ── Proclamation font picker ──────────────────────────────
+// ── Proclamation font + size ──────────────────────────────
 
 const PROC_FONT_KEY = "bj-font-editor-proclamation";
+const PROC_SIZE_KEY = "bj-proc-size";
 
 function getProcFont(): FontPairId {
   if (typeof window === "undefined") return "classic";
   return (localStorage.getItem(PROC_FONT_KEY) as FontPairId) ?? "classic";
 }
-
-function FontPills({ fontId, onChange }: { fontId: FontPairId; onChange: (id: FontPairId) => void }) {
-  const [hov, setHov] = useState<FontPairId | null>(null);
-  return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <span className="font-sans text-[10px] uppercase tracking-widest font-semibold mr-1" style={{ color: "var(--bj-ink4)" }}>Font</span>
-      {fontPairs.map((p) => {
-        const active = fontId === p.id;
-        const isHov = hov === p.id && !active;
-        return (
-          <button
-            key={p.id}
-            onClick={(e) => { e.stopPropagation(); onChange(p.id); }}
-            onMouseEnter={() => setHov(p.id)}
-            onMouseLeave={() => setHov(null)}
-            title={p.label}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-lg"
-            style={{
-              fontFamily: `var(${p.displayVar})`,
-              fontStyle: "italic",
-              fontSize: 13,
-              fontWeight: active ? 600 : 400,
-              background: active ? "var(--bj-gold-tint)" : isHov ? "var(--bj-bg-soft)" : "transparent",
-              color: active ? "var(--bj-gold-deep)" : isHov ? "var(--bj-ink)" : "var(--bj-ink3)",
-              border: `1px solid ${active ? "var(--bj-gold-soft)" : "transparent"}`,
-              transform: isHov ? "translateY(-1px)" : "none",
-              transition: "all 0.12s ease",
-            }}
-          >
-            Aa
-            <span className="font-sans not-italic text-[9px]" style={{ fontFamily: "var(--bj-ui)", fontStyle: "normal" }}>
-              {p.label}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
+function getProcSize(): number {
+  if (typeof window === "undefined") return 17;
+  return Number(localStorage.getItem(PROC_SIZE_KEY)) || 17;
 }
 
 // ── Auto-growing textarea ─────────────────────────────────
@@ -98,19 +65,15 @@ function AutoTextarea({ value, minHeight = 80, style, ...props }: AutoTextareaPr
 interface NewCardProps {
   onSave: (title: string, body: string) => Promise<void>;
   onCancel: () => void;
+  fontId: FontPairId;
+  fontSize: number;
 }
 
-function NewEntryCard({ onSave, onCancel }: NewCardProps) {
+function NewEntryCard({ onSave, onCancel, fontId, fontSize }: NewCardProps) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
-  const [fontId, setFontId] = useState<FontPairId>(getProcFont);
   const titleRef = useRef<HTMLInputElement>(null);
-
-  function handleFontChange(id: FontPairId) {
-    setFontId(id);
-    localStorage.setItem(PROC_FONT_KEY, id);
-  }
 
   const activePair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
 
@@ -172,9 +135,6 @@ function NewEntryCard({ onSave, onCancel }: NewCardProps) {
 
         {/* Body */}
         <div className="pl-4 md:pl-5">
-          <div className="mb-3">
-            <FontPills fontId={fontId} onChange={handleFontChange} />
-          </div>
           <AutoTextarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -184,7 +144,8 @@ function NewEntryCard({ onSave, onCancel }: NewCardProps) {
             className="w-full bg-transparent outline-none leading-relaxed"
             style={{
               fontFamily: `var(${activePair.displayVar})`,
-              fontSize: "clamp(1.05rem, 3vw, 1.2rem)",
+              fontStyle: fontId === "dyslexic" ? "normal" : "italic",
+              fontSize,
               fontWeight: 400,
               lineHeight: 1.95,
               color: "var(--bj-ink2)",
@@ -227,20 +188,16 @@ interface EntryCardProps {
   index: number;
   onUpdate: (title: string, body: string) => Promise<void>;
   onDelete: () => Promise<void>;
+  fontId: FontPairId;
+  fontSize: number;
 }
 
-function EntryCard({ entry, index, onUpdate, onDelete }: EntryCardProps) {
+function EntryCard({ entry, index, onUpdate, onDelete, fontId, fontSize }: EntryCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
-  const [fontId, setFontId] = useState<FontPairId>(getProcFont);
-
-  function handleFontChange(id: FontPairId) {
-    setFontId(id);
-    localStorage.setItem(PROC_FONT_KEY, id);
-  }
 
   const activePair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
 
@@ -337,9 +294,6 @@ function EntryCard({ entry, index, onUpdate, onDelete }: EntryCardProps) {
               >
                 {editing ? (
                   <>
-                    <div className="mb-2" onClick={(e) => e.stopPropagation()}>
-                      <FontPills fontId={fontId} onChange={handleFontChange} />
-                    </div>
                     <AutoTextarea
                       value={editBody}
                       onChange={(e) => setEditBody(e.target.value)}
@@ -349,7 +303,8 @@ function EntryCard({ entry, index, onUpdate, onDelete }: EntryCardProps) {
                       className="w-full bg-transparent outline-none leading-relaxed"
                       style={{
                         fontFamily: `var(${activePair.displayVar})`,
-                        fontSize: "clamp(1.05rem, 3vw, 1.2rem)",
+                        fontStyle: fontId === "dyslexic" ? "normal" : "italic",
+                        fontSize,
                         fontWeight: 400,
                         lineHeight: 1.95,
                         color: "var(--bj-ink2)",
@@ -359,21 +314,24 @@ function EntryCard({ entry, index, onUpdate, onDelete }: EntryCardProps) {
                     />
                   </>
                 ) : (
-                  entry.body && (
-                    <p
-                      className="leading-relaxed mb-4"
-                      style={{
-                        fontFamily: `var(${activePair.displayVar})`,
-                        fontSize: "clamp(1.05rem, 3vw, 1.2rem)",
-                        fontWeight: 400,
-                        lineHeight: 1.95,
-                        color: "var(--bj-ink2)",
-                        letterSpacing: "0.01em",
-                      }}
-                    >
-                      {entry.body}
-                    </p>
-                  )
+                  <>
+                    {entry.body && (
+                      <p
+                        className="leading-relaxed mb-4"
+                        style={{
+                          fontFamily: `var(${activePair.displayVar})`,
+                          fontStyle: fontId === "dyslexic" ? "normal" : "italic",
+                          fontSize,
+                          fontWeight: 400,
+                          lineHeight: 1.95,
+                          color: "var(--bj-ink2)",
+                          letterSpacing: "0.01em",
+                        }}
+                      >
+                        {entry.body}
+                      </p>
+                    )}
+                  </>
                 )}
 
                 {/* Actions */}
@@ -447,6 +405,17 @@ export default function FolderDetailPage() {
   const [editSheet, setEditSheet] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [procFontId, setProcFontId] = useState<FontPairId>(getProcFont);
+  const [procFontSize, setProcFontSize] = useState<number>(getProcSize);
+
+  function handleProcFont(id: FontPairId) {
+    setProcFontId(id);
+    localStorage.setItem(PROC_FONT_KEY, id);
+  }
+  function handleProcSize(s: number) {
+    setProcFontSize(s);
+    localStorage.setItem(PROC_SIZE_KEY, String(s));
+  }
 
   const shareUrl = folder?.shareToken
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/p/${folder.shareToken}`
@@ -555,6 +524,11 @@ export default function FolderDetailPage() {
               {folder?.isPublic ? <Globe size={15} /> : <Lock size={15} />}
             </button>
 
+            <FontSizePopover
+              fontId={procFontId} fontSize={procFontSize}
+              onFont={handleProcFont} onSize={handleProcSize}
+            />
+
             <button
               onClick={handleDeleteFolder}
               className="bj-btn-action w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
@@ -617,6 +591,8 @@ export default function FolderDetailPage() {
                 key="new"
                 onSave={handleNewEntry}
                 onCancel={() => setNewCard(false)}
+                fontId={procFontId}
+                fontSize={procFontSize}
               />
             ) : (
               <motion.button
@@ -663,6 +639,8 @@ export default function FolderDetailPage() {
                     index={i}
                     onUpdate={(t, b) => handleUpdateEntry(entry.id, t, b)}
                     onDelete={() => handleDeleteEntry(entry.id)}
+                    fontId={procFontId}
+                    fontSize={procFontSize}
                   />
                 ))}
               </AnimatePresence>

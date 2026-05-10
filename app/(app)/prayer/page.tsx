@@ -5,7 +5,28 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Flame, CheckCircle2, Clock, Pencil, Trash2, X,
 } from "lucide-react";
+import { fontPairs, type FontPairId } from "@/lib/fonts";
+import { FontSizePopover } from "@/components/shared/FontSizePopover";
 import { usePrayers } from "@/hooks/usePrayers";
+
+const PRAYER_FONT_KEY = "bj-prayer-font";
+const PRAYER_SIZE_KEY = "bj-prayer-size";
+const PRAYER_SIZES = [
+  { label: "S", value: 14 },
+  { label: "M", value: 16 },
+  { label: "L", value: 19 },
+  { label: "XL", value: 23 },
+];
+
+function getPrayerFont(): FontPairId {
+  if (typeof window === "undefined") return "classic";
+  return (localStorage.getItem(PRAYER_FONT_KEY) as FontPairId) ?? "classic";
+}
+function getPrayerSize(): number {
+  if (typeof window === "undefined") return 16;
+  return Number(localStorage.getItem(PRAYER_SIZE_KEY)) || 16;
+}
+
 import {
   createPrayer,
   updatePrayer,
@@ -36,13 +57,16 @@ function formatDate(date: Date): string {
 interface NewCardProps {
   onSave: (title: string, body: string) => Promise<void>;
   onCancel: () => void;
+  fontId: FontPairId;
+  fontSize: number;
 }
 
-function NewPrayerCard({ onSave, onCancel }: NewCardProps) {
+function NewPrayerCard({ onSave, onCancel, fontId, fontSize }: NewCardProps) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const pair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
 
   useEffect(() => {
     titleRef.current?.focus();
@@ -105,8 +129,15 @@ function NewPrayerCard({ onSave, onCancel }: NewCardProps) {
           onKeyDown={handleKey}
           placeholder="Write your prayer…"
           rows={3}
-          className="w-full bg-transparent outline-none font-display italic text-base resize-none leading-relaxed ml-11"
-          style={{ color: "var(--bj-ink2)", fontWeight: 300, width: "calc(100% - 2.75rem)" }}
+          className="w-full bg-transparent outline-none resize-none leading-relaxed ml-11"
+          style={{
+            fontFamily: `var(${pair.displayVar})`,
+            fontStyle: fontId === "dyslexic" ? "normal" : "italic",
+            fontSize,
+            color: "var(--bj-ink2)",
+            fontWeight: 400,
+            width: "calc(100% - 2.75rem)",
+          }}
         />
 
         {/* Actions */}
@@ -144,6 +175,20 @@ export default function PrayerPage() {
   const [tab, setTab] = useState("All");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [newCard, setNewCard] = useState(false);
+
+  const [prayerFontId, setPrayerFontId] = useState<FontPairId>(getPrayerFont);
+  const [prayerFontSize, setPrayerFontSize] = useState<number>(getPrayerSize);
+
+  function handleFontChange(id: FontPairId) {
+    setPrayerFontId(id);
+    localStorage.setItem(PRAYER_FONT_KEY, id);
+  }
+  function handleSizeChange(s: number) {
+    setPrayerFontSize(s);
+    localStorage.setItem(PRAYER_SIZE_KEY, String(s));
+  }
+
+  const prayerPair = fontPairs.find((f) => f.id === prayerFontId) ?? fontPairs[0];
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Prayer | null>(null);
@@ -221,19 +266,25 @@ export default function PrayerPage() {
               {active.length} active &middot; {answered.length} answered
             </p>
           </div>
-          <button
-            onClick={() => { setNewCard(true); setTab("All"); }}
-            className="bj-btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium mt-1 shrink-0"
-            style={{
-              background: "var(--bj-gold)",
-              color: "white",
-              boxShadow: "0 2px 12px color-mix(in oklch, var(--bj-gold) 35%, transparent)",
-            }}
-          >
-            <Plus size={14} />
-            <span className="hidden sm:inline">New Prayer</span>
-            <span className="sm:hidden">New</span>
-          </button>
+          <div className="flex items-center gap-2 mt-1 shrink-0">
+            <FontSizePopover
+              fontId={prayerFontId} fontSize={prayerFontSize}
+              onFont={handleFontChange} onSize={handleSizeChange}
+            />
+            <button
+              onClick={() => { setNewCard(true); setTab("All"); }}
+              className="bj-btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
+              style={{
+                background: "var(--bj-gold)",
+                color: "white",
+                boxShadow: "0 2px 12px color-mix(in oklch, var(--bj-gold) 35%, transparent)",
+              }}
+            >
+              <Plus size={14} />
+              <span className="hidden sm:inline">New Prayer</span>
+              <span className="sm:hidden">New</span>
+            </button>
+          </div>
         </motion.div>
 
         {/* Tabs */}
@@ -278,6 +329,8 @@ export default function PrayerPage() {
                   key="new-card"
                   onSave={handleCreatePrayer}
                   onCancel={() => setNewCard(false)}
+                  fontId={prayerFontId}
+                  fontSize={prayerFontSize}
                 />
               )}
 
@@ -401,13 +454,16 @@ export default function PrayerPage() {
                               className="overflow-hidden"
                             >
                               <p
-                                className="font-display italic text-base leading-relaxed mt-4 pt-4 border-t"
+                                className="leading-relaxed mt-4 pt-4 border-t"
                                 style={{
                                   borderColor: isAnswered
                                     ? "color-mix(in oklch, var(--bj-sage) 20%, transparent)"
                                     : "var(--bj-line-soft)",
+                                  fontFamily: `var(${prayerPair.displayVar})`,
+                                  fontStyle: prayerFontId === "dyslexic" ? "normal" : "italic",
+                                  fontSize: prayerFontSize,
                                   color: "var(--bj-ink2)",
-                                  fontWeight: 300,
+                                  fontWeight: 400,
                                 }}
                               >
                                 {p.body}
@@ -429,8 +485,14 @@ export default function PrayerPage() {
                                     Testimony
                                   </p>
                                   <p
-                                    className="font-display italic text-sm leading-relaxed"
-                                    style={{ color: "var(--bj-ink2)", fontWeight: 300 }}
+                                    className="leading-relaxed"
+                                    style={{
+                                      fontFamily: `var(${prayerPair.displayVar})`,
+                                      fontStyle: prayerFontId === "dyslexic" ? "normal" : "italic",
+                                      fontSize: Math.max(prayerFontSize - 2, 13),
+                                      color: "var(--bj-ink2)",
+                                      fontWeight: 400,
+                                    }}
                                   >
                                     {p.testimony}
                                   </p>
