@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getChapter } from "@/lib/bible-parser";
 
+export const maxDuration = 60; // seconds — AI responses can take a while
+
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const SYSTEM = `You are a concise biblical scholar and pastor. When given a chapter, respond with a JSON object containing exactly these keys:

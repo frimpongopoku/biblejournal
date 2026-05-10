@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getChapter } from "@/lib/bible-parser";
+
+export const maxDuration = 60;
 import { vectorSearch, isIndexReady } from "@/lib/bible-search";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

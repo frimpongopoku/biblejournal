@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getChapter, getChapterCount } from "@/lib/bible-parser";
 import { CHAPTER_COUNTS } from "@/lib/bible-books";
 
+// Bible text never changes — cache responses for 1 year at the CDN
+export const revalidate = 31536000;
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ version: string; book: string; chapter: string }> }
