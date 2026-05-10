@@ -20,3 +20,6 @@ npm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Bible embeddings (generated, large binary)
+data/bible-embeddings.bin
