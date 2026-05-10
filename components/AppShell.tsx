@@ -143,16 +143,18 @@ export function AppShell({ children, rightRail }: AppShellProps) {
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bj-bg)" }}>
+    <div className="flex h-screen" style={{ background: "var(--bj-bg)" }}>
 
       {/* ── Desktop Left Sidebar ─────────────────────── */}
       <aside
-        className="hidden md:flex flex-col shrink-0 h-full border-r overflow-hidden"
+        className="hidden md:flex flex-col shrink-0 h-full border-r"
         style={{
           width: isCompact ? 64 : 240,
           background: "var(--bj-bg-panel)",
           borderColor: "var(--bj-line-soft)",
           transition: "width 0.2s ease",
+          overflowX: "visible",
+          overflowY: "auto",
         }}
       >
         {/* Brand row */}
@@ -280,11 +282,12 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.97 }}
                   transition={{ duration: 0.16 }}
-                  className="absolute bottom-full left-0 right-0 mb-1.5 rounded-xl border overflow-hidden"
+                  className={`absolute bottom-full mb-1.5 rounded-xl border overflow-hidden ${isCompact ? "left-0 w-56" : "left-0 right-0"}`}
                   style={{
                     background: "var(--bj-bg-panel)",
                     borderColor: "var(--bj-line)",
                     boxShadow: "0 8px 32px color-mix(in oklch, var(--bj-ink) 14%, transparent)",
+                    zIndex: 100,
                   }}
                 >
                   <div className="px-3 pt-3 pb-2 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
@@ -412,8 +415,8 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.96 }}
                   transition={{ duration: 0.16 }}
-                  className="absolute bottom-full left-0 right-0 mb-1.5 rounded-xl overflow-hidden border"
-                  style={{ background: "var(--bj-bg-panel)", borderColor: "var(--bj-line)", boxShadow: "0 8px 24px color-mix(in oklch, var(--bj-ink) 12%, transparent)" }}
+                  className={`absolute bottom-full mb-1.5 rounded-xl overflow-hidden border ${isCompact ? "left-0 w-56" : "left-0 right-0"}`}
+                  style={{ background: "var(--bj-bg-panel)", borderColor: "var(--bj-line)", boxShadow: "0 8px 24px color-mix(in oklch, var(--bj-ink) 12%, transparent)", zIndex: 100 }}
                 >
                   {/* Account info */}
                   <div className="px-4 py-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
@@ -574,7 +577,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
             <motion.div
               key="drawer-bd"
               className="fixed inset-0 md:hidden"
-              style={{ background: "color-mix(in oklch, var(--bj-ink) 30%, transparent)", zIndex: 55, cursor: "pointer" }}
+              style={{ background: "rgba(0,0,0,0.4)", zIndex: 55, cursor: "pointer" }}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
               onClick={() => setShowDrawer(false)}

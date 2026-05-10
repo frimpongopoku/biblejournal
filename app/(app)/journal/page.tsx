@@ -115,7 +115,7 @@ function DeleteConfirmModal({ entry, onConfirm, onCancel }: {
   return (
     <>
       <motion.div key="del-bd" className="fixed inset-0 z-50"
-        style={{ background: "color-mix(in oklch, var(--bj-ink) 40%, transparent)", backdropFilter: "blur(3px)" }}
+        style={{ background: "rgba(0,0,0,0.5)" }}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         transition={{ duration: 0.15 }}
         onClick={onCancel} />
@@ -239,7 +239,7 @@ function FeelingPicker({ value, onChange }: { value?: string; onChange: (v: stri
         {open && (
           <>
             <motion.div key="fp-bd" className="fixed inset-0 z-50"
-              style={{ background: "color-mix(in oklch, var(--bj-ink) 35%, transparent)", backdropFilter: "blur(2px)" }}
+              style={{ background: "rgba(0,0,0,0.45)" }}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
               onClick={() => setOpen(false)} />
@@ -911,7 +911,7 @@ export default function JournalPage() {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             className="fixed inset-0 z-40 md:hidden"
-            style={{ background: "color-mix(in oklch, var(--bj-ink) 30%, transparent)", cursor: "pointer" }}
+            style={{ background: "rgba(0,0,0,0.4)", cursor: "pointer" }}
             onClick={() => setShowEntrySheet(false)}
             onTouchEnd={(e) => { e.preventDefault(); setShowEntrySheet(false); }}
           />

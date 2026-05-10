@@ -129,7 +129,7 @@ function FloatShell({ title, icon, onClose, defaultPos, width = 360, children }:
       <>
         <motion.div
           className="fixed inset-0 z-40"
-          style={{ background: "color-mix(in oklch, var(--bj-ink) 30%, transparent)" }}
+          style={{ background: "rgba(0,0,0,0.35)" }}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           onClick={onClose}
         />

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Highlighter, BookMarked } from "lucide-react";
+import { ChevronLeft, ChevronRight, Highlighter, BookMarked, Copy, Check } from "lucide-react";
 import { BookPickerSheet } from "@/components/bible/BookPickerSheet";
 import { QuickRefInput } from "@/components/bible/QuickRefInput";
 import { PROTESTANT_BOOKS, CHAPTER_COUNTS } from "@/lib/bible-books";
@@ -42,6 +42,7 @@ export default function BiblePage() {
   const [error, setError] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<Set<number>>(new Set());
   const [showPicker, setShowPicker] = useState(false);
+  const [copiedVerse, setCopiedVerse] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchChapter = useCallback(async (ver: string, bk: string, ch: number) => {
@@ -94,6 +95,14 @@ export default function BiblePage() {
       const next = new Set(prev);
       next.has(n) ? next.delete(n) : next.add(n);
       return next;
+    });
+  }
+
+  function copyVerse(n: number, text: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(`${book} ${chapter}:${n} — ${text}`).then(() => {
+      setCopiedVerse(n);
+      setTimeout(() => setCopiedVerse(null), 2000);
     });
   }
 
@@ -303,6 +312,14 @@ export default function BiblePage() {
 
                           {/* Hover actions — visible on hover (desktop) or always in expanded (mobile via tap) */}
                           <div className="flex items-start gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 shrink-0 pt-0.5">
+                            <button
+                              onClick={(e) => copyVerse(v.n, v.text, e)}
+                              className="bj-btn-action w-6 h-6 rounded flex items-center justify-center"
+                              style={{ color: copiedVerse === v.n ? "var(--bj-gold)" : "var(--bj-ink4)" }}
+                              title="Copy verse"
+                            >
+                              {copiedVerse === v.n ? <Check size={11} /> : <Copy size={11} />}
+                            </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleHighlight(v.n); }}
                               className="bj-btn-action w-6 h-6 rounded flex items-center justify-center"

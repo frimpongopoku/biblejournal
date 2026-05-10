@@ -50,7 +50,7 @@ export function PrayerDialog({ open, prayer, onClose, onSave }: Props) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             className="fixed inset-0 z-40"
-            style={{ background: "color-mix(in oklch, var(--bj-ink) 14%, transparent)" }}
+            style={{ background: "rgba(0,0,0,0.3)" }}
             onClick={onClose}
           />
 

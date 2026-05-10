@@ -105,7 +105,7 @@ export function ShortcutsPanel({ open, onClose }: Props) {
           <motion.div
             key="sc-bd"
             className="fixed inset-0 z-50"
-            style={{ background: "color-mix(in oklch, var(--bj-ink) 40%, transparent)", backdropFilter: "blur(4px)" }}
+            style={{ background: "rgba(0,0,0,0.5)" }}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             onClick={onClose}

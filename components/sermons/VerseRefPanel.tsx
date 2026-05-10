@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Plus, X, BookOpen, Hash } from "lucide-react";
+import { Search, Plus, X, BookOpen, Hash, ChevronLeft, ChevronRight, Maximize2, Copy, Check } from "lucide-react";
 import { parseRef } from "@/lib/bible-ref-parser";
 import { PROTESTANT_BOOKS, CHAPTER_COUNTS } from "@/lib/bible-books";
+import { useBibleStore } from "@/store/bible.store";
 import type { SermonRef } from "@/types";
+
+const VERSIONS = ["ESV", "KJV", "NIV", "AMP", "MSG", "ASV", "NKJV", "NLT"];
 
 // ── Suggestion types & helpers (mirrors QuickRefInput) ────
 
@@ -85,6 +88,7 @@ interface PreviewVerse {
   book: string;
   chapter: number;
   verse?: number;
+  version: string;
 }
 
 // ── Props ─────────────────────────────────────────────────
@@ -99,12 +103,14 @@ interface Props {
 // ── Main component ────────────────────────────────────────
 
 export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
-  const [value, setValue]       = useState("");
-  const [open, setOpen]         = useState(false);
-  const [selected, setSelected] = useState(0);
-  const [preview, setPreview]   = useState<PreviewVerse | null>(null);
-  const [fetching, setFetching] = useState(false);
-  const [adding, setAdding]     = useState(false);
+  const { version, setVersion } = useBibleStore();
+  const [value, setValue]           = useState("");
+  const [open, setOpen]             = useState(false);
+  const [selected, setSelected]     = useState(0);
+  const [preview, setPreview]       = useState<PreviewVerse | null>(null);
+  const [fetching, setFetching]     = useState(false);
+  const [adding, setAdding]         = useState(false);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const inputRef  = useRef<HTMLInputElement>(null);
   const wrapRef   = useRef<HTMLDivElement>(null);
@@ -117,6 +123,11 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
     setSelected(0);
     setOpen(suggestions.length > 0 && value.trim().length > 0);
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-fetch preview when version changes
+  useEffect(() => {
+    setPreview(null);
+  }, [version]);
 
   // Close on outside click
   useEffect(() => {
@@ -139,7 +150,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
       setFetching(true);
       try {
         const res = await fetch(
-          `/api/bible/ESV/${encodeURIComponent(parsed.book)}/${parsed.chapter}`
+          `/api/bible/${version}/${encodeURIComponent(parsed.book)}/${parsed.chapter}`
         );
         if (!res.ok) { setPreview(null); return; }
         const data = await res.json();
@@ -153,6 +164,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
         setPreview({
           ref: refLabel, text: verse.text,
           book: parsed.book, chapter: parsed.chapter, verse: parsed.verse,
+          version,
         });
       } finally {
         setFetching(false);
@@ -198,7 +210,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
       id: crypto.randomUUID(),
       book: preview.book, chapter: preview.chapter,
       ...(preview.verse !== undefined && { verse: preview.verse }),
-      text: preview.text, note: "", version: "ESV",
+      text: preview.text, note: "", version: preview.version,
       addedAt: new Date().toISOString(),
     };
     await onAdd(newRef);
@@ -207,6 +219,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
   }
 
   return (
+    <>
     <div className="flex flex-col h-full">
       {/* Panel header */}
       <div className="px-4 py-3 border-b shrink-0" style={{ borderColor: "var(--bj-line-soft)" }}>
@@ -313,6 +326,28 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
           )}
         </div>
 
+        {/* Version pills */}
+        <div className="flex flex-wrap gap-1 mt-2">
+          {VERSIONS.map((v) => (
+            <button
+              key={v}
+              onClick={() => setVersion(v)}
+              className="font-sans px-2 py-0.5 rounded-md"
+              style={{
+                fontSize: 10,
+                fontWeight: version === v ? 600 : 400,
+                background: version === v ? "var(--bj-gold)" : "var(--bj-bg-soft)",
+                color: version === v ? "white" : "var(--bj-ink4)",
+                transition: "all 0.12s ease",
+              }}
+              onMouseEnter={(e) => { if (version !== v) { (e.currentTarget as HTMLButtonElement).style.background = "var(--bj-line)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--bj-ink)"; } }}
+              onMouseLeave={(e) => { if (version !== v) { (e.currentTarget as HTMLButtonElement).style.background = "var(--bj-bg-soft)"; (e.currentTarget as HTMLButtonElement).style.color = "var(--bj-ink4)"; } }}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+
         {/* Verse preview */}
         <AnimatePresence>
           {(fetching || preview) && (
@@ -330,7 +365,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
                 ) : preview ? (
                   <>
                     <p className="font-sans font-semibold uppercase tracking-wider mb-1" style={{ fontSize: 10, color: "var(--bj-gold-deep)" }}>
-                      {preview.ref} · ESV
+                      {preview.ref} · {version}
                     </p>
                     <p className="font-display italic text-sm leading-snug mb-2" style={{ color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.55 }}>
                       "{preview.text.length > 120 ? preview.text.slice(0, 120) + "…" : preview.text}"
@@ -368,12 +403,25 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
                 index={i}
                 onUpdateNote={onUpdateNote}
                 onRemove={onRemove}
+                onExpand={() => setExpandedIndex(i)}
               />
             ))}
           </AnimatePresence>
         )}
       </div>
     </div>
+
+    <AnimatePresence>
+      {expandedIndex !== null && refs[expandedIndex] && (
+        <RefExpandModal
+          refs={refs}
+          index={expandedIndex}
+          onClose={() => setExpandedIndex(null)}
+          onNavigate={setExpandedIndex}
+        />
+      )}
+    </AnimatePresence>
+    </>
   );
 }
 
@@ -384,9 +432,10 @@ interface RefCardProps {
   index: number;
   onUpdateNote: (id: string, note: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
+  onExpand: () => void;
 }
 
-function RefCard({ ref_, index, onUpdateNote, onRemove }: RefCardProps) {
+function RefCard({ ref_, index, onUpdateNote, onRemove, onExpand }: RefCardProps) {
   const [note, setNote] = useState(ref_.note);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -415,15 +464,25 @@ function RefCard({ ref_, index, onUpdateNote, onRemove }: RefCardProps) {
         >
           {refLabel}
         </span>
-        <button
-          onClick={() => onRemove(ref_.id)}
-          className="bj-btn-action w-5 h-5 rounded flex items-center justify-center shrink-0"
-          data-danger
-          style={{ color: "var(--bj-ink4)" }}
-          title="Remove"
-        >
-          <X size={9} />
-        </button>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            onClick={onExpand}
+            className="bj-btn-action w-5 h-5 rounded flex items-center justify-center"
+            style={{ color: "var(--bj-ink4)" }}
+            title="Expand"
+          >
+            <Maximize2 size={9} />
+          </button>
+          <button
+            onClick={() => onRemove(ref_.id)}
+            className="bj-btn-action w-5 h-5 rounded flex items-center justify-center"
+            data-danger
+            style={{ color: "var(--bj-ink4)" }}
+            title="Remove"
+          >
+            <X size={9} />
+          </button>
+        </div>
       </div>
 
       <p className="font-display italic leading-relaxed mb-2" style={{ color: "var(--bj-ink2)", fontWeight: 400, lineHeight: 1.6, fontSize: 12 }}>
@@ -440,6 +499,143 @@ function RefCard({ ref_, index, onUpdateNote, onRemove }: RefCardProps) {
           borderTop: "1px solid var(--bj-line-soft)", paddingTop: 6,
         }}
       />
+    </motion.div>
+  );
+}
+
+// ── Expanded verse modal ──────────────────────────────────
+
+const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+interface RefExpandModalProps {
+  refs: SermonRef[];
+  index: number;
+  onClose: () => void;
+  onNavigate: (i: number) => void;
+}
+
+function RefExpandModal({ refs, index, onClose, onNavigate }: RefExpandModalProps) {
+  const ref_ = refs[index];
+  const [copied, setCopied] = useState(false);
+
+  const refLabel = ref_.verse
+    ? `${ref_.book} ${ref_.chapter}:${ref_.verse}`
+    : `${ref_.book} ${ref_.chapter}`;
+
+  useEffect(() => { setCopied(false); }, [index]);
+
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && index > 0) onNavigate(index - 1);
+      if (e.key === "ArrowRight" && index < refs.length - 1) onNavigate(index + 1);
+    }
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [index, refs.length, onClose, onNavigate]);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(`${refLabel} — ${ref_.text}`).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.55)" }}
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.94, y: 12 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.94, y: 12 }}
+        transition={{ ease: EASE_OUT, duration: 0.22 }}
+        className="relative w-full max-w-lg rounded-2xl p-6 flex flex-col gap-5"
+        style={{
+          background: "var(--bj-bg-panel)",
+          border: "1px solid var(--bj-line)",
+          boxShadow: "0 24px 80px color-mix(in oklch, var(--bj-ink) 28%, transparent)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3">
+          <span
+            className="font-sans font-semibold px-2.5 py-1 rounded-full"
+            style={{ fontSize: 11, background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}
+          >
+            {refLabel} · {ref_.version}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleCopy}
+              className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ color: copied ? "var(--bj-gold)" : "var(--bj-ink4)" }}
+              title="Copy text"
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+            </button>
+            <button
+              onClick={onClose}
+              className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ color: "var(--bj-ink4)" }}
+              title="Close"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+
+        {/* Verse text */}
+        <div className="px-1">
+          <p
+            className="font-display italic leading-relaxed"
+            style={{ fontSize: "clamp(1.1rem, 3vw, 1.35rem)", color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.75 }}
+          >
+            &ldquo;{ref_.text}&rdquo;
+          </p>
+          {ref_.note && (
+            <p
+              className="font-sans text-sm mt-4 pt-3 border-t"
+              style={{ color: "var(--bj-ink3)", borderColor: "var(--bj-line-soft)" }}
+            >
+              {ref_.note}
+            </p>
+          )}
+        </div>
+
+        {/* Prev / Next */}
+        {refs.length > 1 && (
+          <div
+            className="flex items-center justify-between pt-3 border-t"
+            style={{ borderColor: "var(--bj-line-soft)" }}
+          >
+            <button
+              onClick={() => onNavigate(index - 1)}
+              disabled={index === 0}
+              className="bj-chip flex items-center gap-1.5 font-sans text-xs px-3 py-2 rounded-xl disabled:opacity-30 min-h-[36px]"
+              style={{ color: "var(--bj-ink3)", border: "1px solid var(--bj-line-soft)" }}
+            >
+              <ChevronLeft size={12} /> Prev
+            </button>
+            <span className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>
+              {index + 1} of {refs.length}
+            </span>
+            <button
+              onClick={() => onNavigate(index + 1)}
+              disabled={index === refs.length - 1}
+              className="bj-chip flex items-center gap-1.5 font-sans text-xs px-3 py-2 rounded-xl disabled:opacity-30 min-h-[36px]"
+              style={{ color: "var(--bj-ink3)", border: "1px solid var(--bj-line-soft)" }}
+            >
+              Next <ChevronRight size={12} />
+            </button>
+          </div>
+        )}
+      </motion.div>
     </motion.div>
   );
 }

@@ -13,6 +13,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { TipTapEditor } from "@/components/journal/TipTapEditor";
 import { FloatingVideo, InlineVideo } from "@/components/sermons/FloatingVideo";
 import { VerseRefPanel } from "@/components/sermons/VerseRefPanel";
+import { FloatingBible, FloatingAsk, JournalFloatTriggers } from "@/components/journal/FloatingWindows";
 import { extractYouTubeId } from "@/lib/youtube-parser";
 import type { SermonRef } from "@/types";
 
@@ -35,6 +36,8 @@ export default function SermonDetailPage() {
   const [showVideo, setShowVideo] = useState(false);
   const [showPanel, setShowPanel] = useState(false); // mobile ref sheet
   const [showDesktopPanel, setShowDesktopPanel] = useState(true);
+  const [bibleOpen, setBibleOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   const [editingUrl, setEditingUrl] = useState(false);
   const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialised = useRef(false);
@@ -171,6 +174,13 @@ export default function SermonDetailPage() {
             >
               <Tv2 size={15} />
             </button>
+
+            {/* Floating window triggers */}
+            <JournalFloatTriggers
+              bibleOpen={bibleOpen} askOpen={askOpen}
+              onToggleBible={() => setBibleOpen((o) => !o)}
+              onToggleAsk={() => setAskOpen((o) => !o)}
+            />
 
             {/* Delete */}
             <button
@@ -365,6 +375,10 @@ export default function SermonDetailPage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Floating Bible + Ask */}
+      {bibleOpen && <FloatingBible onClose={() => setBibleOpen(false)} />}
+      {askOpen && <FloatingAsk onClose={() => setAskOpen(false)} />}
 
       {/* Desktop floating video */}
       <AnimatePresence>

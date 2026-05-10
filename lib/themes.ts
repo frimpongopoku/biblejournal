@@ -108,10 +108,10 @@ export const themes: Theme[] = [
       "--bj-bg": "oklch(13% 0.01 248)",
       "--bj-bg-soft": "oklch(17% 0.013 250)",
       "--bj-bg-panel": "oklch(10% 0.008 244)",
-      "--bj-ink": "oklch(93% 0.007 75)",
-      "--bj-ink2": "oklch(79% 0.01 74)",
-      "--bj-ink3": "oklch(64% 0.011 72)",
-      "--bj-ink4": "oklch(52% 0.009 70)",
+      "--bj-ink": "oklch(94% 0.007 75)",
+      "--bj-ink2": "oklch(82% 0.01 74)",
+      "--bj-ink3": "oklch(70% 0.011 72)",
+      "--bj-ink4": "oklch(58% 0.009 70)",
       "--bj-line": "oklch(24% 0.015 248)",
       "--bj-line-soft": "oklch(19% 0.011 246)",
       "--bj-gold": "oklch(70% 0.09 72)",
@@ -134,10 +134,10 @@ export const themes: Theme[] = [
       "--bj-bg":        "oklch(21% 0.018 252)",  // Dark slate — spacious, not claustrophobic
       "--bj-bg-soft":   "oklch(25% 0.022 254)",  // Input fields, soft cards
       "--bj-bg-panel":  "oklch(18% 0.015 250)",  // Sidebar, panels
-      "--bj-ink":       "oklch(91% 0.007 240)",  // Cool near-white — readable without eye strain
-      "--bj-ink2":      "oklch(74% 0.010 242)",  // Secondary — comfortable mid-gray
-      "--bj-ink3":      "oklch(57% 0.009 244)",  // Muted labels
-      "--bj-ink4":      "oklch(42% 0.009 246)",  // Placeholders, very muted
+      "--bj-ink":       "oklch(93% 0.007 240)",  // Cool near-white — readable without eye strain
+      "--bj-ink2":      "oklch(78% 0.010 242)",  // Secondary — comfortable mid-gray
+      "--bj-ink3":      "oklch(65% 0.009 244)",  // Muted labels
+      "--bj-ink4":      "oklch(54% 0.009 246)",  // Placeholders, very muted
       "--bj-line":      "oklch(30% 0.018 250)",  // Borders, dividers
       "--bj-line-soft": "oklch(24% 0.014 248)",  // Subtle separators
       "--bj-gold":      "oklch(72% 0.11 76)",    // Warm gold pops beautifully on dark slate
