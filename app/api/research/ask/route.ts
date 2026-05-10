@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       }],
     });
 
-    const raw = (message.content[0] as { type: string; text: string }).text;
+    const raw = (message.content[0] as { type: string; text: string }).text.replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
     const parsed = JSON.parse(raw);
     return NextResponse.json({ ...parsed, semanticSearch: isIndexReady(), version: ver });
   } catch (e) {

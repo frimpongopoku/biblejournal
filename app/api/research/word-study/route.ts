@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       messages: [{ role: "user", content: `Word study: "${word}"${contextNote}` }],
     });
 
-    const raw = (message.content[0] as { type: string; text: string }).text;
+    const raw = (message.content[0] as { type: string; text: string }).text.replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
     return NextResponse.json(JSON.parse(raw));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
