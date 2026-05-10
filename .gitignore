@@ -21,7 +21,5 @@ npm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Bible embeddings — generated binary, run `npm run embed` to create locally
-# bible-index.json IS committed (needed for vector search on Vercel)
-data/bible-embeddings.bin
+# Embedding checkpoint (temporary file, only exists mid-run)
 data/embed-progress.json

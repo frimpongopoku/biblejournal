@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   // to include these files in the relevant API-route bundles explicitly.
   outputFileTracingIncludes: {
     "/api/bible/(.*)":    ["./bibles/**"],
-    "/api/research/(.*)": ["./bibles/**", "./data/bible-index.json"],
+    "/api/research/(.*)": ["./bibles/**", "./data/bible-index.json", "./data/bible-embeddings.bin"],
   },
 
   // ── External images ─────────────────────────────────────
