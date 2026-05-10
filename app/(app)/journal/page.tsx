@@ -377,6 +377,7 @@ export default function JournalPage() {
                   entryId={selected.id}
                   content={selected.content}
                   onChange={handleContentChange}
+                  fontKey="journal"
                 />
               </div>
             </motion.div>

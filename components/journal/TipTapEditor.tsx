@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -8,21 +8,17 @@ import { ScriptureBlock } from "@/extensions/ScriptureBlock";
 import { CalloutBlock } from "@/extensions/CalloutBlock";
 import { SlashCommands } from "@/extensions/SlashCommands";
 import {
-  Bold,
-  Italic,
-  Underline,
-  Heading1,
-  Heading2,
-  List,
-  ListOrdered,
-  BookOpen,
-  MessageSquareQuote,
+  Bold, Italic, Underline, Heading1, Heading2,
+  List, ListOrdered, BookOpen, MessageSquareQuote, Type,
 } from "lucide-react";
+import { fontPairs, type FontPairId } from "@/lib/fonts";
 
 interface Props {
   entryId: string;
   content: string;
   onChange: (json: string) => void;
+  /** localStorage key for persisting this editor's font choice independently */
+  fontKey?: string;
 }
 
 interface ToolbarButtonProps {
@@ -52,7 +48,108 @@ function ToolbarButton({ active, onClick, title, children }: ToolbarButtonProps)
   );
 }
 
-export function TipTapEditor({ entryId, content, onChange }: Props) {
+// ── Font picker ───────────────────────────────────────────
+
+function FontPickerBtn({ fontKey }: { fontKey?: string }) {
+  const storageKey = `bj-font-editor-${fontKey ?? "default"}`;
+  const [fontId, setFontId] = useState<FontPairId>(() => {
+    if (typeof window === "undefined") return "classic";
+    return (localStorage.getItem(storageKey) as FontPairId) ?? "classic";
+  });
+  const [open, setOpen] = useState(false);
+  const [hov, setHov] = useState<FontPairId | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const activePair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  function choose(id: FontPairId) {
+    setFontId(id);
+    localStorage.setItem(storageKey, id);
+    // Push to editor DOM directly — works even across re-renders
+    const editors = document.querySelectorAll<HTMLElement>(`.bj-editor-${fontKey ?? "default"}`);
+    const pair = fontPairs.find((f) => f.id === id) ?? fontPairs[0];
+    editors.forEach((el) => { el.style.fontFamily = `var(${pair.displayVar})`; });
+    setOpen(false);
+  }
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
+        title="Writing font"
+        className="bj-btn-icon w-7 h-7 rounded flex items-center justify-center"
+        style={{
+          fontFamily: `var(${activePair.displayVar})`,
+          background: open ? "var(--bj-gold-tint)" : "transparent",
+          color: open ? "var(--bj-gold-deep)" : "var(--bj-ink3)",
+          fontSize: 13, fontStyle: "italic", fontWeight: 600,
+        }}
+      >
+        Aa
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 rounded-xl overflow-hidden z-50"
+          style={{
+            top: "calc(100% + 6px)",
+            background: "var(--bj-bg-panel)",
+            border: "1px solid var(--bj-line)",
+            boxShadow: "0 8px 28px color-mix(in oklch, var(--bj-ink) 14%, transparent)",
+            minWidth: 180,
+          }}
+        >
+          <p className="px-3 pt-2.5 pb-1 font-sans text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--bj-ink4)" }}>
+            Writing font
+          </p>
+          {fontPairs.map((pair) => {
+            const active = fontId === pair.id;
+            const isHov = hov === pair.id && !active;
+            return (
+              <button
+                key={pair.id}
+                onMouseDown={(e) => { e.preventDefault(); choose(pair.id); }}
+                onMouseEnter={() => setHov(pair.id)}
+                onMouseLeave={() => setHov(null)}
+                className="flex items-center gap-3 w-full px-3 py-2"
+                style={{
+                  background: active ? "var(--bj-gold-tint)" : isHov ? "var(--bj-bg-soft)" : "transparent",
+                  transition: "background 0.1s ease",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: `var(${pair.displayVar})`,
+                    fontSize: 18, fontStyle: "italic",
+                    color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)",
+                    lineHeight: 1, width: 28, textAlign: "center",
+                    transition: "color 0.1s ease",
+                  }}
+                >
+                  Aa
+                </span>
+                <span className="font-sans text-xs" style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink)", fontWeight: active ? 500 : 400 }}>
+                  {pair.label}
+                </span>
+                {active && <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: "var(--bj-gold)" }} />}
+              </button>
+            );
+          })}
+          <div className="h-2" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function TipTapEditor({ entryId, content, onChange, fontKey }: Props) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -68,10 +165,19 @@ export function TipTapEditor({ entryId, content, onChange }: Props) {
     },
     editorProps: {
       attributes: {
-        class: "bj-editor outline-none",
+        class: `bj-editor bj-editor-${fontKey ?? "default"} outline-none`,
       },
     },
   });
+
+  // Apply the persisted font to the editor DOM element
+  useEffect(() => {
+    if (!editor) return;
+    const storageKey = `bj-font-editor-${fontKey ?? "default"}`;
+    const savedId = (localStorage.getItem(storageKey) as FontPairId) ?? "classic";
+    const pair = fontPairs.find((f) => f.id === savedId) ?? fontPairs[0];
+    (editor.view.dom as HTMLElement).style.fontFamily = `var(${pair.displayVar})`;
+  }, [editor, fontKey]);
 
   // Sync content when switching entries (entryId change)
   useEffect(() => {
@@ -163,6 +269,10 @@ export function TipTapEditor({ entryId, content, onChange }: Props) {
         >
           <MessageSquareQuote size={13} />
         </ToolbarButton>
+
+        <div className="flex-1" />
+        {divider}
+        <FontPickerBtn fontKey={fontKey} />
       </div>
 
       {/* Editor area */}

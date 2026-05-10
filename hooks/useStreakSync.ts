@@ -5,6 +5,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useStreakStore } from "@/store/streak.store";
 import { subscribeToEntries } from "@/services/journal.service";
 import { subscribeToPrayers } from "@/services/prayer.service";
+import { subscribeToSermons } from "@/services/sermon.service";
 
 /**
  * Subscribes to journal entries + prayers in the background,
@@ -18,10 +19,11 @@ export function useStreakSync() {
   const updateStreak = useStreakStore((s) => s.update);
 
   const journalDates = useRef<Date[]>([]);
-  const prayerDates = useRef<Date[]>([]);
+  const prayerDates  = useRef<Date[]>([]);
+  const sermonDates  = useRef<Date[]>([]);
 
   function merge() {
-    updateStreak([...journalDates.current, ...prayerDates.current]);
+    updateStreak([...journalDates.current, ...prayerDates.current, ...sermonDates.current]);
   }
 
   useEffect(() => {
@@ -37,9 +39,11 @@ export function useStreakSync() {
       merge();
     });
 
-    return () => {
-      unsubJ();
-      unsubP();
-    };
+    const unsubS = subscribeToSermons(user.uid, (sermons) => {
+      sermonDates.current = sermons.map((s) => s.updatedAt);
+      merge();
+    });
+
+    return () => { unsubJ(); unsubP(); unsubS(); };
   }, [user?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 }

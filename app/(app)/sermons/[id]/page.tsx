@@ -274,6 +274,7 @@ export default function SermonDetailPage() {
                 entryId={id}
                 content={sermon?.content ?? JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] })}
                 onChange={handleContentChange}
+                fontKey="sermon"
               />
             </div>
           )}

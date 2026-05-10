@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Globe, Lock, Link2, Check, Plus, X, Pencil, Trash2,
 } from "lucide-react";
+import { fontPairs, type FontPairId } from "@/lib/fonts";
 import { useProclamationFolders } from "@/hooks/useProclamationFolders";
 import { useProclamationEntries } from "@/hooks/useProclamationEntries";
 import {
@@ -16,6 +17,54 @@ import {
 import { useAuthStore } from "@/store/auth.store";
 import { NewFolderSheet } from "@/components/proclamations/NewFolderSheet";
 import type { ProclamationEntry } from "@/types";
+
+// ── Proclamation font picker ──────────────────────────────
+
+const PROC_FONT_KEY = "bj-font-editor-proclamation";
+
+function getProcFont(): FontPairId {
+  if (typeof window === "undefined") return "classic";
+  return (localStorage.getItem(PROC_FONT_KEY) as FontPairId) ?? "classic";
+}
+
+function FontPills({ fontId, onChange }: { fontId: FontPairId; onChange: (id: FontPairId) => void }) {
+  const [hov, setHov] = useState<FontPairId | null>(null);
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className="font-sans text-[10px] uppercase tracking-widest font-semibold mr-1" style={{ color: "var(--bj-ink4)" }}>Font</span>
+      {fontPairs.map((p) => {
+        const active = fontId === p.id;
+        const isHov = hov === p.id && !active;
+        return (
+          <button
+            key={p.id}
+            onClick={(e) => { e.stopPropagation(); onChange(p.id); }}
+            onMouseEnter={() => setHov(p.id)}
+            onMouseLeave={() => setHov(null)}
+            title={p.label}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-lg"
+            style={{
+              fontFamily: `var(${p.displayVar})`,
+              fontStyle: "italic",
+              fontSize: 13,
+              fontWeight: active ? 600 : 400,
+              background: active ? "var(--bj-gold-tint)" : isHov ? "var(--bj-bg-soft)" : "transparent",
+              color: active ? "var(--bj-gold-deep)" : isHov ? "var(--bj-ink)" : "var(--bj-ink3)",
+              border: `1px solid ${active ? "var(--bj-gold-soft)" : "transparent"}`,
+              transform: isHov ? "translateY(-1px)" : "none",
+              transition: "all 0.12s ease",
+            }}
+          >
+            Aa
+            <span className="font-sans not-italic text-[9px]" style={{ fontFamily: "var(--bj-ui)", fontStyle: "normal" }}>
+              {p.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 // ── Auto-growing textarea ─────────────────────────────────
 
@@ -55,7 +104,15 @@ function NewEntryCard({ onSave, onCancel }: NewCardProps) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fontId, setFontId] = useState<FontPairId>(getProcFont);
   const titleRef = useRef<HTMLInputElement>(null);
+
+  function handleFontChange(id: FontPairId) {
+    setFontId(id);
+    localStorage.setItem(PROC_FONT_KEY, id);
+  }
+
+  const activePair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
 
   useEffect(() => { titleRef.current?.focus(); }, []);
 
@@ -115,14 +172,18 @@ function NewEntryCard({ onSave, onCancel }: NewCardProps) {
 
         {/* Body */}
         <div className="pl-4 md:pl-5">
+          <div className="mb-3">
+            <FontPills fontId={fontId} onChange={handleFontChange} />
+          </div>
           <AutoTextarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }}
             placeholder="Write your reflection, a scripture, a deeper context… (optional)"
             minHeight={100}
-            className="w-full bg-transparent outline-none font-display leading-relaxed"
+            className="w-full bg-transparent outline-none leading-relaxed"
             style={{
+              fontFamily: `var(${activePair.displayVar})`,
               fontSize: "clamp(1.05rem, 3vw, 1.2rem)",
               fontWeight: 400,
               lineHeight: 1.95,
@@ -174,6 +235,14 @@ function EntryCard({ entry, index, onUpdate, onDelete }: EntryCardProps) {
   const [editTitle, setEditTitle] = useState("");
   const [editBody, setEditBody] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fontId, setFontId] = useState<FontPairId>(getProcFont);
+
+  function handleFontChange(id: FontPairId) {
+    setFontId(id);
+    localStorage.setItem(PROC_FONT_KEY, id);
+  }
+
+  const activePair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
 
   function startEdit(e: React.MouseEvent) {
     e.stopPropagation();
@@ -267,27 +336,34 @@ function EntryCard({ entry, index, onUpdate, onDelete }: EntryCardProps) {
                 style={{ borderColor: "var(--bj-line-soft)" }}
               >
                 {editing ? (
-                  <AutoTextarea
-                    value={editBody}
-                    onChange={(e) => setEditBody(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    placeholder="Reflection, scripture, context…"
-                    minHeight={80}
-                    className="w-full bg-transparent outline-none font-display leading-relaxed"
-                    style={{
-                      fontSize: "clamp(1.05rem, 3vw, 1.2rem)",
-                      fontWeight: 400,
-                      lineHeight: 1.95,
-                      color: "var(--bj-ink2)",
-                      caretColor: "var(--bj-gold)",
-                      letterSpacing: "0.01em",
-                    }}
-                  />
+                  <>
+                    <div className="mb-2" onClick={(e) => e.stopPropagation()}>
+                      <FontPills fontId={fontId} onChange={handleFontChange} />
+                    </div>
+                    <AutoTextarea
+                      value={editBody}
+                      onChange={(e) => setEditBody(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="Reflection, scripture, context…"
+                      minHeight={80}
+                      className="w-full bg-transparent outline-none leading-relaxed"
+                      style={{
+                        fontFamily: `var(${activePair.displayVar})`,
+                        fontSize: "clamp(1.05rem, 3vw, 1.2rem)",
+                        fontWeight: 400,
+                        lineHeight: 1.95,
+                        color: "var(--bj-ink2)",
+                        caretColor: "var(--bj-gold)",
+                        letterSpacing: "0.01em",
+                      }}
+                    />
+                  </>
                 ) : (
                   entry.body && (
                     <p
-                      className="font-display leading-relaxed mb-4"
+                      className="leading-relaxed mb-4"
                       style={{
+                        fontFamily: `var(${activePair.displayVar})`,
                         fontSize: "clamp(1.05rem, 3vw, 1.2rem)",
                         fontWeight: 400,
                         lineHeight: 1.95,
