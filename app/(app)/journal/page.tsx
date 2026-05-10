@@ -56,95 +56,145 @@ function feelingByLabel(label?: string) {
   return FEELINGS.find((f) => f.label === label);
 }
 
-// ── Feeling picker ────────────────────────────────────────
+// ── Feeling picker modal ──────────────────────────────────
 
 function FeelingPicker({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const active = feelingByLabel(value);
+  const [custom, setCustom] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const preset = feelingByLabel(value);
+  const isCustom = value && !preset;
 
   useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+    if (!open) return;
+    function handler(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open]);
+
+  // Focus custom input when user starts typing in the modal
+  function saveCustom() {
+    const trimmed = custom.trim();
+    if (!trimmed) return;
+    onChange(trimmed);
+    setCustom("");
+    setOpen(false);
+  }
 
   return (
-    <div ref={wrapRef} className="relative">
+    <>
+      {/* Trigger button */}
       <button
-        onClick={() => setOpen((o) => !o)}
-        title={active ? `Feeling: ${active.label}` : "Set feeling"}
-        className="bj-btn-action flex items-center gap-1 px-2 py-1 rounded-lg"
+        onClick={() => setOpen(true)}
+        title={value ? `Feeling: ${value}` : "How are you feeling?"}
+        className="bj-btn-action flex items-center gap-1.5 px-2 py-1 rounded-lg"
         style={{
-          background: open || active ? "var(--bj-gold-tint)" : "transparent",
-          color: active ? "var(--bj-gold-deep)" : "var(--bj-ink4)",
-          border: `1px solid ${active ? "var(--bj-gold-soft)" : "transparent"}`,
-          fontSize: 13,
-          transition: "all 0.12s ease",
+          background: value ? "var(--bj-gold-tint)" : "transparent",
+          color: value ? "var(--bj-gold-deep)" : "var(--bj-ink4)",
+          border: `1px solid ${value ? "var(--bj-gold-soft)" : "transparent"}`,
+          fontSize: 13, transition: "all 0.12s ease",
         }}
       >
-        {active ? <span>{active.emoji}</span> : <Smile size={13} />}
-        {active && <span className="font-sans text-xs hidden sm:inline">{active.label}</span>}
+        {preset ? <span>{preset.emoji}</span> : isCustom ? <span>✍️</span> : <Smile size={13} />}
+        {value && <span className="font-sans text-xs hidden sm:inline">{preset?.label ?? value}</span>}
       </button>
 
+      {/* Modal */}
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 4 }}
-            transition={{ duration: 0.14 }}
-            className="absolute z-50 rounded-2xl overflow-hidden"
-            style={{
-              top: "calc(100% + 6px)", left: 0,
-              background: "var(--bj-bg-panel)",
-              border: "1px solid var(--bj-line)",
-              boxShadow: "0 8px 28px color-mix(in oklch, var(--bj-ink) 14%, transparent)",
-              minWidth: 200,
-            }}
-          >
-            <p className="px-3 pt-2.5 pb-1 font-sans text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--bj-ink4)" }}>
-              How are you feeling?
-            </p>
-            <div className="grid grid-cols-2 gap-px p-1.5">
-              {FEELINGS.map((f) => {
-                const isActive = value === f.label;
-                return (
-                  <button
-                    key={f.label}
-                    onClick={() => { onChange(isActive ? undefined : f.label); setOpen(false); }}
-                    className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-left"
-                    style={{
-                      background: isActive ? "var(--bj-gold-tint)" : "transparent",
-                      transition: "background 0.1s ease",
-                    }}
-                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--bj-bg-soft)"; }}
-                    onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "transparent"; }}
-                  >
-                    <span style={{ fontSize: 16, lineHeight: 1 }}>{f.emoji}</span>
-                    <span className="font-sans text-xs" style={{ color: isActive ? "var(--bj-gold-deep)" : "var(--bj-ink2)", fontWeight: isActive ? 500 : 400 }}>
-                      {f.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            {value && (
-              <button
-                onClick={() => { onChange(undefined); setOpen(false); }}
-                className="w-full text-center font-sans text-xs py-2 border-t"
-                style={{ color: "var(--bj-ink4)", borderColor: "var(--bj-line-soft)" }}
+          <>
+            <motion.div key="fp-bd" className="fixed inset-0 z-50"
+              style={{ background: "color-mix(in oklch, var(--bj-ink) 35%, transparent)", backdropFilter: "blur(2px)" }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={() => setOpen(false)} />
+
+            <motion.div key="fp-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ pointerEvents: "none" }}>
+              <motion.div
+                className="w-full rounded-2xl overflow-hidden"
+                style={{
+                  maxWidth: 420, pointerEvents: "auto",
+                  background: "var(--bj-bg-panel)",
+                  border: "1px solid var(--bj-line)",
+                  boxShadow: "0 24px 60px color-mix(in oklch, var(--bj-ink) 22%, transparent)",
+                }}
+                initial={{ opacity: 0, scale: 0.94, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.94, y: 12 }}
+                transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.22 }}
               >
-                Clear feeling
-              </button>
-            )}
-            <div className="h-1" />
-          </motion.div>
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
+                  <h2 className="font-display text-lg" style={{ color: "var(--bj-ink)", fontWeight: 400 }}>
+                    How are you feeling?
+                  </h2>
+                  <button onClick={() => setOpen(false)} className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {/* Preset grid */}
+                <div className="grid grid-cols-2 gap-1.5 p-4">
+                  {FEELINGS.map((f) => {
+                    const isActive = value === f.label;
+                    return (
+                      <button key={f.label}
+                        onClick={() => { onChange(isActive ? undefined : f.label); setOpen(false); }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-100"
+                        style={{
+                          background: isActive ? "var(--bj-gold-tint)" : "var(--bj-bg-soft)",
+                          border: `1px solid ${isActive ? "var(--bj-gold-soft)" : "transparent"}`,
+                          transform: "none",
+                        }}
+                        onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.background = "var(--bj-line-soft)"; e.currentTarget.style.transform = "translateY(-1px)"; } }}
+                        onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = "var(--bj-bg-soft)"; e.currentTarget.style.transform = "none"; } }}
+                      >
+                        <span style={{ fontSize: 20, lineHeight: 1 }}>{f.emoji}</span>
+                        <span className="font-sans text-sm" style={{ color: isActive ? "var(--bj-gold-deep)" : "var(--bj-ink2)", fontWeight: isActive ? 500 : 400 }}>
+                          {f.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom input */}
+                <div className="px-4 pb-4 pt-1 border-t" style={{ borderColor: "var(--bj-line-soft)" }}>
+                  <p className="font-sans text-[10px] uppercase tracking-widest font-semibold mb-2 mt-3" style={{ color: "var(--bj-ink4)" }}>
+                    Or describe it yourself
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      ref={inputRef}
+                      value={custom}
+                      onChange={(e) => setCustom(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveCustom(); }}
+                      placeholder="Overwhelmed, grateful beyond words…"
+                      className="flex-1 bg-transparent outline-none font-sans text-sm px-3 py-2 rounded-xl"
+                      style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)", color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }}
+                    />
+                    <button onClick={saveCustom} disabled={!custom.trim()}
+                      className="font-sans text-sm px-3 py-2 rounded-xl disabled:opacity-40 transition-all"
+                      style={{ background: "var(--bj-gold)", color: "white" }}>
+                      Set
+                    </button>
+                  </div>
+                </div>
+
+                {/* Clear */}
+                {value && (
+                  <button onClick={() => { onChange(undefined); setOpen(false); }}
+                    className="w-full font-sans text-xs py-3 border-t"
+                    style={{ color: "var(--bj-ink4)", borderColor: "var(--bj-line-soft)" }}>
+                    Clear feeling
+                  </button>
+                )}
+              </motion.div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
 
@@ -274,12 +324,12 @@ export default function JournalPage() {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
       // ⌘⌥B — Bible panel (changed from ⌘⇧B which conflicted with browser bookmark bar)
-      if (e.altKey && e.key.toLowerCase() === "b") { e.preventDefault(); setBibleOpen((o) => !o); return; }
+      // Use e.code (physical key) — e.key is unreliable with Option/Alt modifiers
+      // e.g. on macOS, ⌥B produces "∫" not "b"
+      if (e.altKey && e.code === "KeyB") { e.preventDefault(); setBibleOpen((o) => !o); return; }
       if (!e.shiftKey) return;
-      switch (e.key.toLowerCase()) {
-        case "n": e.preventDefault(); handleNew(); break;
-        case "a": e.preventDefault(); setAskOpen((o) => !o); break;
-      }
+      if (e.code === "KeyN") { e.preventDefault(); handleNew(); }
+      if (e.code === "KeyA") { e.preventDefault(); setAskOpen((o) => !o); }
     }
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -376,7 +426,7 @@ export default function JournalPage() {
       {/* Mobile: full-screen list when no entry selected; hidden when editor open */}
       {/* Desktop: always visible 300px sidebar */}
       <div
-        className={`${selectedId ? "hidden md:flex" : "flex"} w-full flex-col border-r h-full overflow-hidden shrink-0`}
+        className={`${viewMode === "table" ? "hidden" : selectedId ? "hidden md:flex" : "flex"} w-full flex-col border-r h-full overflow-hidden shrink-0`}
         style={{ maxWidth: listCompact ? 220 : 300, minWidth: listCompact ? 220 : 300, borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)", transition: "min-width 0.2s ease, max-width 0.2s ease" }}
       >
         {/* Header */}

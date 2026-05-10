@@ -87,8 +87,11 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
 
+      // Use e.code (physical key position) — reliable across all keyboard layouts
+      // e.key changes with modifiers/locale; e.code always reflects the physical key
+
       // ⌘/ → shortcuts panel (always, even in editors)
-      if (e.key === "/") { e.preventDefault(); setShowShortcuts((o) => !o); return; }
+      if (e.code === "Slash") { e.preventDefault(); setShowShortcuts((o) => !o); return; }
 
       // Don't fire nav shortcuts when typing in an input / editor
       const target = e.target as HTMLElement;
@@ -96,15 +99,15 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       if (inEditable) return;
 
       const NAV: Record<string, string> = {
-        j: "/journal",
-        k: "/prayer",
-        p: "/proclamations",
-        b: "/bible",
-        d: "/dashboard",
-        s: "/sermons",
-        e: "/research",
+        KeyJ: "/journal",
+        KeyK: "/prayer",
+        KeyP: "/proclamations",
+        KeyB: "/bible",
+        KeyD: "/dashboard",
+        KeyS: "/sermons",
+        KeyE: "/research",
       };
-      const dest = NAV[e.key.toLowerCase()];
+      const dest = NAV[e.code];
       if (dest) { e.preventDefault(); router.push(dest); }
     }
     window.addEventListener("keydown", handler);
