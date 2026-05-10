@@ -117,6 +117,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const suggestions = getSuggestions(value);
+  const sortedRefs = [...refs].sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
 
   // Sync dropdown open state
   useEffect(() => {
@@ -396,7 +397,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
-            {refs.map((ref, i) => (
+            {sortedRefs.map((ref, i) => (
               <RefCard
                 key={ref.id}
                 ref_={ref}
@@ -412,9 +413,9 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
     </div>
 
     <AnimatePresence>
-      {expandedIndex !== null && refs[expandedIndex] && (
+      {expandedIndex !== null && sortedRefs[expandedIndex] && (
         <RefExpandModal
-          refs={refs}
+          refs={sortedRefs}
           index={expandedIndex}
           onClose={() => setExpandedIndex(null)}
           onNavigate={setExpandedIndex}
