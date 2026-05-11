@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { EntriesClient } from "./EntriesClient";
 
 // ── Firestore REST helpers (no auth — public documents) ───
 
@@ -10,7 +11,7 @@ async function fsGet(path: string): Promise<Record<string, unknown> | null> {
   if (!PROJECT || PROJECT === "placeholder") return null;
   try {
     const res = await fetch(`${BASE}/${path}`, {
-      next: { revalidate: 60 },
+      cache: "no-store",
     });
     if (!res.ok) return null;
     return res.json();
@@ -23,7 +24,7 @@ async function fsList(path: string): Promise<Record<string, unknown>[]> {
   if (!PROJECT || PROJECT === "placeholder") return [];
   try {
     const res = await fetch(`${BASE}/${path}`, {
-      next: { revalidate: 60 },
+      cache: "no-store",
     });
     if (!res.ok) return [];
     const json = await res.json();
@@ -170,31 +171,7 @@ export default async function PublicProclamationPage(
           No declarations yet.
         </p>
       ) : (
-        <div className="flex flex-col gap-8">
-          {entries.map((entry, i) => (
-            <div key={entry.id} className="flex gap-4">
-              {/* Number */}
-              <span
-                className="font-sans text-xs font-semibold shrink-0 w-6 h-6 rounded-lg flex items-center justify-center mt-1"
-                style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", fontSize: 10 }}
-              >
-                {i + 1}
-              </span>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <p className="font-sans font-semibold text-base leading-snug mb-2" style={{ color: "var(--bj-ink)", fontSize: 17 }}>
-                  {entry.title}
-                </p>
-                {entry.body && (
-                  <p className="font-sans text-sm leading-relaxed" style={{ color: "var(--bj-ink3)", lineHeight: 1.8 }}>
-                    {entry.body}
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <EntriesClient entries={entries} />
       )}
 
       {/* Footer */}

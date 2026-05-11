@@ -339,3 +339,27 @@
   font-style: italic;
   font-size: 17px;
 }
+
+/* Simple rich editor (proclamations, prayers) */
+.bj-simple-editor {
+  outline: none;
+  min-height: 80px;
+  line-height: 1.95;
+  letter-spacing: 0.01em;
+}
+.bj-simple-editor > *:first-child { margin-top: 0 !important; }
+.bj-simple-editor p { margin-bottom: 0.75rem; }
+.bj-simple-editor p:last-child { margin-bottom: 0; }
+.bj-simple-editor strong { font-weight: 650; }
+.bj-simple-editor em { font-style: italic; }
+.bj-simple-editor ::selection {
+  background: color-mix(in oklch, var(--bj-gold) 22%, transparent);
+}
+.bj-simple-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--bj-ink4);
+  pointer-events: none;
+  float: left;
+  height: 0;
+  font-style: italic;
+}

@@ -17,8 +17,8 @@ interface Props {
   entryId: string;
   content: string;
   onChange: (json: string) => void;
-  /** localStorage key for persisting this editor's font choice independently */
   fontKey?: string;
+  autoFocus?: boolean;
 }
 
 interface ToolbarButtonProps {
@@ -191,7 +191,18 @@ function FontPickerBtn({ fontKey }: { fontKey?: string }) {
   );
 }
 
-export function TipTapEditor({ entryId, content, onChange, fontKey }: Props) {
+/** Parse body content that may be TipTap JSON, HTML, or plain text */
+function parseContent(raw: string): object | string | undefined {
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw); // TipTap JSON doc
+  } catch {
+    // HTML or plain text — TipTap can ingest both as a string
+    return raw;
+  }
+}
+
+export function TipTapEditor({ entryId, content, onChange, fontKey, autoFocus }: Props) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -201,7 +212,7 @@ export function TipTapEditor({ entryId, content, onChange, fontKey }: Props) {
       CalloutBlock,
       SlashCommands,
     ],
-    content: content ? JSON.parse(content) : undefined,
+    content: parseContent(content),
     onUpdate({ editor }) {
       onChange(JSON.stringify(editor.getJSON()));
     },
@@ -223,13 +234,21 @@ export function TipTapEditor({ entryId, content, onChange, fontKey }: Props) {
     dom.style.fontSize   = `${savedSize}px`;
   }, [editor, fontKey]);
 
+  // Focus editor content on mount when autoFocus is set
+  useEffect(() => {
+    if (autoFocus && editor) {
+      editor.commands.focus("end");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
+
   // Sync content when switching entries (entryId change)
   useEffect(() => {
     if (!editor) return;
-    const incoming = content ? JSON.parse(content) : { type: "doc", content: [{ type: "paragraph" }] };
+    const incoming = parseContent(content) ?? { type: "doc", content: [{ type: "paragraph" }] };
     const current = editor.getJSON();
     if (JSON.stringify(incoming) !== JSON.stringify(current)) {
-      editor.commands.setContent(incoming);
+      editor.commands.setContent(incoming as Parameters<typeof editor.commands.setContent>[0]);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryId]);
