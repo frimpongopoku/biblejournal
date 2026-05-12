@@ -118,7 +118,7 @@ export function EntriesClient({ entries }: { entries: Entry[] }) {
                   className="overflow-hidden"
                 >
                   <div
-                    className="px-5 pb-5 pt-1 ml-10"
+                    className="px-4 sm:px-5 pb-5 pt-1 sm:ml-10"
                     style={{ borderTop: "1px solid var(--bj-line-soft, #f0f0f0)" }}
                   >
                     <div className="pt-3">

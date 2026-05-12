@@ -126,7 +126,7 @@ export default async function PublicProclamationPage(
   const { folderName, description, entries } = data;
 
   return (
-    <div className="min-h-screen px-5 md:px-10 py-10 md:py-16" style={{ maxWidth: 680, margin: "0 auto" }}>
+    <div className="min-h-screen px-2 sm:px-5 md:px-10 py-8 md:py-16" style={{ maxWidth: 680, margin: "0 auto" }}>
 
       {/* Brand mark */}
       <div className="flex items-center gap-2 mb-12">
