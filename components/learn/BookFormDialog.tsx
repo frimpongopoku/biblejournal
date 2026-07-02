@@ -28,7 +28,7 @@ export function BookFormDialog({ open, onClose, topics, editing, defaultTopicId 
   const user = useAuthStore((s) => s.user);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [color, setColor] = useState(BOOK_COLORS[0]);
+  const [color, setColor] = useState<string>(BOOK_COLORS[0]);
   const [status, setStatus] = useState<BookStatus>("want-to-read");
   const [rating, setRating] = useState<number | null>(null);
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([]);

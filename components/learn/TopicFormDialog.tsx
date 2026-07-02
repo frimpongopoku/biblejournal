@@ -34,7 +34,7 @@ export function TopicFormDialog({ open, onClose, editing }: Props) {
   const user = useAuthStore((s) => s.user);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [color, setColor] = useState(TOPIC_COLORS[0]);
+  const [color, setColor] = useState<string>(TOPIC_COLORS[0]);
   const [status, setStatus] = useState<TopicStatus>("active");
   const [saving, setSaving] = useState(false);
 
