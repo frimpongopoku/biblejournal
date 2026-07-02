@@ -117,3 +117,46 @@ export interface ProclamationEntry {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// ── Learning Portfolio ────────────────────────────────────
+
+export type TopicStatus = "active" | "paused" | "completed";
+export type InsightSourceType = "book" | "sermon" | "bible" | "course" | "conversation" | "reflection";
+export type BookStatus = "want-to-read" | "reading" | "finished";
+
+export interface LearningTopic {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  color: string;
+  status: TopicStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Insight {
+  id: string;
+  userId: string;
+  topicId: string;
+  body: string;
+  sourceType: InsightSourceType;
+  sourceRef: string | null;
+  scriptures: ScriptureRef[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LearningBook {
+  id: string;
+  userId: string;
+  topicIds: string[];
+  title: string;
+  author: string;
+  color: string;
+  status: BookStatus;
+  rating: number | null;
+  notes: string;
+  createdAt: Date;
+  updatedAt: Date;
+}

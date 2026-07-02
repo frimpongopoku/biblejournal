@@ -8,7 +8,7 @@ import {
   LayoutDashboard, NotebookPen, BookOpen, HeartHandshake,
   Megaphone, Mic, Compass, Network, Search, Plus, Bell, Moon, Sun,
   Settings, LogOut, Flame, Palette, Menu, X, Keyboard,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, GraduationCap,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ShortcutsPanel } from "@/components/ShortcutsPanel";
@@ -29,6 +29,7 @@ const navItems = [
   { href: "/prayer",         label: "Prayer",           icon: HeartHandshake },
   { href: "/sermons",        label: "Sermons",          icon: Mic },
   { href: "/proclamations",  label: "Proclamations",    icon: Megaphone },
+  { href: "/learn",          label: "Learning",         icon: GraduationCap },
   { href: "/research",       label: "Research",         icon: Compass },
 ];
 
@@ -107,6 +108,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
         KeyB: "/bible",
         KeyD: "/dashboard",
         KeyS: "/sermons",
+        KeyL: "/learn",
         KeyE: "/research",
       };
       const dest = NAV[e.code];
