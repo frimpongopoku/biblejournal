@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Highlighter, BookMarked, Copy, Check } from "lucide-react";
 import { BookPickerSheet } from "@/components/bible/BookPickerSheet";
@@ -32,11 +33,21 @@ function nextLoc(book: string, ch: number, total: number) {
   return { book: PROTESTANT_BOOKS[i + 1], chapter: 1 };
 }
 
-export default function BiblePage() {
+function BibleReader() {
+  const searchParams = useSearchParams();
   const { version, setVersion } = useBibleStore();
-  const [book, setBook] = useState(DEFAULT_BOOK);
-  const [chapter, setChapter] = useState(DEFAULT_CHAPTER);
-  const [targetVerse, setTargetVerse] = useState<number | undefined>();
+  const [book, setBook] = useState(() => {
+    const b = searchParams.get("book");
+    return b && (PROTESTANT_BOOKS as readonly string[]).includes(b) ? b : DEFAULT_BOOK;
+  });
+  const [chapter, setChapter] = useState(() => {
+    const c = parseInt(searchParams.get("chapter") ?? "", 10);
+    return Number.isFinite(c) && c > 0 ? c : DEFAULT_CHAPTER;
+  });
+  const [targetVerse, setTargetVerse] = useState<number | undefined>(() => {
+    const v = parseInt(searchParams.get("verse") ?? "", 10);
+    return Number.isFinite(v) && v > 0 ? v : undefined;
+  });
   const [data, setData] = useState<ChapterData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -386,5 +397,13 @@ export default function BiblePage() {
         onClose={() => setShowPicker(false)}
       />
     </>
+  );
+}
+
+export default function BiblePage() {
+  return (
+    <Suspense fallback={null}>
+      <BibleReader />
+    </Suspense>
   );
 }
