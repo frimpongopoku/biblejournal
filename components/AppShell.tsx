@@ -8,7 +8,7 @@ import {
   LayoutDashboard, NotebookPen, BookOpen, HeartHandshake,
   Megaphone, Mic, Compass, Network, Search, Plus, Bell, Moon, Sun,
   Settings, LogOut, Flame, Palette, Menu, X, Keyboard,
-  ChevronLeft, ChevronRight, GraduationCap, Scroll, BookOpenCheck, Coins,
+  ChevronLeft, ChevronRight, GraduationCap, Scroll, BookOpenCheck, Coins, Zap,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ShortcutsPanel } from "@/components/ShortcutsPanel";
@@ -34,6 +34,7 @@ const navItems = [
   { href: "/promises",       label: "Promises",         icon: Scroll },
   { href: "/principles",     label: "Principles",       icon: BookOpenCheck },
   { href: "/wealth",         label: "Wealth",           icon: Coins },
+  { href: "/authority",      label: "Authority",        icon: Zap },
 ];
 
 const WEEK_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -116,6 +117,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
         KeyO: "/promises",
         KeyT: "/principles",
         KeyW: "/wealth",
+        KeyA: "/authority",
       };
       const dest = NAV[e.code];
       if (dest) { e.preventDefault(); router.push(dest); }

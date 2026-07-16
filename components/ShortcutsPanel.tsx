@@ -32,6 +32,7 @@ const GROUPS: Group[] = [
       { keys: ["⌘", "O"], desc: "Promises" },
       { keys: ["⌘", "T"], desc: "Principles" },
       { keys: ["⌘", "W"], desc: "Wealth" },
+      { keys: ["⌘", "A"], desc: "Authority" },
       { keys: ["⌘", "/"], desc: "Show shortcuts" },
     ],
   },
