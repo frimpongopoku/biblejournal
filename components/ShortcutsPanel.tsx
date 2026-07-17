@@ -33,6 +33,7 @@ const GROUPS: Group[] = [
       { keys: ["⌘", "T"], desc: "Principles" },
       { keys: ["⌘", "W"], desc: "Wealth" },
       { keys: ["⌘", "A"], desc: "Authority" },
+      { keys: ["⌘", "I"], desc: "Intercession" },
       { keys: ["⌘", "/"], desc: "Show shortcuts" },
       { keys: ["⌘", "⌥", "B"], desc: "Toggle floating Bible (anywhere)" },
       { keys: ["⌘", "⇧", "A"], desc: "Toggle floating Ask (anywhere)" },

@@ -8,7 +8,7 @@ import {
   LayoutDashboard, NotebookPen, BookOpen, HeartHandshake,
   Megaphone, Mic, Compass, Network, Search, Plus, Bell, Moon, Sun,
   Settings, LogOut, Flame, Palette, Menu, X, Keyboard,
-  ChevronLeft, ChevronRight, GraduationCap, Scroll, BookOpenCheck, Coins, Zap,
+  ChevronLeft, ChevronRight, GraduationCap, Scroll, BookOpenCheck, Coins, Zap, Handshake,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ShortcutsPanel } from "@/components/ShortcutsPanel";
@@ -24,7 +24,7 @@ import type { ThemeId } from "@/lib/themes";
 import { fontPairs } from "@/lib/fonts";
 import type { FontPairId } from "@/lib/fonts";
 
-const navItems = [
+const menuItems = [
   { href: "/dashboard",      label: "Today",           icon: LayoutDashboard },
   { href: "/journal",        label: "Journal",          icon: NotebookPen },
   { href: "/bible",          label: "Bible",            icon: BookOpen },
@@ -33,11 +33,17 @@ const navItems = [
   { href: "/proclamations",  label: "Proclamations",    icon: Megaphone },
   { href: "/learn",          label: "Learning",         icon: GraduationCap },
   { href: "/research",       label: "Research",         icon: Compass },
+];
+
+const spaceItems = [
   { href: "/promises",       label: "Promises",         icon: Scroll },
   { href: "/principles",     label: "Principles",       icon: BookOpenCheck },
   { href: "/wealth",         label: "Wealth",           icon: Coins },
   { href: "/authority",      label: "Authority",        icon: Zap },
+  { href: "/intercession",   label: "Intercession",     icon: Handshake },
 ];
+
+const navItems = [...menuItems, ...spaceItems];
 
 const WEEK_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -132,6 +138,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
         KeyT: "/principles",
         KeyW: "/wealth",
         KeyA: "/authority",
+        KeyI: "/intercession",
       };
       const dest = NAV[e.code];
       if (dest) { e.preventDefault(); router.push(dest); }
@@ -211,7 +218,35 @@ export function AppShell({ children, rightRail }: AppShellProps) {
 
         {/* Nav */}
         <nav className={`${isCompact ? "px-1" : "px-2"} pb-2 border-b`} style={{ borderColor: "var(--bj-line-soft)" }}>
-          {navItems.map(({ href, label, icon: Icon }) => {
+          {!isCompact && (
+            <p className="px-3 mb-1.5 mt-1 text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--bj-ink4)" }}>Menu</p>
+          )}
+          {menuItems.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(href + "/");
+            return isCompact ? (
+              <Link key={href} href={href} title={label}
+                className="bj-nav-item relative flex items-center justify-center w-10 h-10 rounded-xl mb-0.5 mx-auto"
+                style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink3)", background: active ? "var(--bj-gold-tint)" : "transparent" }}>
+                {active && <motion.div layoutId="sidebar-indicator" className="absolute inset-0 rounded-xl" style={{ background: "var(--bj-gold-tint)" }} transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
+                <Icon size={16} className="relative z-10 shrink-0" />
+              </Link>
+            ) : (
+              <Link key={href} href={href} data-active={active || undefined}
+                className="bj-nav-item relative flex items-center gap-2.5 px-3 py-2 rounded-xl mb-0.5 text-sm font-sans"
+                style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)", background: active ? "var(--bj-gold-tint)" : "transparent", fontWeight: active ? 500 : 400 }}>
+                {active && <motion.div layoutId="sidebar-indicator" className="absolute inset-0 rounded-xl" style={{ background: "var(--bj-gold-tint)" }} transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
+                <Icon size={14} className="relative z-10 shrink-0" />
+                <span className="relative z-10 text-[13px]">{label}</span>
+              </Link>
+            );
+          })}
+
+          {isCompact ? (
+            <div className="my-2 mx-auto w-6 h-px" style={{ background: "var(--bj-line-soft)" }} />
+          ) : (
+            <p className="px-3 mb-1.5 mt-3 text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--bj-ink4)" }}>Study Spaces</p>
+          )}
+          {spaceItems.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + "/");
             return isCompact ? (
               <Link key={href} href={href} title={label}
@@ -680,7 +715,28 @@ export function AppShell({ children, rightRail }: AppShellProps) {
 
               {/* Nav items */}
               <nav className="px-2 py-2 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
-                {navItems.map(({ href, label, icon: Icon }) => {
+                <p className="px-3 mb-1.5 mt-1 text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--bj-ink4)" }}>Menu</p>
+                {menuItems.map(({ href, label, icon: Icon }) => {
+                  const active = pathname === href || pathname.startsWith(href + "/");
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      data-active={active || undefined}
+                      className="bj-nav-item relative flex items-center gap-2.5 px-3 py-2 rounded-xl mb-0.5 text-sm font-sans"
+                      style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)", background: active ? "var(--bj-gold-tint)" : "transparent", fontWeight: active ? 500 : 400 }}
+                    >
+                      {active && (
+                        <motion.div layoutId="drawer-indicator" className="absolute inset-0 rounded-xl" style={{ background: "var(--bj-gold-tint)" }} transition={{ type: "spring", stiffness: 380, damping: 30 }} />
+                      )}
+                      <Icon size={14} className="relative z-10 shrink-0" />
+                      <span className="relative z-10 text-[13px]">{label}</span>
+                    </Link>
+                  );
+                })}
+
+                <p className="px-3 mb-1.5 mt-3 text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--bj-ink4)" }}>Study Spaces</p>
+                {spaceItems.map(({ href, label, icon: Icon }) => {
                   const active = pathname === href || pathname.startsWith(href + "/");
                   return (
                     <Link
