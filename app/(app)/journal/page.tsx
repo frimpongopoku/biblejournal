@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Pin, Star, Search, Plus, Trash2, ChevronLeft, List, X, PanelLeftClose, PanelLeftOpen, Table2, Smile } from "lucide-react";
-import { FloatingBible, FloatingAsk, JournalFloatTriggers } from "@/components/journal/FloatingWindows";
+import { BibleFloatTriggers } from "@/components/shared/FloatingWindows";
+import { useFloatWindowsStore } from "@/store/floatWindows.store";
 import { useJournalEntries } from "@/hooks/useJournalEntries";
 import { createEntry, updateEntry, deleteEntry } from "@/services/journal.service";
 import { useAuthStore } from "@/store/auth.store";
@@ -440,8 +441,10 @@ export default function JournalPage() {
   const [localTitle, setLocalTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [showEntrySheet, setShowEntrySheet] = useState(false);
-  const [bibleOpen, setBibleOpen] = useState(false);
-  const [askOpen, setAskOpen] = useState(false);
+  const bibleOpen = useFloatWindowsStore((s) => s.bibleOpen);
+  const askOpen = useFloatWindowsStore((s) => s.askOpen);
+  const toggleBible = useFloatWindowsStore((s) => s.toggleBible);
+  const toggleAsk = useFloatWindowsStore((s) => s.toggleAsk);
   const [listCompact, setListCompact] = useState(() =>
     typeof window !== "undefined" && localStorage.getItem("bj-journal-compact") === "true"
   );
@@ -455,17 +458,13 @@ export default function JournalPage() {
   }
 
   // Journal-specific keyboard shortcuts (work even inside the editor)
+  // Bible (⌘⌥B) and Ask (⌘⇧A) are handled globally in AppShell.
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
-      // ⌘⌥B — Bible panel (changed from ⌘⇧B which conflicted with browser bookmark bar)
-      // Use e.code (physical key) — e.key is unreliable with Option/Alt modifiers
-      // e.g. on macOS, ⌥B produces "∫" not "b"
-      if (e.altKey && e.code === "KeyB") { e.preventDefault(); setBibleOpen((o) => !o); return; }
       if (!e.shiftKey) return;
       if (e.code === "KeyN") { e.preventDefault(); handleNew(); }
-      if (e.code === "KeyA") { e.preventDefault(); setAskOpen((o) => !o); }
     }
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -840,10 +839,10 @@ export default function JournalPage() {
                     <Trash2 size={13} />
                   </button>
                   {/* Floating window triggers */}
-                  <JournalFloatTriggers
+                  <BibleFloatTriggers
                     bibleOpen={bibleOpen} askOpen={askOpen}
-                    onToggleBible={() => setBibleOpen((o) => !o)}
-                    onToggleAsk={() => setAskOpen((o) => !o)}
+                    onToggleBible={toggleBible}
+                    onToggleAsk={toggleAsk}
                   />
                 </div>
 
@@ -993,22 +992,14 @@ export default function JournalPage() {
       )}
     </AnimatePresence>
 
-    {/* ── Floating windows ─────────────────────────── */}
     <AnimatePresence>
-      {bibleOpen && <FloatingBible onClose={() => setBibleOpen(false)} />}
-
-      <AnimatePresence>
-        {deleteTarget && (
-          <DeleteConfirmModal
-            entry={deleteTarget}
-            onConfirm={confirmDelete}
-            onCancel={() => setDeleteTarget(null)}
-          />
-        )}
-      </AnimatePresence>
-    </AnimatePresence>
-    <AnimatePresence>
-      {askOpen && <FloatingAsk onClose={() => setAskOpen(false)} />}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          entry={deleteTarget}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </AnimatePresence>
     </>
   );

@@ -34,14 +34,14 @@ const GROUPS: Group[] = [
       { keys: ["⌘", "W"], desc: "Wealth" },
       { keys: ["⌘", "A"], desc: "Authority" },
       { keys: ["⌘", "/"], desc: "Show shortcuts" },
+      { keys: ["⌘", "⌥", "B"], desc: "Toggle floating Bible (anywhere)" },
+      { keys: ["⌘", "⇧", "A"], desc: "Toggle floating Ask (anywhere)" },
     ],
   },
   {
     title: "Journal",
     shortcuts: [
       { keys: ["⌘", "⇧", "N"], desc: "New entry" },
-      { keys: ["⌘", "⌥", "B"], desc: "Toggle Bible panel" },
-      { keys: ["⌘", "⇧", "A"], desc: "Toggle Ask panel" },
     ],
   },
   {

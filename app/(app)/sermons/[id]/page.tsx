@@ -14,7 +14,8 @@ import { TipTapEditor } from "@/components/journal/TipTapEditor";
 import { InlineVideo } from "@/components/sermons/FloatingVideo";
 import { useVideoStore } from "@/store/video.store";
 import { VerseRefPanel } from "@/components/sermons/VerseRefPanel";
-import { FloatingBible, FloatingAsk, JournalFloatTriggers } from "@/components/journal/FloatingWindows";
+import { BibleFloatTriggers } from "@/components/shared/FloatingWindows";
+import { useFloatWindowsStore } from "@/store/floatWindows.store";
 import { extractYouTubeId } from "@/lib/youtube-parser";
 import type { SermonRef } from "@/types";
 
@@ -37,8 +38,10 @@ export default function SermonDetailPage() {
   const [showPanel, setShowPanel] = useState(false); // mobile ref sheet
   const videoStore = useVideoStore();
   const [showDesktopPanel, setShowDesktopPanel] = useState(true);
-  const [bibleOpen, setBibleOpen] = useState(false);
-  const [askOpen, setAskOpen] = useState(false);
+  const bibleOpen = useFloatWindowsStore((s) => s.bibleOpen);
+  const askOpen = useFloatWindowsStore((s) => s.askOpen);
+  const toggleBible = useFloatWindowsStore((s) => s.toggleBible);
+  const toggleAsk = useFloatWindowsStore((s) => s.toggleAsk);
   const [editingUrl, setEditingUrl] = useState(false);
   const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialised = useRef(false);
@@ -183,10 +186,10 @@ export default function SermonDetailPage() {
             </button>
 
             {/* Floating window triggers */}
-            <JournalFloatTriggers
+            <BibleFloatTriggers
               bibleOpen={bibleOpen} askOpen={askOpen}
-              onToggleBible={() => setBibleOpen((o) => !o)}
-              onToggleAsk={() => setAskOpen((o) => !o)}
+              onToggleBible={toggleBible}
+              onToggleAsk={toggleAsk}
             />
 
             {/* Delete */}
@@ -383,9 +386,7 @@ export default function SermonDetailPage() {
         )}
       </AnimatePresence>
 
-      {/* Floating Bible + Ask */}
-      {bibleOpen && <FloatingBible onClose={() => setBibleOpen(false)} />}
-      {askOpen && <FloatingAsk onClose={() => setAskOpen(false)} />}
+      {/* Bible + Ask floats are rendered globally by AppShell */}
 
       {/* Desktop floating video is handled by PersistentVideo in layout */}
     </div>

@@ -12,12 +12,14 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ShortcutsPanel } from "@/components/ShortcutsPanel";
+import { BibleFloatTriggers, FloatingBible, FloatingAsk } from "@/components/shared/FloatingWindows";
 import pkg from "@/version.json";
 import { useThemeStore } from "@/store/theme.store";
 import { useFontStore } from "@/store/font.store";
 import { useAuth } from "@/hooks/useAuth";
 import { signOutUser } from "@/services/auth.service";
 import { useStreakStore } from "@/store/streak.store";
+import { useFloatWindowsStore } from "@/store/floatWindows.store";
 import type { ThemeId } from "@/lib/themes";
 import { fontPairs } from "@/lib/fonts";
 import type { FontPairId } from "@/lib/fonts";
@@ -69,6 +71,13 @@ export function AppShell({ children, rightRail }: AppShellProps) {
 
   const { streak, weekDots } = useStreakStore();
 
+  const bibleOpen = useFloatWindowsStore((s) => s.bibleOpen);
+  const askOpen = useFloatWindowsStore((s) => s.askOpen);
+  const toggleBible = useFloatWindowsStore((s) => s.toggleBible);
+  const toggleAsk = useFloatWindowsStore((s) => s.toggleAsk);
+  const closeBible = useFloatWindowsStore((s) => s.closeBible);
+  const closeAsk = useFloatWindowsStore((s) => s.closeAsk);
+
   const router = useRouter();
   const [showProfile, setShowProfile] = useState(false);
   const [showAppearance, setShowAppearance] = useState(false);
@@ -100,6 +109,11 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       // ⌘/ → shortcuts panel (always, even in editors)
       if (e.code === "Slash") { e.preventDefault(); setShowShortcuts((o) => !o); return; }
 
+      // ⌘⌥B → floating Bible, ⌘⇧A → floating Ask (always, even in editors —
+      // this is how you look up a reference without losing your place)
+      if (e.altKey && e.code === "KeyB") { e.preventDefault(); toggleBible(); return; }
+      if (e.shiftKey && e.code === "KeyA") { e.preventDefault(); toggleAsk(); return; }
+
       // Don't fire nav shortcuts when typing in an input / editor
       const target = e.target as HTMLElement;
       const inEditable = target.isContentEditable || target.tagName === "INPUT" || target.tagName === "TEXTAREA";
@@ -124,7 +138,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
     }
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [router]);
+  }, [router, toggleBible, toggleAsk]);
 
   const isDark = themeId === "midnight" || themeId === "dusk";
 
@@ -494,6 +508,11 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           }}
         >
           <div className="flex-1" />
+          <BibleFloatTriggers
+            bibleOpen={bibleOpen} askOpen={askOpen}
+            onToggleBible={toggleBible} onToggleAsk={toggleAsk}
+          />
+          <div className="w-px h-4" style={{ background: "var(--bj-line-soft)" }} />
           <button className="bj-btn-icon p-1.5 rounded-lg" style={{ color: "var(--bj-ink4)" }} onClick={toggleTheme}>
             {isDark ? <Sun size={14} /> : <Moon size={14} />}
           </button>
@@ -532,6 +551,23 @@ export function AppShell({ children, rightRail }: AppShellProps) {
             </aside>
           )}
         </div>
+      </div>
+
+      {/* ── Mobile Bible/Ask quick access ─────────────── */}
+      <div
+        className="md:hidden fixed z-40 flex items-center gap-0.5 p-1 rounded-full"
+        style={{
+          right: 12,
+          bottom: "calc(4.75rem + env(safe-area-inset-bottom))",
+          background: "var(--bj-bg-panel)",
+          border: "1px solid var(--bj-line)",
+          boxShadow: "0 6px 20px color-mix(in oklch, var(--bj-ink) 16%, transparent)",
+        }}
+      >
+        <BibleFloatTriggers
+          bibleOpen={bibleOpen} askOpen={askOpen}
+          onToggleBible={toggleBible} onToggleAsk={toggleAsk}
+        />
       </div>
 
       {/* ── Mobile Bottom Nav ────────────────────────── */}
@@ -726,6 +762,12 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       </AnimatePresence>
 
       <ShortcutsPanel open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+
+      {/* Bible + Ask floats — available everywhere, without leaving the current page */}
+      <AnimatePresence>
+        {bibleOpen && <FloatingBible key="float-bible" onClose={closeBible} />}
+        {askOpen && <FloatingAsk key="float-ask" onClose={closeAsk} />}
+      </AnimatePresence>
     </div>
   );
 }

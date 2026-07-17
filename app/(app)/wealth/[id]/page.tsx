@@ -8,6 +8,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Bookmark, Check, ChevronLeft, ChevronR
 import { WealthIcon } from "@/components/wealth/WealthIcon";
 import { WealthCard } from "@/components/wealth/WealthCard";
 import { useWealthStore } from "@/store/wealth.store";
+import { useFloatWindowsStore } from "@/store/floatWindows.store";
 import { WEALTH_ENTRIES, getWealthCategory, getWealthEntryById, getWealthKind, testamentOf } from "@/lib/data/wealth";
 
 const fadeUp = {
@@ -25,6 +26,7 @@ export default function WealthDetailPage() {
 
   const bookmarked = useWealthStore((s) => (entry ? s.isBookmarked(entry.id) : false));
   const toggleBookmark = useWealthStore((s) => s.toggleBookmark);
+  const openBibleAt = useFloatWindowsStore((s) => s.openBibleAt);
 
   const index = useMemo(() => (entry ? WEALTH_ENTRIES.findIndex((e) => e.id === entry.id) : -1), [entry]);
   const prev = useMemo(() => (index >= 0 ? WEALTH_ENTRIES[(index - 1 + WEALTH_ENTRIES.length) % WEALTH_ENTRIES.length] : null), [index]);
@@ -102,13 +104,13 @@ export default function WealthDetailPage() {
               {entry.reference}
             </span>
             <div className="flex items-center gap-1">
-              <Link
-                href={`/bible?book=${encodeURIComponent(entry.book)}&chapter=${entry.chapter}&verse=${entry.verse}`}
+              <button
+                onClick={() => openBibleAt({ book: entry.book, chapter: entry.chapter, verse: entry.verse })}
                 className="bj-btn-ghost flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-sans text-xs"
                 style={{ border: "1px solid var(--bj-line)", color: "var(--bj-ink2)" }}
               >
                 <BookOpen size={12} /> Read in Bible
-              </Link>
+              </button>
               <button
                 onClick={copyReference}
                 className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"

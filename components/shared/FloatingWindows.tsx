@@ -9,6 +9,7 @@ import {
 import { parseRef } from "@/lib/bible-ref-parser";
 import { PROTESTANT_BOOKS, CHAPTER_COUNTS } from "@/lib/bible-books";
 import { useBibleStore } from "@/store/bible.store";
+import { useFloatWindowsStore } from "@/store/floatWindows.store";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -153,7 +154,7 @@ function FloatShell({ title, icon, onClose, defaultPos, width = 360, children }:
   }
 
   return (
-    <div
+    <motion.div
       className="fixed z-50 flex flex-col rounded-2xl overflow-hidden"
       style={{
         left: pos.x, top: pos.y, width,
@@ -162,6 +163,8 @@ function FloatShell({ title, icon, onClose, defaultPos, width = 360, children }:
         boxShadow: "0 12px 48px color-mix(in oklch, var(--bj-ink) 20%, transparent)",
         maxHeight: "72vh",
       }}
+      initial={{ opacity: 0, scale: 0.97, y: 6 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.97, y: 6 }}
+      transition={{ duration: 0.16 }}
     >
       {/* Title bar — drag handle */}
       <div
@@ -184,7 +187,7 @@ function FloatShell({ title, icon, onClose, defaultPos, width = 360, children }:
         </button>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto">{children}</div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -192,10 +195,14 @@ function FloatShell({ title, icon, onClose, defaultPos, width = 360, children }:
 
 export function FloatingBible({ onClose }: { onClose: () => void }) {
   const { version, setVersion } = useBibleStore();
-  const [book, setBook] = useState("John");
-  const [chapter, setChapter] = useState(3);
+  const bibleTarget = useFloatWindowsStore((s) => s.bibleTarget);
+  const clearBibleTarget = useFloatWindowsStore((s) => s.clearBibleTarget);
+  const [book, setBook] = useState(() => bibleTarget?.book ?? "John");
+  const [chapter, setChapter] = useState(() => bibleTarget?.chapter ?? 3);
+  const [targetVerse, setTargetVerse] = useState<number | undefined>(() => bibleTarget?.verse);
   const [data, setData] = useState<{ verses: Verse[]; totalChapters: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Search
   const [query, setQuery] = useState("");
@@ -206,6 +213,17 @@ export function FloatingBible({ onClose }: { onClose: () => void }) {
 
   const VERSIONS = ["ESV", "KJV", "NIV", "AMP", "MSG", "ASV", "NKJV", "NLT"];
   const [hoveredV, setHoveredV] = useState<string | null>(null);
+
+  // React to a reference being requested from elsewhere in the app (e.g. a study
+  // space's "Read in Bible" button), whether this window is opening fresh or
+  // already sitting open on a different passage.
+  useEffect(() => {
+    if (!bibleTarget) return;
+    setBook(bibleTarget.book);
+    setChapter(bibleTarget.chapter);
+    setTargetVerse(bibleTarget.verse);
+    clearBibleTarget();
+  }, [bibleTarget, clearBibleTarget]);
 
   useEffect(() => { setSugs(getSuggestions(query)); setSugIdx(0); }, [query]);
   useEffect(() => { setSugOpen(sugs.length > 0 && query.trim().length > 0); }, [sugs, query]);
@@ -219,9 +237,19 @@ export function FloatingBible({ onClose }: { onClose: () => void }) {
       .finally(() => setLoading(false));
   }, [version, book, chapter]);
 
+  // Scroll to the requested verse once its text has loaded.
+  useEffect(() => {
+    if (!data || !targetVerse) return;
+    const el = document.getElementById(`float-verse-${targetVerse}`);
+    if (!el) return;
+    const t = setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    return () => clearTimeout(t);
+  }, [data, targetVerse]);
+
   function commit(sug: Suggestion) {
     if (sug.type === "book") { setQuery(sug.book + " "); inputRef.current?.focus(); return; }
-    setBook(sug.book); setChapter(sug.chapter); setQuery(""); setSugOpen(false);
+    setBook(sug.book); setChapter(sug.chapter); setTargetVerse(sug.type === "verse" ? sug.verse : undefined);
+    setQuery(""); setSugOpen(false);
     inputRef.current?.blur();
   }
 
@@ -318,14 +346,14 @@ export function FloatingBible({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Verses */}
-        <div className="flex-1 overflow-y-auto px-3 py-3">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3">
           {loading ? (
             <div className="flex justify-center py-8"><Loader2 size={16} className="animate-spin" style={{ color: "var(--bj-ink4)" }} /></div>
           ) : data?.verses.map((v) => (
-            <div key={v.n} className="flex gap-2.5 py-1.5 group rounded-lg px-1"
-              style={{ transition: "background 0.1s ease" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bj-bg-soft)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+            <div key={v.n} id={`float-verse-${v.n}`} className="flex gap-2.5 py-1.5 group rounded-lg px-1"
+              style={{ background: v.n === targetVerse ? "var(--bj-gold-tint)" : "transparent", transition: "background 0.4s ease" }}
+              onMouseEnter={(e) => { if (v.n !== targetVerse) e.currentTarget.style.background = "var(--bj-bg-soft)"; }}
+              onMouseLeave={(e) => { if (v.n !== targetVerse) e.currentTarget.style.background = "transparent"; }}>
               <span className="font-sans shrink-0 w-5 text-right select-none pt-0.5" style={{ fontSize: 10, fontWeight: 600, color: "var(--bj-ink4)" }}>{v.n}</span>
               <p className="font-sans text-sm flex-1" style={{ color: "var(--bj-ink2)", lineHeight: 1.75 }}>{v.text}</p>
             </div>
@@ -334,14 +362,14 @@ export function FloatingBible({ onClose }: { onClose: () => void }) {
 
         {/* Prev / Next */}
         <div className="flex items-center justify-between px-3 py-2 border-t shrink-0" style={{ borderColor: "var(--bj-line-soft)" }}>
-          <button onClick={() => prev && (setBook(prev.book), setChapter(prev.chapter))} disabled={!prev}
+          <button onClick={() => { if (prev) { setBook(prev.book); setChapter(prev.chapter); setTargetVerse(undefined); } }} disabled={!prev}
             className="bj-btn-icon flex items-center gap-1 px-2 py-1.5 rounded-lg font-sans text-xs disabled:opacity-30"
             style={{ color: "var(--bj-ink3)" }}>
             <ChevronLeft size={13} />
             {prev ? `${prev.book} ${prev.chapter}` : "Start"}
           </button>
           <span className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>{book} {chapter}</span>
-          <button onClick={() => next && (setBook(next.book), setChapter(next.chapter))} disabled={!next}
+          <button onClick={() => { if (next) { setBook(next.book); setChapter(next.chapter); setTargetVerse(undefined); } }} disabled={!next}
             className="bj-btn-icon flex items-center gap-1 px-2 py-1.5 rounded-lg font-sans text-xs disabled:opacity-30"
             style={{ color: "var(--bj-ink3)" }}>
             {next ? `${next.book} ${next.chapter}` : "End"}
@@ -442,9 +470,9 @@ export function FloatingAsk({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ── Trigger buttons (rendered in journal toolbar) ──────────
+// ── Trigger buttons (usable anywhere: toolbars, topbar, FAB) ──
 
-export function JournalFloatTriggers({
+export function BibleFloatTriggers({
   bibleOpen, askOpen, onToggleBible, onToggleAsk,
 }: {
   bibleOpen: boolean; askOpen: boolean;
@@ -463,11 +491,10 @@ export function JournalFloatTriggers({
 
   return (
     <div className="flex items-center gap-1">
-      <div className="w-px h-4 mx-1" style={{ background: "var(--bj-line-soft)" }} />
       <button
         onClick={onToggleBible}
         onMouseEnter={() => setHovB(true)} onMouseLeave={() => setHovB(false)}
-        title={bibleOpen ? "Close Bible" : "Open Bible"}
+        title={bibleOpen ? "Close Bible" : "Open Bible (⌘⌥B)"}
         className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg font-sans text-xs"
         style={btn(bibleOpen, hovB)}
       >
@@ -477,7 +504,7 @@ export function JournalFloatTriggers({
       <button
         onClick={onToggleAsk}
         onMouseEnter={() => setHovA(true)} onMouseLeave={() => setHovA(false)}
-        title={askOpen ? "Close Ask" : "Ask Scripture"}
+        title={askOpen ? "Close Ask" : "Ask Scripture (⌘⇧A)"}
         className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg font-sans text-xs"
         style={btn(askOpen, hovA)}
       >

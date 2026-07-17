@@ -8,6 +8,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Bookmark, Check, ChevronLeft, ChevronR
 import { PrincipleIcon } from "@/components/principles/PrincipleIcon";
 import { PrincipleCard } from "@/components/principles/PrincipleCard";
 import { usePrinciplesStore } from "@/store/principles.store";
+import { useFloatWindowsStore } from "@/store/floatWindows.store";
 import { PRINCIPLES, getPrincipleCategory, getPrincipleById, testamentOf } from "@/lib/data/principles";
 
 const fadeUp = {
@@ -25,6 +26,7 @@ export default function PrincipleDetailPage() {
 
   const bookmarked = usePrinciplesStore((s) => (principle ? s.isBookmarked(principle.id) : false));
   const toggleBookmark = usePrinciplesStore((s) => s.toggleBookmark);
+  const openBibleAt = useFloatWindowsStore((s) => s.openBibleAt);
 
   const index = useMemo(() => (principle ? PRINCIPLES.findIndex((p) => p.id === principle.id) : -1), [principle]);
   const prev = useMemo(() => (index >= 0 ? PRINCIPLES[(index - 1 + PRINCIPLES.length) % PRINCIPLES.length] : null), [index]);
@@ -95,13 +97,13 @@ export default function PrincipleDetailPage() {
               {principle.reference}
             </span>
             <div className="flex items-center gap-1">
-              <Link
-                href={`/bible?book=${encodeURIComponent(principle.book)}&chapter=${principle.chapter}&verse=${principle.verse}`}
+              <button
+                onClick={() => openBibleAt({ book: principle.book, chapter: principle.chapter, verse: principle.verse })}
                 className="bj-btn-ghost flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-sans text-xs"
                 style={{ border: "1px solid var(--bj-line)", color: "var(--bj-ink2)" }}
               >
                 <BookOpen size={12} /> Read in Bible
-              </Link>
+              </button>
               <button
                 onClick={copyReference}
                 className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"

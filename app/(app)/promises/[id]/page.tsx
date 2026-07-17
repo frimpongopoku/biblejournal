@@ -8,6 +8,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Bookmark, Check, ChevronLeft, ChevronR
 import { PromiseIcon } from "@/components/promises/PromiseIcon";
 import { PromiseCard } from "@/components/promises/PromiseCard";
 import { usePromisesStore } from "@/store/promises.store";
+import { useFloatWindowsStore } from "@/store/floatWindows.store";
 import { PROMISES, getCategory, getPromiseById, testamentOf } from "@/lib/data/promises";
 
 const fadeUp = {
@@ -25,6 +26,7 @@ export default function PromiseDetailPage() {
 
   const bookmarked = usePromisesStore((s) => (promise ? s.isBookmarked(promise.id) : false));
   const toggleBookmark = usePromisesStore((s) => s.toggleBookmark);
+  const openBibleAt = useFloatWindowsStore((s) => s.openBibleAt);
 
   const index = useMemo(() => (promise ? PROMISES.findIndex((p) => p.id === promise.id) : -1), [promise]);
   const prev = useMemo(() => (index >= 0 ? PROMISES[(index - 1 + PROMISES.length) % PROMISES.length] : null), [index]);
@@ -95,13 +97,13 @@ export default function PromiseDetailPage() {
               {promise.reference}
             </span>
             <div className="flex items-center gap-1">
-              <Link
-                href={`/bible?book=${encodeURIComponent(promise.book)}&chapter=${promise.chapter}&verse=${promise.verse}`}
+              <button
+                onClick={() => openBibleAt({ book: promise.book, chapter: promise.chapter, verse: promise.verse })}
                 className="bj-btn-ghost flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-sans text-xs"
                 style={{ border: "1px solid var(--bj-line)", color: "var(--bj-ink2)" }}
               >
                 <BookOpen size={12} /> Read in Bible
-              </Link>
+              </button>
               <button
                 onClick={copyReference}
                 className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"
