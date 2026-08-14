@@ -340,6 +340,30 @@
   font-size: 17px;
 }
 
+/* Compact TipTap instance for the Study side panel — smaller footprint than .bj-editor */
+.bj-study-composer {
+  min-height: 64px;
+  font-family: var(--bj-ui, var(--font-inter, sans-serif));
+  color: var(--bj-ink2);
+  line-height: 1.6;
+  font-size: 13.5px;
+}
+.bj-study-composer > *:first-child { margin-top: 0 !important; }
+.bj-study-composer p { margin-bottom: 0.5rem; }
+.bj-study-composer ul { list-style: disc; padding-left: 1.2rem; margin-bottom: 0.5rem; }
+.bj-study-composer li { margin-bottom: 0.15rem; }
+.bj-study-composer strong { font-weight: 650; color: var(--bj-ink); }
+.bj-study-composer em { font-style: italic; }
+.bj-study-composer p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--bj-ink4);
+  pointer-events: none;
+  float: left;
+  height: 0;
+  font-style: italic;
+  font-size: 13.5px;
+}
+
 /* Simple rich editor (proclamations, prayers) */
 .bj-simple-editor {
   outline: none;

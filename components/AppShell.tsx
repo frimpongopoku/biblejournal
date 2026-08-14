@@ -8,7 +8,7 @@ import {
   LayoutDashboard, NotebookPen, BookOpen, HeartHandshake,
   Megaphone, Mic, Compass, Network, Search, Plus, Bell, Moon, Sun,
   Settings, LogOut, Flame, Palette, Menu, X, Keyboard,
-  ChevronLeft, ChevronRight, GraduationCap, Scroll, BookOpenCheck, Coins, Zap, Handshake, Wheat,
+  ChevronLeft, ChevronRight, GraduationCap, Scroll, BookOpenCheck, Coins, Zap, Handshake, Wheat, Highlighter,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { ShortcutsPanel } from "@/components/ShortcutsPanel";
@@ -33,6 +33,7 @@ const menuItems = [
   { href: "/proclamations",  label: "Proclamations",    icon: Megaphone },
   { href: "/learn",          label: "Learning",         icon: GraduationCap },
   { href: "/research",       label: "Research",         icon: Compass },
+  { href: "/study",          label: "Study",            icon: Highlighter },
 ];
 
 const spaceItems = [
@@ -141,6 +142,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
         KeyA: "/authority",
         KeyI: "/intercession",
         KeyR: "/parables",
+        KeyU: "/study",
       };
       const dest = NAV[e.code];
       if (dest) { e.preventDefault(); router.push(dest); }

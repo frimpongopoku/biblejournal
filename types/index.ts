@@ -58,13 +58,19 @@ export interface Prayer {
   updatedAt: Date;
 }
 
-export interface Highlight {
+export type StudyNoteKind = "note" | "highlight" | "question";
+
+export interface StudyNote {
   id: string;
   userId: string;
   scripture: ScriptureRef;
-  note: string | null;
-  color: string;
+  kind: StudyNoteKind;
+  color: string | null;
+  content: string | null;
+  answer: string | null; // question only — TipTap JSON string
+  resolved: boolean | null;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export type BibleVersion = "KJV" | "NIV" | "ESV" | "NKJV" | "NLT";
