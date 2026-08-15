@@ -75,6 +75,22 @@ export interface StudyNote {
 
 export type BibleVersion = "KJV" | "NIV" | "ESV" | "NKJV" | "NLT";
 
+export interface CommentaryEntry {
+  verse: number;
+  endVerse: number | null; // null = runs to end of chapter
+  text: string;
+}
+
+export interface CommentaryChapter {
+  commentary: string;
+  commentaryName: string;
+  licenseUrl: string | null;
+  book: string;
+  chapter: number;
+  introduction: string | null;
+  entries: CommentaryEntry[];
+}
+
 export interface ProclamationFolder {
   id: string;
   userId: string;

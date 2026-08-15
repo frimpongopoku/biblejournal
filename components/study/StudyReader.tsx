@@ -3,14 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, Copy, Check, PenLine, CircleHelp, NotebookPen, MessageSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Check, PenLine, CircleHelp, NotebookPen, MessageSquare, Library, Info } from "lucide-react";
 import { BookPickerSheet } from "@/components/bible/BookPickerSheet";
 import { QuickRefInput } from "@/components/bible/QuickRefInput";
 import { AnnotationPanel } from "@/components/study/AnnotationPanel";
+import { CommentaryBlock } from "@/components/study/CommentaryBlock";
+import { CommentaryAboutModal } from "@/components/study/CommentaryAboutModal";
 import { studyColorHex } from "@/lib/study-colors";
 import { previewText } from "@/lib/tiptap-preview";
+import { COMMENTARY_SOURCES, commentarySource } from "@/lib/commentary-sources";
+import { useCommentary } from "@/hooks/useCommentary";
+import { useCommentaryStore } from "@/store/commentary.store";
 import type { useBibleChapter } from "@/hooks/useBibleChapter";
-import type { StudyNote } from "@/types";
+import type { StudyNote, CommentaryEntry } from "@/types";
 
 const VERSIONS = ["ESV", "KJV", "NIV", "AMP", "MSG", "ASV", "NKJV", "NLT"];
 
@@ -193,6 +198,11 @@ export function StudyReader({ uid, chapterState, studyNotes }: Props) {
   const [hoverAnchor, setHoverAnchor] = useState<HoverAnchor | null>(null);
   const hoverHideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const { enabled: commentaryEnabled, source: commentarySourceId, setEnabled: setCommentaryEnabled, setSource: setCommentarySource } = useCommentaryStore();
+  const [commentaryAboutOpen, setCommentaryAboutOpen] = useState(false);
+  const { data: commentaryData, error: commentaryError } = useCommentary(book, chapter, commentarySourceId, commentaryEnabled);
+  const activeCommentarySource = commentarySource(commentarySourceId)!;
+
   function handleVerseEnter(n: number, hasNotes: boolean, el: HTMLElement) {
     if (!hasNotes) return;
     if (hoverHideTimeout.current) clearTimeout(hoverHideTimeout.current);
@@ -231,6 +241,20 @@ export function StudyReader({ uid, chapterState, studyNotes }: Props) {
     setPanelOpen(true);
     setMobilePanelOpen(true);
   }
+
+  // Group commentary entries by the last verse they cover, so each block
+  // renders directly under the verse row it belongs to.
+  const commentaryByEndVerse = useMemo(() => {
+    const map = new Map<number, CommentaryEntry[]>();
+    if (!commentaryData || !data?.verses.length) return map;
+    const lastVerse = data.verses[data.verses.length - 1].n;
+    for (const entry of commentaryData.entries) {
+      const end = entry.endVerse ?? lastVerse;
+      if (!map.has(end)) map.set(end, []);
+      map.get(end)!.push(entry);
+    }
+    return map;
+  }, [commentaryData, data]);
 
   function copyVerse(n: number, text: string, e: React.MouseEvent) {
     e.stopPropagation();
@@ -329,6 +353,57 @@ export function StudyReader({ uid, chapterState, studyNotes }: Props) {
           </button>
         </div>
 
+        {/* ── Commentary controls ─────────────────── */}
+        <div
+          className="flex items-center gap-1.5 px-3 md:px-5 py-2 border-b shrink-0 overflow-x-auto"
+          style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)", scrollbarWidth: "none" }}
+        >
+          <button
+            onClick={() => setCommentaryEnabled(!commentaryEnabled)}
+            data-active={commentaryEnabled || undefined}
+            className="bj-chip flex items-center gap-1.5 font-sans text-xs px-2.5 py-1.5 rounded-lg shrink-0"
+            style={{
+              background: commentaryEnabled ? "var(--bj-gold)" : "var(--bj-bg-soft)",
+              color: commentaryEnabled ? "white" : "var(--bj-ink3)",
+              fontWeight: commentaryEnabled ? 500 : 400,
+            }}
+          >
+            <Library size={12} />
+            Commentary
+          </button>
+
+          {commentaryEnabled && (
+            <>
+              <div className="w-px h-4 shrink-0 mx-0.5" style={{ background: "var(--bj-line-soft)" }} />
+              {COMMENTARY_SOURCES.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setCommentarySource(s.id)}
+                  data-active={commentarySourceId === s.id || undefined}
+                  title={s.description}
+                  className="bj-chip font-sans text-[11px] px-2.5 py-1 rounded-lg shrink-0"
+                  style={{
+                    background: commentarySourceId === s.id ? "var(--bj-gold-tint)" : "transparent",
+                    color: commentarySourceId === s.id ? "var(--bj-gold-deep)" : "var(--bj-ink4)",
+                    fontWeight: commentarySourceId === s.id ? 500 : 400,
+                    border: `1px solid ${commentarySourceId === s.id ? "var(--bj-gold-soft)" : "transparent"}`,
+                  }}
+                >
+                  {s.shortLabel}
+                </button>
+              ))}
+              <button
+                onClick={() => setCommentaryAboutOpen(true)}
+                className="bj-btn-icon w-6 h-6 rounded flex items-center justify-center shrink-0"
+                style={{ color: "var(--bj-ink4)" }}
+                title="Who wrote these?"
+              >
+                <Info size={13} />
+              </button>
+            </>
+          )}
+        </div>
+
         <div className="md:hidden px-3 py-2 border-b shrink-0" style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}>
           <QuickRefInput onNavigate={handleQuickRef} fullWidth />
         </div>
@@ -358,6 +433,29 @@ export function StudyReader({ uid, chapterState, studyNotes }: Props) {
                 <div className="h-px flex-1" style={{ background: "var(--bj-line-soft)" }} />
               </div>
             </motion.div>
+
+            {commentaryEnabled && commentaryData?.introduction && (
+              <div className="mb-8 pl-4" style={{ borderLeft: "2.5px solid var(--bj-gold-soft)" }}>
+                <button
+                  onClick={() => setCommentaryAboutOpen(true)}
+                  className="bj-btn-ghost flex items-center gap-1.5 mb-2 px-1.5 py-0.5 -ml-1.5 rounded-md"
+                >
+                  <span className="font-sans text-[10.5px] font-semibold uppercase" style={{ color: "var(--bj-gold-deep)", letterSpacing: "0.08em" }}>
+                    {activeCommentarySource.author} on {book} {chapter}
+                  </span>
+                  <Info size={11} style={{ color: "var(--bj-ink4)" }} />
+                </button>
+                <p className="font-sans whitespace-pre-wrap" style={{ fontSize: 15, color: "var(--bj-ink2)", lineHeight: 1.8, letterSpacing: "0.01em" }}>
+                  {commentaryData.introduction}
+                </p>
+              </div>
+            )}
+
+            {commentaryEnabled && commentaryError && !commentaryData?.introduction && (
+              <p className="font-sans text-xs mb-8" style={{ color: "var(--bj-ink4)" }}>
+                {commentaryError}
+              </p>
+            )}
 
             {loading && (
               <div className="flex flex-col gap-4">
@@ -399,10 +497,11 @@ export function StudyReader({ uid, chapterState, studyNotes }: Props) {
                     const hasUnresolvedQuestion = comments.some((n) => n.kind === "question" && !n.resolved);
                     const isSelected = v.n === selectedVerse && panelOpen;
                     const isTarget = v.n === targetVerse;
+                    const verseCommentary = commentaryEnabled ? commentaryByEndVerse.get(v.n) : undefined;
 
                     return (
+                      <div key={v.n}>
                       <div
-                        key={v.n}
                         id={`verse-${v.n}`}
                         onClick={() => selectVerse(v.n)}
                         onMouseEnter={(e) => handleVerseEnter(v.n, vNotes.length > 0, e.currentTarget)}
@@ -451,6 +550,16 @@ export function StudyReader({ uid, chapterState, studyNotes }: Props) {
                         {comments.length > 0 && (
                           <CommentMarker hasUnresolved={hasUnresolvedQuestion} count={comments.length} />
                         )}
+                      </div>
+
+                      {verseCommentary?.map((entry) => (
+                        <CommentaryBlock
+                          key={`${commentarySourceId}-${entry.verse}`}
+                          entry={entry}
+                          source={activeCommentarySource}
+                          onInfoClick={() => setCommentaryAboutOpen(true)}
+                        />
+                      ))}
                       </div>
                     );
                   })}
@@ -560,6 +669,8 @@ export function StudyReader({ uid, chapterState, studyNotes }: Props) {
         onSelect={(b, ch) => { setBook(b); setChapter(ch); setTargetVerse(undefined); }}
         onClose={() => setShowPicker(false)}
       />
+
+      <CommentaryAboutModal open={commentaryAboutOpen} onClose={() => setCommentaryAboutOpen(false)} />
     </div>
   );
 }
