@@ -40,16 +40,19 @@ export function subscribeToEntries(
   });
 }
 
-export async function createEntry(uid: string): Promise<string> {
+export async function createEntry(
+  uid: string,
+  seed?: Partial<Pick<JournalEntry, "title" | "content" | "tags" | "scriptures">>
+): Promise<string> {
   const ref = await addDoc(col(uid), {
     userId: uid,
-    title: "",
-    content: JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] }),
-    tags: [],
+    title: seed?.title ?? "",
+    content: seed?.content ?? JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] }),
+    tags: seed?.tags ?? [],
     folderId: null,
     isPinned: false,
     isFavorite: false,
-    scriptures: [],
+    scriptures: seed?.scriptures ?? [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

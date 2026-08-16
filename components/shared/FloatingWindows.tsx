@@ -90,7 +90,7 @@ interface FloatShellProps {
   children: React.ReactNode;
 }
 
-function FloatShell({ title, icon, onClose, defaultPos, width = 360, children }: FloatShellProps) {
+export function FloatShell({ title, icon, onClose, defaultPos, width = 360, children }: FloatShellProps) {
   const isMobile = useIsMobile();
   const [pos, setPos] = useState(defaultPos ?? { x: 100, y: 80 });
   const dragging = useRef(false);

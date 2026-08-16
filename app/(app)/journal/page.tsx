@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Pin, Star, Search, Plus, Trash2, ChevronLeft, List, X, PanelLeftClose, PanelLeftOpen, Table2, Smile } from "lucide-react";
 import { BibleFloatTriggers } from "@/components/shared/FloatingWindows";
@@ -433,7 +434,16 @@ function TableView({ entries, onSelect }: { entries: JournalEntry[]; onSelect: (
 // ── Page ──────────────────────────────────────────────────
 
 export default function JournalPage() {
+  return (
+    <Suspense fallback={null}>
+      <JournalView />
+    </Suspense>
+  );
+}
+
+function JournalView() {
   const user = useAuthStore((s) => s.user);
+  const searchParams = useSearchParams();
   const { entries, loading } = useJournalEntries();
   const [activeFilter, setActiveFilter] = useState("All");
   const [search, setSearch] = useState("");
@@ -474,14 +484,18 @@ export default function JournalPage() {
 
   const selected = entries.find((e) => e.id === selectedId) ?? null;
 
-  // Auto-select first entry on initial load only — never re-fires when user
-  // manually clears the selection (back button), because hasAutoSelected guards it.
+  // Auto-select on initial load only — never re-fires when user manually
+  // clears the selection (back button), because hasAutoSelected guards it.
+  // A ?entry=<id> param (e.g. from a "continue your note" link elsewhere in
+  // the app) takes priority over the default "select the first entry".
   useEffect(() => {
     if (!loading && entries.length > 0 && !hasAutoSelected.current) {
       hasAutoSelected.current = true;
-      setSelectedId(entries[0].id);
+      const paramId = searchParams.get("entry");
+      const target = paramId && entries.some((e) => e.id === paramId) ? paramId : entries[0].id;
+      setSelectedId(target);
     }
-  }, [loading, entries]);
+  }, [loading, entries, searchParams]);
 
   // Sync local title when selection changes
   useEffect(() => {
