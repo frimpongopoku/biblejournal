@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ChevronRight } from "lucide-react";
@@ -8,16 +9,20 @@ import { EraIconGlyph } from "./EraIconGlyph";
 import { useTimelineStore } from "@/store/timeline.store";
 
 const ROW_HEIGHT = 172;
-const GUTTER_WIDTH = 64;
-const MARKER_SIZE = 26;
-const LEFT_X = 22;
-const RIGHT_X = 42;
 
-function stationX(i: number) {
-  return i % 2 === 0 ? LEFT_X : RIGHT_X;
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const check = () => setNarrow(window.innerWidth < 420);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return narrow;
 }
 
-function buildPath(n: number) {
+function buildPath(n: number, leftX: number, rightX: number) {
+  const stationX = (i: number) => (i % 2 === 0 ? leftX : rightX);
   const points = Array.from({ length: n }, (_, i) => ({
     x: stationX(i),
     y: i * ROW_HEIGHT + ROW_HEIGHT / 2,
@@ -36,9 +41,20 @@ function buildPath(n: number) {
 
 export function TimelineTrail() {
   const visitedEras = useTimelineStore((s) => s.visitedEras);
+  const narrow = useIsNarrow();
+
+  // Shrink the decorative gutter on very small phones so it doesn't eat
+  // into the card's text width — the winding path is a nice-to-have, the
+  // reading content is not.
+  const GUTTER_WIDTH = narrow ? 40 : 64;
+  const MARKER_SIZE = narrow ? 20 : 26;
+  const LEFT_X = narrow ? 13 : 22;
+  const RIGHT_X = narrow ? 27 : 42;
+  const stationX = (i: number) => (i % 2 === 0 ? LEFT_X : RIGHT_X);
+
   const n = TIMELINE_ERAS.length;
   const totalHeight = n * ROW_HEIGHT;
-  const pathD = buildPath(n);
+  const pathD = buildPath(n, LEFT_X, RIGHT_X);
 
   return (
     <div className="relative flex" style={{ minHeight: totalHeight }}>
@@ -86,7 +102,7 @@ export function TimelineTrail() {
               viewport={{ once: true, margin: "-60px" }}
               transition={{ delay: 0.15 + i * 0.03, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             >
-              <EraIconGlyph name={era.icon} size={12} style={{ color: visited ? era.color : "var(--bj-ink4)" }} />
+              <EraIconGlyph name={era.icon} size={narrow ? 10 : 12} style={{ color: visited ? era.color : "var(--bj-ink4)" }} />
             </motion.div>
           );
         })}

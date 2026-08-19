@@ -37,7 +37,7 @@ function ToolbarButton({ active, onClick, title, children }: ToolbarButtonProps)
         onClick();
       }}
       data-active={active || undefined}
-      className="bj-btn-icon w-7 h-7 rounded flex items-center justify-center"
+      className="bj-btn-icon w-7 h-7 rounded flex items-center justify-center shrink-0"
       style={{
         background: active ? "var(--bj-gold-tint)" : "transparent",
         color: active ? "var(--bj-gold-deep)" : "var(--bj-ink3)",
@@ -103,11 +103,11 @@ function FontPickerBtn({ fontKey }: { fontKey?: string }) {
   }
 
   return (
-    <div ref={wrapRef} className="relative">
+    <div ref={wrapRef} className="relative shrink-0">
       <button
         onMouseDown={(e) => { e.preventDefault(); setOpen((o) => !o); }}
         title="Font & size"
-        className="bj-btn-icon h-7 px-2 rounded flex items-center gap-1 justify-center"
+        className="bj-btn-icon h-7 px-2 rounded flex items-center gap-1 justify-center shrink-0"
         style={{
           fontFamily: `var(${activePair.displayVar})`,
           background: open ? "var(--bj-gold-tint)" : "transparent",
@@ -256,14 +256,14 @@ export function TipTapEditor({ entryId, content, onChange, fontKey, autoFocus }:
   if (!editor) return null;
 
   const divider = (
-    <div className="h-4 w-px mx-1" style={{ background: "var(--bj-line)" }} />
+    <div className="h-4 w-px mx-1 shrink-0" style={{ background: "var(--bj-line)" }} />
   );
 
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div
-        className="flex items-center gap-0.5 px-8 border-b shrink-0"
+        className="flex items-center gap-0.5 px-8 border-b shrink-0 overflow-x-auto"
         style={{ height: 44, borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}
       >
         <ToolbarButton

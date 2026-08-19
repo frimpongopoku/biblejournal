@@ -686,7 +686,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
               transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.28 }}
             >
               {/* Drawer header */}
-              <div className="px-4 pt-4 pb-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
+              <div className="px-4 pt-4 pb-4 border-b shrink-0" style={{ borderColor: "var(--bj-line-soft)" }}>
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--bj-gold)", boxShadow: "0 2px 8px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
@@ -718,6 +718,12 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                   </div>
                 </div>
               </div>
+
+              {/* Scrollable middle: nav items + shortcuts + streak + bottom actions.
+                  Everything here shares one scroll region so nothing (e.g. items
+                  added to the end of Study Spaces) can end up unreachable below
+                  the viewport on shorter phones. */}
+              <div className="flex-1 min-h-0 overflow-y-auto">
 
               {/* Nav items */}
               <nav className="px-2 py-2 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
@@ -763,7 +769,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
               </nav>
 
               {/* Shortcuts */}
-              <div className="px-2 py-3 border-b flex-1 overflow-y-auto" style={{ borderColor: "var(--bj-line-soft)" }}>
+              <div className="px-2 py-3 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
                 <p className="px-3 mb-2 text-[10px] uppercase tracking-widest font-medium" style={{ color: "var(--bj-ink4)" }}>Shortcuts</p>
                 {[
                   { href: "/dashboard",     icon: LayoutDashboard, label: "Dashboard",     desc: "Today's overview" },
@@ -810,8 +816,10 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                 </button>
               </div>
 
+              </div>
+
               {/* Version — mobile drawer footer */}
-              <div className="px-5 py-3 border-t flex items-center gap-2" style={{ borderColor: "var(--bj-line-soft)" }}>
+              <div className="px-5 py-3 border-t flex items-center gap-2 shrink-0" style={{ borderColor: "var(--bj-line-soft)" }}>
                 <span className="font-sans text-[11px] font-semibold px-2 py-0.5 rounded-full"
                   style={{ background: "var(--bj-bg-soft)", color: "var(--bj-ink4)", border: "1px solid var(--bj-line-soft)" }}>
                   v{pkg.version}

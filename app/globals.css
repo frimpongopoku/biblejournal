@@ -117,24 +117,27 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* BibJournal default theme tokens (warm) — overridden at runtime by ThemeProvider */
+/* BibJournal default theme tokens (midnight) — overridden at runtime by
+   ThemeProvider, but must match the "midnight" entry in lib/themes.ts so
+   the very first paint (before JS hydrates) already renders midnight
+   instead of flashing a different theme. */
 :root {
-  --bj-bg: oklch(98% 0.012 80);
-  --bj-bg-soft: oklch(96% 0.016 78);
-  --bj-bg-panel: oklch(99% 0.008 75);
-  --bj-ink: oklch(22% 0.02 60);
-  --bj-ink2: oklch(38% 0.018 62);
-  --bj-ink3: oklch(55% 0.014 65);
-  --bj-ink4: oklch(72% 0.01 68);
-  --bj-line: oklch(88% 0.018 75);
-  --bj-line-soft: oklch(93% 0.012 78);
-  --bj-gold: oklch(72% 0.12 75);
-  --bj-gold-deep: oklch(60% 0.14 72);
-  --bj-gold-soft: oklch(84% 0.08 78);
-  --bj-gold-tint: oklch(96% 0.03 80);
-  --bj-sage: oklch(62% 0.08 150);
-  --bj-sage-tint: oklch(94% 0.025 148);
-  --bj-ember: oklch(65% 0.14 45);
+  --bj-bg: oklch(13% 0.01 248);
+  --bj-bg-soft: oklch(17% 0.013 250);
+  --bj-bg-panel: oklch(10% 0.008 244);
+  --bj-ink: oklch(94% 0.007 75);
+  --bj-ink2: oklch(82% 0.01 74);
+  --bj-ink3: oklch(70% 0.011 72);
+  --bj-ink4: oklch(58% 0.009 70);
+  --bj-line: oklch(24% 0.015 248);
+  --bj-line-soft: oklch(19% 0.011 246);
+  --bj-gold: oklch(70% 0.09 72);
+  --bj-gold-deep: oklch(78% 0.1 74);
+  --bj-gold-soft: oklch(48% 0.065 70);
+  --bj-gold-tint: oklch(17% 0.04 72);
+  --bj-sage: oklch(60% 0.08 152);
+  --bj-sage-tint: oklch(15% 0.025 150);
+  --bj-ember: oklch(64% 0.15 38);
 }
 
 @layer base {

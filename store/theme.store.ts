@@ -10,7 +10,7 @@ interface ThemeState {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
-      themeId: "warm",
+      themeId: "midnight",
       setTheme: (themeId) => set({ themeId }),
     }),
     { name: "bj-theme" }

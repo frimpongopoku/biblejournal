@@ -151,7 +151,7 @@ export const themes: Theme[] = [
   },
 ];
 
-export const defaultTheme = themes[0];
+export const defaultTheme = themes.find((t) => t.id === "midnight")!;
 
 export function applyTheme(themeId: ThemeId) {
   const theme = themes.find((t) => t.id === themeId) ?? defaultTheme;
