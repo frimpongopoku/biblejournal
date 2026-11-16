@@ -1,28 +1,31 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, Moon, Sun, LogOut, Flame, Palette, Menu, X, Keyboard,
-  ChevronLeft, ChevronRight, ChevronDown,
+  Search, Moon, Sun, LogOut, Flame, Palette, X, Keyboard,
+  ChevronLeft, ChevronRight, ChevronDown, BookOpen, PenLine, Wrench,
 } from "lucide-react";
 import { ShortcutsPanel } from "@/components/ShortcutsPanel";
 import { CommandPalette } from "@/components/CommandPalette";
 import { BibleFloatTriggers, FloatingBible, FloatingAsk } from "@/components/shared/FloatingWindows";
 import pkg from "@/version.json";
 import { useThemeStore } from "@/store/theme.store";
-import { useFontStore } from "@/store/font.store";
 import { useAuth } from "@/hooks/useAuth";
 import { signOutUser } from "@/services/auth.service";
 import { useStreakStore } from "@/store/streak.store";
+import { useReadingStore, chaptersReadIn } from "@/store/reading.store";
+import { CHAPTER_COUNTS } from "@/lib/bible-books";
 import { useFloatWindowsStore } from "@/store/floatWindows.store";
 import { useWritingStore } from "@/store/writing.store";
-import { NAV_GROUPS, NAV_ITEMS, MOBILE_TABS, isActive, type NavItem } from "@/lib/nav";
+import { startEntry } from "@/lib/startEntry";
+import { lastInputWasKeyboard } from "@/lib/inputMode";
+import { NAV_GROUPS, NAV_ITEMS, MOBILE_TABS, isActive, keySequence, type NavItem } from "@/lib/nav";
 import type { ThemeId } from "@/lib/themes";
-import { fontPairs } from "@/lib/fonts";
-import type { FontPairId } from "@/lib/fonts";
+import { TypePicker } from "@/components/TypePicker";
 
 const THEME_COLORS: Record<ThemeId, string> = {
   warm: "#C9A96E",
@@ -33,13 +36,6 @@ const THEME_COLORS: Record<ThemeId, string> = {
   dusk: "#5B6E9E",
 };
 
-const FONT_FAMILY: Record<string, string> = {
-  classic: "var(--font-cormorant, Georgia, serif)",
-  dyslexic: "OpenDyslexic, sans-serif",
-  serif: "var(--font-playfair, Georgia, serif)",
-  modern: "var(--font-fraunces, Georgia, serif)",
-  humanist: "var(--font-eb-garamond, Georgia, serif)",
-};
 
 const THEME_OPTIONS: { id: ThemeId; label: string }[] = [
   { id: "warm", label: "Warm" },
@@ -67,8 +63,7 @@ function isEditable(t: EventTarget | null) {
 
 function Logo({ size = 24 }: { size?: number }) {
   return (
-    <div className="rounded-lg flex items-center justify-center shrink-0"
-      style={{ width: size, height: size, background: "var(--bj-gold)", boxShadow: "0 2px 8px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}>
+    <div className="bj-gold rounded-lg flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
       <svg width={size / 2} height={size / 2} viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" />
         <path d="M12 10c0 0-2 2.5-2 4a2 2 0 004 0c0-1.5-2-4-2-4z" fill="white" fillOpacity="0.5" />
@@ -90,24 +85,34 @@ function Avatar({ size, photo, initial }: { size: number; photo?: string | null;
   );
 }
 
-function NavLink({ item, active, compact }: { item: NavItem; active: boolean; compact: boolean }) {
+/** The raised pill under the current page — it slides to the next one (instantly after a key press). */
+function ActivePill({ id, className }: { id: string; className: string }) {
+  return (
+    <motion.span layoutId={id} aria-hidden="true" className={`bj-raised absolute inset-0 ${className}`}
+      transition={lastInputWasKeyboard() ? { duration: 0 } : { type: "spring", duration: 0.38, bounce: 0.14 }} />
+  );
+}
+
+function NavLink({ item, active, compact, pill }: { item: NavItem; active: boolean; compact: boolean; pill: string }) {
   const Icon = item.icon;
   if (compact) {
     return (
       <Link href={item.href} title={item.label} aria-label={item.label} aria-current={active ? "page" : undefined}
-        className="bj-nav-item flex items-center justify-center w-10 h-10 rounded-xl mb-0.5 mx-auto"
+        className="bj-nav-item relative flex items-center justify-center w-10 h-10 rounded-xl mb-0.5 mx-auto"
         data-active={active || undefined}
-        style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink3)", background: active ? "var(--bj-gold-tint)" : "transparent" }}>
-        <Icon size={16} className="shrink-0" />
+        style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink3)" }}>
+        {active && <ActivePill id={pill} className="rounded-xl" />}
+        <Icon size={16} className="relative shrink-0" />
       </Link>
     );
   }
   return (
     <Link href={item.href} aria-current={active ? "page" : undefined} data-active={active || undefined}
-      className="bj-nav-item group flex items-center gap-2.5 px-3 h-8 rounded-lg mb-px font-sans"
-      style={{ color: active ? "var(--bj-ink)" : "var(--bj-ink2)", background: active ? "var(--bj-gold-tint)" : "transparent", fontWeight: active ? 500 : 400 }}>
-      <Icon size={14} className="shrink-0" style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink4)" }} />
-      <span className="text-[13px] flex-1 truncate">{item.label}</span>
+      className="bj-nav-item group relative flex items-center gap-2.5 px-3 h-8 rounded-lg mb-px font-sans"
+      style={{ color: active ? "var(--bj-ink)" : "var(--bj-ink2)", fontWeight: active ? 500 : 400, border: "1px solid transparent" }}>
+      {active && <ActivePill id={pill} className="rounded-lg" />}
+      <Icon size={14} className="relative shrink-0" style={{ color: active ? "var(--bj-gold)" : "var(--bj-ink4)" }} />
+      <span className="relative text-[13px] flex-1 truncate">{item.label}</span>
     </Link>
   );
 }
@@ -121,9 +126,12 @@ export function AppShell({ children, rightRail }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { themeId, setTheme } = useThemeStore();
-  const { fontPairId, setFontPair } = useFontStore();
   const { user } = useAuth();
   const { streak, weekDots } = useStreakStore();
+  const lastRead = useReadingStore((s) => s.last);
+  const readMap = useReadingStore((s) => s.read);
+  const bookTotal = lastRead ? CHAPTER_COUNTS[lastRead.book] ?? 1 : 1;
+  const bookDone = lastRead ? chaptersReadIn(readMap, lastRead.book) : 0;
   const zen = useWritingStore((s) => s.zen);
 
   const bibleOpen = useFloatWindowsStore((s) => s.bibleOpen);
@@ -139,10 +147,14 @@ export function AppShell({ children, rightRail }: AppShellProps) {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [isCompact, setIsCompact] = useState(() => readBool("bj-sidebar-compact", false));
-  const [spacesOpen, setSpacesOpen] = useState(() => readBool("bj-sidebar-spaces", true));
+  const [toolsOpen, setToolsOpen] = useState(() => readBool("bj-sidebar-tools", false));
   const [gPending, setGPending] = useState(false);
   const [mac, setMac] = useState(true);
   const appearanceRef = useRef<HTMLDivElement>(null);
+  const appearancePopRef = useRef<HTMLDivElement>(null);
+  // The appearance popover portals to <body> (the glass sidebar would clip it).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const profileRef = useRef<HTMLDivElement>(null);
   const topProfileRef = useRef<HTMLDivElement>(null);
 
@@ -150,7 +162,10 @@ export function AppShell({ children, rightRail }: AppShellProps) {
   useEffect(() => { setShowDrawer(false); setShowProfile(null); }, [pathname]);
 
   function toggleCompact() { setIsCompact((c) => { writeBool("bj-sidebar-compact", !c); return !c; }); }
-  function toggleSpaces() { setSpacesOpen((o) => { writeBool("bj-sidebar-spaces", !o); return !o; }); }
+  function toggleTools() { setToolsOpen((o) => { writeBool("bj-sidebar-tools", !o); return !o; }); }
+  const write = useCallback(() => { if (user) void startEntry(user.uid, router.push); }, [user, router]);
+  const writeRef = useRef(write);
+  useEffect(() => { writeRef.current = write; }, [write]);
 
   const isDark = themeId === "midnight" || themeId === "dusk";
   const toggleTheme = () => setTheme(isDark ? "warm" : "dusk");
@@ -163,7 +178,12 @@ export function AppShell({ children, rightRail }: AppShellProps) {
     let gTimer: ReturnType<typeof setTimeout> | undefined;
     let g = false;
     let lastKeyAt = 0; // a "g" typed mid-word (focus lost while writing) must not navigate
-    const setG = (v: boolean) => { g = v; setGPending(v); clearTimeout(gTimer); if (v) gTimer = setTimeout(() => setG(false), 1200); };
+    const setG = (v: boolean) => {
+      g = v; setGPending(v); clearTimeout(gTimer);
+      // Cleared a tick later so the second key's other listeners still see it pending.
+      keySequence.gPendingUntil = v ? performance.now() + 1200 : performance.now() + 50;
+      if (v) gTimer = setTimeout(() => setG(false), 1200);
+    };
 
     function handler(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
@@ -171,6 +191,8 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       if (mod && e.code === "Slash") { e.preventDefault(); setShowShortcuts((o) => !o); return; }
       if (mod && e.altKey && e.code === "KeyB") { e.preventDefault(); toggleBible(); return; }
       if (mod && e.shiftKey && e.code === "KeyA") { e.preventDefault(); toggleAsk(); return; }
+      // The journal handles its own ⌘⇧N (it keeps the list in place).
+      if (mod && e.shiftKey && e.code === "KeyN" && !window.location.pathname.startsWith("/journal")) { e.preventDefault(); writeRef.current(); return; }
       if (mod || e.altKey || isEditable(e.target) || e.defaultPrevented) { if (g) setG(false); return; }
 
       const key = e.key.toLowerCase();
@@ -189,13 +211,12 @@ export function AppShell({ children, rightRail }: AppShellProps) {
     window.addEventListener("keydown", handler);
     return () => { window.removeEventListener("keydown", handler); clearTimeout(gTimer); };
   }, [router, toggleBible, toggleAsk]);
-
   // Popovers close on outside click / Esc.
   useEffect(() => {
     if (!showAppearance && !showProfile) return;
     function onDown(e: MouseEvent) {
       const t = e.target as Node;
-      if (showAppearance && appearanceRef.current && !appearanceRef.current.contains(t)) setShowAppearance(false);
+      if (showAppearance && appearanceRef.current && !appearanceRef.current.contains(t) && !appearancePopRef.current?.contains(t)) setShowAppearance(false);
       if (showProfile) {
         const ref = showProfile === "sidebar" ? profileRef : topProfileRef;
         if (ref.current && !ref.current.contains(t)) setShowProfile(null);
@@ -246,31 +267,57 @@ export function AppShell({ children, rightRail }: AppShellProps) {
     </motion.div>
   );
 
-  const navGroups = (compact: boolean) => NAV_GROUPS.map((group) => {
-    const collapsed = group.collapsible && !spacesOpen && !compact;
-    const hasActive = group.items.some((i) => isActive(pathname, i.href));
+  const navGroups = (compact: boolean, pill = "nav-pill") => NAV_GROUPS.map((group) => {
+    const folded = !!group.fold && !toolsOpen && !compact;
+    const shown = folded
+      ? group.items.filter((i, idx) => idx < group.fold! || isActive(pathname, i.href))
+      : group.items;
+    const hidden = group.items.length - shown.length;
     return (
-      <div key={group.id} className={group.label ? "mt-3" : ""}>
+      <div key={group.id} className={group.id === "main" ? "" : "mt-4"}>
         {group.label && (compact ? (
           <div className="my-2 mx-auto w-6 h-px" style={{ background: "var(--bj-line-soft)" }} />
-        ) : group.collapsible ? (
-          <button type="button" onClick={toggleSpaces} aria-expanded={!collapsed}
-            className="bj-btn-ghost w-full flex items-center gap-1 px-3 h-6 mb-0.5 rounded-md font-sans text-[11px] font-medium" style={{ color: "var(--bj-ink4)" }}>
-            {group.label}
-            <ChevronDown size={11} style={{ transform: collapsed ? "rotate(-90deg)" : "none", transition: "transform 0.15s var(--ease-out)" }} />
-          </button>
         ) : (
-          <p className="px-3 h-6 mb-0.5 flex items-center font-sans text-[11px] font-medium" style={{ color: "var(--bj-ink4)" }}>{group.label}</p>
+          <p className="px-3 h-6 mb-0.5 flex items-center font-sans text-[10.5px] font-semibold uppercase" style={{ color: "var(--bj-ink4)", letterSpacing: "0.07em" }}>
+            {group.label}
+          </p>
         ))}
-        {(!collapsed ? group.items : hasActive ? group.items.filter((i) => isActive(pathname, i.href)) : []).map((item) => (
-          <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} compact={compact} />
+        {(compact && group.fold ? group.items.slice(0, group.fold) : shown).map((item) => (
+          <div key={item.href}>
+            <NavLink item={item} active={isActive(pathname, item.href)} compact={compact} pill={pill} />
+            {item.href === "/bible" && !compact && continueRow}
+          </div>
         ))}
+        {!compact && group.fold && (hidden > 0 || toolsOpen) && (
+          <button type="button" onClick={toggleTools} aria-expanded={toolsOpen}
+            className="bj-btn-ghost w-full flex items-center gap-2.5 px-3 h-7 rounded-lg font-sans text-[12px]" style={{ color: "var(--bj-ink4)" }}>
+            <ChevronDown size={13} style={{ transform: toolsOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s var(--ease-out)" }} />
+            {toolsOpen ? "Show less" : `${hidden} more`}
+          </button>
+        )}
       </div>
     );
   });
 
+  const continueRow = lastRead && !pathname.startsWith("/bible") ? (
+    <Link href={`/bible?book=${encodeURIComponent(lastRead.book)}&chapter=${lastRead.chapter}`}
+      className="bj-raised bj-lift mx-1 mt-1 mb-1 px-3 py-2.5 rounded-xl block"
+      title={`Continue reading ${lastRead.book} ${lastRead.chapter}`}>
+      <span className="flex items-center gap-2.5">
+        <BookOpen size={13} style={{ color: "var(--bj-gold)", flexShrink: 0 }} />
+        <span className="font-sans text-[12px] truncate min-w-0" style={{ color: "var(--bj-ink3)" }}>
+          Continue · <b className="font-medium" style={{ color: "var(--bj-ink)" }}>{lastRead.book} {lastRead.chapter}</b>
+        </span>
+      </span>
+      <span className="bj-well block h-[4px] rounded-full mt-2 overflow-hidden" style={{ border: 0 }}
+        aria-label={`${bookDone} of ${bookTotal} chapters of ${lastRead.book} read`}>
+        <span className="bj-glow block h-full rounded-full" style={{ width: `${Math.max(4, Math.round((bookDone / bookTotal) * 100))}%`, background: "linear-gradient(90deg, var(--bj-gold), color-mix(in oklch, var(--bj-gold), white 25%))" }} />
+      </span>
+    </Link>
+  ) : null;
+
   const streakRow = (
-    <div className="mx-2 mb-2 px-3 py-2.5 rounded-xl flex items-center gap-2.5" style={{ background: "var(--bj-bg-soft)" }}
+    <div className="bj-raised mx-2 mb-2 px-3 py-2.5 rounded-xl flex items-center gap-2.5"
       title={streak > 0 ? `${streak}-day streak` : "Write today to start a streak"}>
       <Flame size={13} style={{ color: streak > 0 ? "var(--bj-gold)" : "var(--bj-ink4)", flexShrink: 0 }} />
       <span className="font-sans text-[12px] font-medium" style={{ color: streak > 0 ? "var(--bj-gold-deep)" : "var(--bj-ink4)" }}>
@@ -278,7 +325,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       </span>
       <div className="flex gap-1 ml-auto" aria-hidden="true">
         {weekDots.map((dot, i) => (
-          <div key={i} title={dot.label} className="w-2 h-2 rounded-full"
+          <div key={i} title={dot.label} className={`w-2 h-2 rounded-full ${dot.on ? "bj-glow" : ""}`}
             style={{ background: dot.on ? "var(--bj-gold)" : "var(--bj-line)" }} />
         ))}
       </div>
@@ -286,14 +333,14 @@ export function AppShell({ children, rightRail }: AppShellProps) {
   );
 
   return (
-    <div className="flex h-screen" style={{ background: "var(--bj-bg)" }}>
+    <div className="bj-ambient flex h-screen">
 
       {/* ── Desktop sidebar ─────────────────────────── */}
       {!zen && (
         <aside
           aria-label="Main navigation"
-          className="hidden md:flex flex-col shrink-0 h-full border-r"
-          style={{ width: isCompact ? 64 : 232, background: "var(--bj-bg-panel)", borderColor: "var(--bj-line-soft)" }}
+          className="bj-glass hidden md:flex flex-col shrink-0 h-full"
+          style={{ width: isCompact ? 64 : 232, borderWidth: "0 1px 0 0", borderRadius: 0, boxShadow: "none" }}
         >
           {/* Brand */}
           {isCompact ? (
@@ -315,6 +362,21 @@ export function AppShell({ children, rightRail }: AppShellProps) {
             </div>
           )}
 
+          {/* Write */}
+          {isCompact ? (
+            <button type="button" onClick={write} title={`Write (${modKey}⇧N)`} aria-label="Write"
+              className="bj-gold w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2">
+              <PenLine size={16} strokeWidth={2.2} />
+            </button>
+          ) : (
+            <button type="button" onClick={write}
+              className="bj-gold mx-3 mb-2 flex items-center gap-2 px-3 h-10 rounded-xl font-sans text-[13.5px] font-semibold">
+              <PenLine size={15} strokeWidth={2.2} />
+              <span className="flex-1 text-left">Write</span>
+              <span className="text-[10.5px] font-medium opacity-60">{modKey}⇧N</span>
+            </button>
+          )}
+
           {/* Search */}
           {isCompact ? (
             <button type="button" onClick={() => setShowPalette(true)} title={`Search (${modKey}K)`} aria-label="Search"
@@ -323,8 +385,8 @@ export function AppShell({ children, rightRail }: AppShellProps) {
             </button>
           ) : (
             <button type="button" onClick={() => setShowPalette(true)}
-              className="bj-btn-ghost mx-3 mb-3 flex items-center gap-2 px-3 h-8 rounded-lg font-sans text-[13px]"
-              style={{ color: "var(--bj-ink4)", background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
+              className="bj-well mx-3 mb-3 flex items-center gap-2 px-3 h-8 rounded-lg font-sans text-[13px]"
+              style={{ color: "var(--bj-ink4)" }}>
               <Search size={13} />
               <span className="flex-1 text-left">Search</span>
               <kbd className="bj-kbd">{modKey}K</kbd>
@@ -338,7 +400,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           {!isCompact && streakRow}
 
           {/* Bottom */}
-          <div className={`border-t ${isCompact ? "px-1 py-2 flex flex-col items-center gap-0.5" : "px-2 py-2 flex items-center gap-1"}`} style={{ borderColor: "var(--bj-line-soft)" }}>
+          <div className={`relative border-t ${isCompact ? "px-1 py-2 flex flex-col items-center gap-0.5" : "px-2 py-2 flex items-center gap-1"}`} style={{ borderColor: "var(--bj-line-soft)" }}>
             <div className={`relative ${isCompact ? "" : "flex-1 min-w-0"}`} ref={profileRef}>
               <button type="button" onClick={() => setShowProfile(showProfile === "sidebar" ? null : "sidebar")}
                 aria-expanded={showProfile === "sidebar"} aria-label="Account"
@@ -354,23 +416,27 @@ export function AppShell({ children, rightRail }: AppShellProps) {
             </div>
 
             {/* Appearance */}
-            <div className="relative" ref={appearanceRef}>
+            {/* Expanded: the popover anchors to the whole footer so it never runs off-screen. */}
+            <div className={isCompact ? "relative" : ""} ref={appearanceRef}>
               <button type="button" onClick={() => setShowAppearance((o) => !o)} title="Appearance" aria-label="Appearance" aria-expanded={showAppearance}
                 className={`bj-btn-icon ${isCompact ? "w-10 h-10 rounded-xl" : "w-8 h-8 rounded-lg"} flex items-center justify-center`}
                 style={{ color: showAppearance ? "var(--bj-gold-deep)" : "var(--bj-ink3)", background: showAppearance ? "var(--bj-gold-tint)" : "transparent" }}>
                 <Palette size={15} />
               </button>
-              <AnimatePresence>
+              {mounted && createPortal(
+                <AnimatePresence>
                 {showAppearance && (
                   <motion.div
+                    ref={appearancePopRef}
                     initial={{ opacity: 0, y: 4, scale: 0.97 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
                     transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
-                    className="absolute bottom-full mb-1.5 rounded-xl border overflow-hidden w-64"
+                    className="fixed rounded-xl border overflow-y-auto"
                     style={{
-                      [isCompact ? "left" : "right"]: 0,
-                      transformOrigin: isCompact ? "bottom left" : "bottom right",
+                      // Fixed, so the sidebar never clips it.
+                      left: isCompact ? 76 : 12, bottom: 64, width: 330, maxWidth: "calc(100vw - 24px)", maxHeight: "min(80vh, 680px)",
+                      transformOrigin: "bottom left",
                       background: "var(--bj-bg-panel)", borderColor: "var(--bj-line)", boxShadow: "var(--bj-shadow-lg)", zIndex: 100,
                     }}
                   >
@@ -390,25 +456,14 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                       </div>
                     </div>
                     <div className="px-3 py-2.5">
-                      <p className="font-sans text-[11px] font-medium mb-2" style={{ color: "var(--bj-ink4)" }}>Interface font</p>
-                      <div className="grid grid-cols-2 gap-1">
-                        {fontPairs.map((pair) => {
-                          const active = fontPairId === pair.id;
-                          return (
-                            <button key={pair.id} type="button" onClick={() => setFontPair(pair.id as FontPairId)}
-                              className="bj-chip flex items-center gap-2 px-2 h-8 rounded-lg text-left" data-active={active || undefined}
-                              style={{ background: active ? "var(--bj-gold-tint)" : "transparent", border: active ? "1px solid var(--bj-gold-soft)" : "1px solid transparent" }}>
-                              <span style={{ fontFamily: FONT_FAMILY[pair.id], fontSize: 14, fontStyle: "italic", color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)", lineHeight: 1 }}>Aa</span>
-                              <span className="font-sans truncate" style={{ fontSize: 11.5, color: active ? "var(--bj-gold-deep)" : "var(--bj-ink3)" }}>{pair.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="font-sans text-[11px] mt-2.5" style={{ color: "var(--bj-ink4)" }}>Writing typeface lives in the editor’s <span className="font-display italic">Aa</span> menu.</p>
+                      <p className="font-sans text-[11px] font-medium mb-2" style={{ color: "var(--bj-ink4)" }}>Type</p>
+                      <TypePicker />
                     </div>
                   </motion.div>
                 )}
-              </AnimatePresence>
+                </AnimatePresence>,
+                document.body,
+              )}
             </div>
 
             <button type="button" onClick={toggleTheme} title={isDark ? "Light theme" : "Dark theme"} aria-label={isDark ? "Light theme" : "Dark theme"}
@@ -423,7 +478,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
         {!zen && (
           <header className="hidden md:flex items-center gap-2 pl-6 pr-4 border-b shrink-0"
-            style={{ height: 44, background: "var(--bj-bg)", borderColor: "var(--bj-line-soft)" }}>
+            style={{ height: 44, borderColor: "var(--bj-line-soft)" }}>
             <span className="font-sans text-[13px] font-medium truncate" style={{ color: "var(--bj-ink2)" }}>{current?.label ?? ""}</span>
             {gPending && (
               <span className="font-sans text-[11.5px] ml-2" style={{ color: "var(--bj-ink4)" }}>
@@ -451,7 +506,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
 
         <div className="flex flex-1 min-h-0">
           <main className="flex-1 overflow-y-auto">
-            <div className={`${zen ? "" : "pb-20 md:pb-0"} h-full`}>{children}</div>
+            <div className={`${zen ? "" : "pb-24 md:pb-0"} h-full`}>{children}</div>
           </main>
           {rightRail && !zen && (
             <aside className="hidden xl:flex flex-col w-[300px] shrink-0 h-full border-l overflow-y-auto"
@@ -462,11 +517,11 @@ export function AppShell({ children, rightRail }: AppShellProps) {
         </div>
       </div>
 
-      {/* ── Mobile Bible/Ask quick access ── */}
-      {!zen && (
+      {/* ── Mobile Bible/Ask quick access (the journal has its own toolbar) ── */}
+      {!zen && !pathname.startsWith("/journal") && (
         <div className="md:hidden fixed z-40 flex items-center gap-0.5 p-1 rounded-full"
           style={{
-            right: 12, bottom: "calc(4.75rem + env(safe-area-inset-bottom))",
+            right: 12, bottom: "calc(5.4rem + env(safe-area-inset-bottom))",
             background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-md)",
           }}>
           <BibleFloatTriggers bibleOpen={bibleOpen} askOpen={askOpen} onToggleBible={toggleBible} onToggleAsk={toggleAsk} />
@@ -475,28 +530,36 @@ export function AppShell({ children, rightRail }: AppShellProps) {
 
       {/* ── Mobile tab bar ── */}
       {!zen && (
-        <nav aria-label="Main" className="md:hidden fixed bottom-0 left-0 right-0 flex items-stretch border-t z-50"
-          style={{
-            background: "color-mix(in oklch, var(--bj-bg-panel) 90%, transparent)", borderColor: "var(--bj-line-soft)",
-            backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
-            paddingBottom: "env(safe-area-inset-bottom)", paddingLeft: 6, paddingRight: 6,
-          }}>
-          {MOBILE_TABS.map((item) => {
+        <nav aria-label="Main" className="bj-glass md:hidden fixed z-50 flex items-center rounded-[22px] px-1.5"
+          style={{ left: 10, right: 10, bottom: "calc(8px + env(safe-area-inset-bottom))", height: 62 }}>
+          {[...MOBILE_TABS.slice(0, 2), null, ...MOBILE_TABS.slice(2)].map((item) => {
+            if (!item) return (
+              <div key="write" className="flex-1 flex justify-center">
+                <button type="button" onClick={write} aria-label="Write"
+                  className="bj-gold w-[54px] h-[54px] rounded-[18px] flex items-center justify-center" style={{ marginTop: -22 }}>
+                  <PenLine size={22} strokeWidth={2.2} />
+                </button>
+              </div>
+            );
             const active = isActive(pathname, item.href);
             const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined}
-                className="bj-btn-icon flex flex-col items-center justify-center gap-1 flex-1 min-w-0 h-14 rounded-xl"
-                style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink4)" }}>
+                className="bj-btn-icon relative flex flex-col items-center justify-center gap-1 flex-1 min-w-0 h-[52px] rounded-xl"
+                style={{ color: active ? "var(--bj-gold)" : "var(--bj-ink4)" }}>
+                {active && (
+                  <motion.span layoutId="tab-dot" aria-hidden="true" className="bj-glow absolute top-1 w-5 h-[3px] rounded-full"
+                    style={{ background: "var(--bj-gold)" }} transition={{ type: "spring", duration: 0.35, bounce: 0.2 }} />
+                )}
                 <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
                 <span className="font-sans text-[10px] font-medium">{item.label}</span>
               </Link>
             );
           })}
-          <button type="button" onClick={() => setShowDrawer(true)} aria-label="More"
-            className="bj-btn-icon flex flex-col items-center justify-center gap-1 flex-1 min-w-0 h-14 rounded-xl"
+          <button type="button" onClick={() => setShowDrawer(true)} aria-label="Tools and more"
+            className="bj-btn-icon flex flex-col items-center justify-center gap-1 flex-1 min-w-0 h-[52px] rounded-xl"
             style={{ color: MOBILE_TABS.some((t) => isActive(pathname, t.href)) ? "var(--bj-ink4)" : "var(--bj-gold-deep)" }}>
-            <Menu size={20} />
+            <Wrench size={20} />
             <span className="font-sans text-[10px] font-medium">More</span>
           </button>
         </nav>
@@ -531,7 +594,8 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                 <Search size={14} /> Search
               </button>
               <div className="flex-1 min-h-0 overflow-y-auto">
-                <nav className="px-2 pb-3">{navGroups(false)}</nav>
+                <nav className="px-2 pb-3">{navGroups(false, "drawer-pill")}</nav>
+                {continueRow}
                 {streakRow}
               </div>
               <div className="px-2 py-2 border-t shrink-0 flex items-center gap-1" style={{ borderColor: "var(--bj-line-soft)" }}>

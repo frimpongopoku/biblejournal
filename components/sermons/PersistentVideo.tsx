@@ -7,7 +7,7 @@ import { useVideoStore } from "@/store/video.store";
 import { youTubeEmbedUrl } from "@/lib/youtube-parser";
 
 export function PersistentVideo() {
-  const { videoId, title, isVisible, setVisible, clearVideo } = useVideoStore();
+  const { videoId, title, isVisible, setVisible, clearVideo, start } = useVideoStore();
   const [large, setLarge] = useState(false);
   const [minimized, setMinimized] = useState(false);
 
@@ -113,7 +113,7 @@ export function PersistentVideo() {
         }}
       >
         <iframe
-          src={youTubeEmbedUrl(videoId)}
+          src={start ? `${youTubeEmbedUrl(videoId)}&start=${start}&autoplay=1` : youTubeEmbedUrl(videoId)}
           width={w}
           height={h}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

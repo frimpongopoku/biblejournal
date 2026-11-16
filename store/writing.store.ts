@@ -3,16 +3,9 @@ import { persist } from "zustand/middleware";
 import type { SwitchId } from "@/lib/typing/keySounds";
 
 export type WritingWidth = "narrow" | "normal" | "wide";
-export type WritingFont = "classic" | "garamond" | "lora" | "fraunces" | "sans" | "dyslexic";
+import { WRITE_FACES, READ_FACES, face, faceStack, type WriteFont, type ReadFont } from "@/lib/typeface";
 
-export const WRITING_FONTS: { id: WritingFont; label: string; cssVar: string; scale: number; italic: boolean }[] = [
-  { id: "classic", label: "Classic", cssVar: "--font-cormorant", scale: 1, italic: true },
-  { id: "garamond", label: "Garamond", cssVar: "--font-eb-garamond", scale: 0.94, italic: true },
-  { id: "lora", label: "Lora", cssVar: "--font-lora", scale: 0.88, italic: true },
-  { id: "fraunces", label: "Fraunces", cssVar: "--font-fraunces", scale: 0.88, italic: true },
-  { id: "sans", label: "Sans", cssVar: "--font-inter", scale: 0.84, italic: false },
-  { id: "dyslexic", label: "Dyslexic", cssVar: "--font-opendyslexic", scale: 0.8, italic: false },
-];
+export type WritingFont = WriteFont;
 
 export const WIDTHS: Record<WritingWidth, number> = { narrow: 600, normal: 700, wide: 860 };
 
@@ -32,8 +25,11 @@ interface WritingPrefs {
   /** Full-screen, chrome-free writing (per session, not persisted). */
   zen: boolean;
   font: WritingFont;
-  /** Base size in px for the Classic face; other faces are optically matched. */
+  /** Base size in px; each face is optically matched to it. */
   size: number;
+  /** Scripture has its own face and size. */
+  readFont: ReadFont;
+  readSize: number;
   width: WritingWidth;
   /** Words to write this session; 0 = no goal. */
   goal: number;
@@ -51,8 +47,10 @@ export const useWritingStore = create<WritingPrefs>()(
       typewriter: false,
       focusParagraph: false,
       zen: false,
-      font: "classic",
+      font: "newsreader",
       size: 20,
+      readFont: "garamond",
+      readSize: 21,
       width: "normal",
       goal: 0,
       set: (patch) => set(patch),
@@ -60,6 +58,18 @@ export const useWritingStore = create<WritingPrefs>()(
     }),
     {
       name: "bj-writing",
+      version: 2,
+      // v1 had a single face list shared by writing and the Bible.
+      migrate: (old, v) => {
+        const o = (old ?? {}) as Record<string, unknown>;
+        if (v < 2) {
+          const map: Record<string, WriteFont> = { lora: "literata", sans: "source", dyslexic: "dyslexic" };
+          o.font = map[o.font as string] ?? "newsreader";
+          o.readFont = o.font === "dyslexic" ? "dyslexic" : "garamond";
+          o.readSize = Math.max(18, Math.min(26, Number(o.size) || 20) + 1);
+        }
+        return o as unknown as WritingPrefs;
+      },
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       partialize: ({ zen, set, toggle, ...rest }) => rest,
     },
@@ -67,6 +77,11 @@ export const useWritingStore = create<WritingPrefs>()(
 );
 
 export function writingFontStyle(font: WritingFont, size: number): React.CSSProperties {
-  const f = WRITING_FONTS.find((x) => x.id === font) ?? WRITING_FONTS[0];
-  return { fontFamily: `var(${f.cssVar}), Georgia, serif`, fontSize: `${Math.round(size * f.scale * 10) / 10}px` };
+  const f = face(WRITE_FACES, font);
+  return { fontFamily: faceStack(f), fontSize: `${Math.round(size * f.scale * 10) / 10}px` };
+}
+
+export function readingFontStyle(font: ReadFont, size: number): React.CSSProperties {
+  const f = face(READ_FACES, font);
+  return { fontFamily: faceStack(f), fontSize: `${Math.round(size * f.scale * 10) / 10}px` };
 }

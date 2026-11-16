@@ -469,7 +469,7 @@ export function FloatingAsk({ onClose }: { onClose: () => void }) {
                   {result.keyVerses.map((v) => (
                     <div key={v.ref} className="rounded-xl px-3 py-2.5" style={{ background: "var(--bj-gold-tint)", border: "1px solid var(--bj-gold-soft)" }}>
                       <p className="font-sans text-[10px] font-semibold mb-1" style={{ color: "var(--bj-gold-deep)" }}>{v.ref} · {version}</p>
-                      <p className="font-display italic text-xs" style={{ color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.6 }}>"{v.text}"</p>
+                      <p className="font-read italic text-[13px]" style={{ color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.6 }}>"{v.text}"</p>
                     </div>
                   ))}
                 </div>

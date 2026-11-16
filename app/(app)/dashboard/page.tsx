@@ -1,478 +1,451 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import {
-  NotebookPen, BookOpen, HeartHandshake, Mic, Megaphone,
-  ArrowRight, Flame, Plus, Play,
-} from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { useStreakStore } from "@/store/streak.store";
+import { Camera, BookOpen, Feather, ArrowRight, RefreshCw, HeartHandshake, Sparkles } from "lucide-react";
+import { useAuthStore } from "@/store/auth.store";
 import { useJournalEntries } from "@/hooks/useJournalEntries";
 import { usePrayers } from "@/hooks/usePrayers";
-import { useSermons } from "@/hooks/useSermons";
-import { useProclamationFolders } from "@/hooks/useProclamationFolders";
-import { createEntry } from "@/services/journal.service";
-import { useAuthStore } from "@/store/auth.store";
-import { youTubeThumbnail } from "@/lib/youtube-parser";
+import { useStudyNotes } from "@/hooks/useStudyNotes";
+import { useReadingStore } from "@/store/reading.store";
+import { useBibleStore } from "@/store/bible.store";
+import { fetchPassage } from "@/lib/bible-client";
+import { startEntry } from "@/lib/startEntry";
+import { attachCover, pickPhotos, imageFiles } from "@/lib/photos";
+import { FEELING_COLORS, feelingColor } from "@/lib/feelings";
+import { cachedDocText, feelingByLabel, plural, FEELINGS } from "@/components/journal/JournalParts";
+import type { JournalEntry } from "@/types";
 
 // ── Helpers ───────────────────────────────────────────────
 
-interface DailyVerse {
-  ref: string;
-  text: string;
-  version: string;
-}
+const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const words = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
 
-function getGreeting() {
-  const h = new Date().getHours();
+function greeting(h: number) {
+  if (h < 5) return "Still up";
   if (h < 12) return "Good morning";
   if (h < 17) return "Good afternoon";
   return "Good evening";
 }
 
-function formatDate() {
-  return new Date().toLocaleDateString("en-US", {
-    weekday: "long", month: "long", day: "numeric",
-  });
-}
-
-function extractExcerpt(content: string, max = 90): string {
-  try {
-    const doc = JSON.parse(content);
-    const parts: string[] = [];
-    const walk = (n: { text?: string; content?: typeof n[] }) => {
-      if (n.text) parts.push(n.text);
-      n.content?.forEach(walk);
-    };
-    walk(doc);
-    const full = parts.join(" ").trim();
-    return full.length > max ? full.slice(0, max) + "…" : full;
-  } catch { return ""; }
-}
-
-
-// ── Animation variants ────────────────────────────────────
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
-  show: (i: number) => ({
-    opacity: 1, y: 0,
-    transition: { delay: i * 0.07, duration: 0.5, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
-  }),
-};
-
-// ── Skeleton card ─────────────────────────────────────────
-
-function Skeleton({ h = 120 }: { h?: number }) {
-  return <div className="rounded-2xl animate-pulse" style={{ height: h, background: "var(--bj-bg-soft)" }} />;
-}
-
-// ── Section card wrapper ──────────────────────────────────
-
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div
-      className={`rounded-2xl overflow-hidden ${className}`}
-      style={{ background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line-soft)", boxShadow: "0 2px 16px color-mix(in oklch, var(--bj-ink) 4%, transparent)" }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function SectionHeader({ title, href }: { title: string; href: string }) {
-  return (
-    <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
-      <h2 className="font-display text-lg" style={{ color: "var(--bj-ink)", fontWeight: 500 }}>{title}</h2>
-      <Link href={href} className="bj-chip font-sans text-xs flex items-center gap-1 px-2 py-1 rounded-lg" style={{ color: "var(--bj-gold-deep)" }}>
-        View all <ArrowRight size={11} />
-      </Link>
-    </div>
-  );
-}
-
-// ── Section empty states ──────────────────────────────────
-
-function SectionEmpty({ icon: Icon, message, cta, href }: { icon: React.ElementType; message: string; cta: string; href: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-10 px-6 gap-3 text-center">
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "var(--bj-bg-soft)" }}>
-        <Icon size={18} style={{ color: "var(--bj-ink4)" }} />
-      </div>
-      <p className="font-sans text-sm" style={{ color: "var(--bj-ink4)", lineHeight: 1.55 }}>{message}</p>
-      <Link href={href} className="bj-chip font-sans text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5" style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}>
-        <Plus size={11} /> {cta}
-      </Link>
-    </div>
-  );
-}
-
-// ── Onboarding screen (brand new user) ───────────────────
-
-const FEATURES = [
-  { icon: NotebookPen, label: "Journal",        desc: "Write freely. Process the Word. Capture revelation.",         href: "/journal",        color: "var(--bj-gold)" },
-  { icon: BookOpen,    label: "Bible",           desc: "Read, highlight, and reference across 8 translations.",      href: "/bible",           color: "var(--bj-sage)" },
-  { icon: HeartHandshake, label: "Prayer",       desc: "Track your prayers. Mark what God answers.",                 href: "/prayer",          color: "var(--bj-ember)" },
-  { icon: Mic,         label: "Sermons",         desc: "Follow a sermon with notes, verses, and a live video.",      href: "/sermons",         color: "var(--bj-gold)" },
-  { icon: Megaphone,   label: "Proclamations",   desc: "Declare what God says. Share your folders publicly.",        href: "/proclamations",   color: "var(--bj-sage)" },
+const PROMPTS = [
+  "What is this asking of you today?",
+  "Where do you see yourself in this?",
+  "What would change if you really believed this?",
+  "What does this show you about God?",
+  "Which word won’t let go of you — and why?",
+  "Who needs to hear this from you this week?",
 ];
 
-function OnboardingScreen({ firstName }: { firstName: string }) {
-  return (
-    <motion.div custom={2} variants={fadeUp} initial="hidden" animate="show" className="flex flex-col gap-8">
-      <div className="text-center py-4">
-        <p className="font-display italic mb-2" style={{ fontSize: "clamp(1.4rem, 3.5vw, 1.8rem)", color: "var(--bj-ink)", fontWeight: 300 }}>
-          Your spiritual life, beautifully organised.
-        </p>
-        <p className="font-sans text-sm" style={{ color: "var(--bj-ink4)", maxWidth: 400, margin: "0 auto", lineHeight: 1.65 }}>
-          BibJournal brings together everything you need to go deeper — journaling, scripture, prayer, sermons, and declarations. Start anywhere.
-        </p>
-      </div>
+interface Passage { ref: string; book: string; chapter: number; verse: number; endVerse?: number; text: string; version: string; why: string }
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {FEATURES.map(({ icon: Icon, label, desc, href, color }, i) => (
-          <motion.div key={label} custom={i + 3} variants={fadeUp} initial="hidden" animate="show">
-            <Link
-              href={href}
-              className="bj-list-row flex flex-col gap-4 p-5 rounded-2xl h-full"
-              style={{ background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line-soft)", boxShadow: "0 2px 12px color-mix(in oklch, var(--bj-ink) 3%, transparent)" }}
-            >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `color-mix(in oklch, ${color} 12%, var(--bj-bg))` }}>
-                <Icon size={18} style={{ color }} />
-              </div>
-              <div>
-                <p className="font-sans font-semibold text-sm mb-1" style={{ color: "var(--bj-ink)" }}>{label}</p>
-                <p className="font-sans text-xs leading-relaxed" style={{ color: "var(--bj-ink4)" }}>{desc}</p>
-              </div>
-              <div className="flex items-center gap-1 mt-auto font-sans text-xs font-medium" style={{ color }}>
-                Open {label} <ArrowRight size={11} />
-              </div>
-            </Link>
-          </motion.div>
-        ))}
-      </div>
-
-      <p className="text-center font-display italic" style={{ color: "var(--bj-ink4)", fontWeight: 300, fontSize: "0.9rem" }}>
-        "Every great spiritual journey starts with a single step."
-      </p>
-    </motion.div>
-  );
+function timeOf(d: Date) {
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 // ── Page ──────────────────────────────────────────────────
 
-export default function DashboardPage() {
-  const { user } = useAuth();
-  const authUser = useAuthStore((s) => s.user);
+export default function TodayPage() {
+  const user = useAuthStore((s) => s.user);
   const router = useRouter();
-  const firstName = user?.displayName?.split(" ")[0] ?? "Friend";
-  const [dailyVerse, setDailyVerse] = useState<DailyVerse | null>(null);
+  const { entries, loading } = useJournalEntries();
+  const { prayers } = usePrayers();
+  const { studyNotes } = useStudyNotes();
+  const last = useReadingStore((s) => s.last);
+  const version = useBibleStore((s) => s.version);
+
+  const [now] = useState(() => new Date());
+  const firstName = user?.displayName?.split(" ")[0] ?? "";
+
+  // ── Days written ──
+  const daysWritten = useMemo(() => new Set(entries.map((e) => dayKey(e.createdAt))).size, [entries]);
+  const today = useMemo(() => entries.filter((e) => dayKey(e.createdAt) === dayKey(now)), [entries, now]);
+  const wroteToday = today.length > 0;
+
+  // ── From your reading ──
+  const [passage, setPassage] = useState<Passage | null>(null);
+  const [prompt, setPrompt] = useState(() => now.getDate() % PROMPTS.length);
+  const source = useMemo(() => {
+    const highlights = studyNotes.filter((n) => n.kind === "highlight").sort((a, b) => +b.createdAt - +a.createdAt);
+    const inLast = last ? highlights.find((h) => h.scripture.book === last.book && h.scripture.chapter === last.chapter) : undefined;
+    const pick = inLast ?? highlights[0];
+    if (pick) {
+      const s = pick.scripture;
+      return { book: s.book, chapter: s.chapter, verse: s.verse, endVerse: s.endVerse, version: s.version || version, text: s.text, why: inLast ? "You highlighted this" : "A recent highlight" };
+    }
+    if (last) return { book: last.book, chapter: last.chapter, verse: 1, endVerse: 3, version, text: undefined, why: "Where you were reading" };
+    return null;
+  }, [studyNotes, last, version]);
 
   useEffect(() => {
-    fetch("/api/bible/daily")
-      .then((r) => r.json())
-      .then(setDailyVerse)
-      .catch(() => {
-        // Fallback so the hero never crashes
-        setDailyVerse({ ref: "Psalm 119:105", text: "Your word is a lamp to my feet and a light to my path.", version: "ESV" });
-      });
-  }, []);
+    let cancelled = false;
+    if (source) {
+      fetchPassage(source.version, { book: source.book, chapter: source.chapter, verse: source.verse, verseEnd: source.endVerse })
+        .then(({ verses, label }) => {
+          if (cancelled) return;
+          setPassage({ ...source, ref: label, text: source.text || verses.map((v) => v.text).join(" ") });
+        })
+        .catch(() => { /* card falls back below */ });
+    } else {
+      fetch("/api/bible/daily").then((r) => r.json())
+        .then((d: { ref: string; text: string; version: string }) => {
+          if (!cancelled) setPassage({ ref: d.ref, text: d.text, version: d.version, book: "", chapter: 0, verse: 0, why: "Today’s verse" });
+        })
+        .catch(() => { if (!cancelled) setPassage({ ref: "Psalm 119:105", text: "Your word is a lamp to my feet and a light to my path.", version: "ESV", book: "Psalms", chapter: 119, verse: 105, why: "Today’s verse" }); });
+    }
+    return () => { cancelled = true; };
+  }, [source]);
 
-  const { entries, loading: jLoading } = useJournalEntries();
-  const { prayers, loading: pLoading } = usePrayers();
-  const { sermons, loading: sLoading } = useSermons();
-  const { folders, loading: fLoading } = useProclamationFolders();
-
-  const allLoading = jLoading || pLoading || sLoading || fLoading;
-  const allEmpty = !allLoading && entries.length === 0 && prayers.length === 0 && sermons.length === 0 && folders.length === 0;
-
-  const activePrayers = prayers.filter((p) => p.status === "active");
-  const recentJournal = entries.slice(0, 3);
-  const recentSermons = sermons.slice(0, 2);
-
-  const { streak, weekDots } = useStreakStore();
-
-  async function handleNewEntry() {
-    if (!authUser) return;
-    const id = await createEntry(authUser.uid);
-    router.push(`/journal`);
+  // ── Starting entries ──
+  const [busy, setBusy] = useState(false);
+  async function begin(seed: Parameters<typeof startEntry>[2], focus?: "title" | "body" | "verse") {
+    if (!user || busy) return null;
+    setBusy(true);
+    try { return await startEntry(user.uid, router.push, seed, focus); } finally { setBusy(false); }
   }
 
+  function writeOnPassage() {
+    if (!passage) return;
+    void begin({
+      title: `On ${passage.ref}`,
+      content: JSON.stringify({ type: "doc", content: [
+        { type: "scriptureBlock", attrs: { reference: passage.ref, version: passage.version }, content: [{ type: "text", text: passage.text }] },
+        { type: "paragraph", content: [{ type: "text", marks: [{ type: "italic" }], text: PROMPTS[prompt] }] },
+        { type: "paragraph" },
+      ] }),
+      scriptures: passage.book ? [{ book: passage.book, chapter: passage.chapter, verse: passage.verse, ...(passage.endVerse ? { endVerse: passage.endVerse } : {}), version: passage.version }] : [],
+    });
+  }
+
+  const [draft, setDraft] = useState("");
+  const [feeling, setFeeling] = useState<string | null>(null);
+  const draftRef = useRef<HTMLTextAreaElement>(null);
+
+  function keepWriting() {
+    const text = draft.trim();
+    void begin({
+      ...(feeling ? { feeling } : {}),
+      ...(text ? { content: JSON.stringify({ type: "doc", content: text.split(/\n+/).map((p) => ({ type: "paragraph", content: [{ type: "text", text: p }] })) }) } : {}),
+    }, text ? "body" : "title");
+  }
+
+  async function withPhoto(files?: File[]) {
+    if (!user) return;
+    const picked = files ?? await pickPhotos({ camera: window.matchMedia("(pointer: coarse)").matches });
+    const [file] = picked;
+    if (!file) return;
+    const id = await begin({ ...(feeling ? { feeling } : {}), ...(draft.trim() ? { content: JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: draft.trim() }] }] }) } : {}) }, "title");
+    if (id) attachCover(user.uid, id, file);
+  }
+
+  // ── Rail data ──
+  const week = useMemo(() => {
+    const days: { date: Date; entries: JournalEntry[]; words: number; cover?: string; feeling?: string }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const list = entries.filter((e) => dayKey(e.createdAt) === dayKey(d));
+      days.push({
+        date: d, entries: list,
+        words: list.reduce((n, e) => n + words(cachedDocText(e.content)), 0),
+        cover: list.find((e) => e.cover?.url)?.cover?.url,
+        feeling: list.find((e) => e.feeling)?.feeling,
+      });
+    }
+    return days;
+  }, [entries, now]);
+  const weekWords = week.reduce((n, d) => n + d.words, 0);
+
+  const onThisDay = useMemo(() => {
+    const sameDay = entries.filter((e) => e.createdAt.getMonth() === now.getMonth() && e.createdAt.getDate() === now.getDate() && e.createdAt.getFullYear() < now.getFullYear());
+    if (sameDay.length) return { label: `${now.getFullYear() - sameDay[0].createdAt.getFullYear()} year${now.getFullYear() - sameDay[0].createdAt.getFullYear() === 1 ? "" : "s"} ago today`, entry: sameDay[0] };
+    for (const [days, label] of [[30, "A month ago"], [7, "A week ago"]] as const) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days);
+      const hit = entries.find((e) => dayKey(e.createdAt) === dayKey(d));
+      if (hit) return { label, entry: hit };
+    }
+    return null;
+  }, [entries, now]);
+
+  const questions = useMemo(() => {
+    const out: { q: string; id: string; date: Date }[] = [];
+    const since = +now - 45 * 864e5;
+    for (const e of entries) {
+      if (+e.createdAt < since) continue;
+      const text = cachedDocText(e.content);
+      for (const m of text.matchAll(/[^.!?\n]{12,160}\?/g)) {
+        const q = m[0].trim();
+        if (q.split(/\s+/).length >= 4) { out.push({ q, id: e.id, date: e.createdAt }); break; }
+      }
+      if (out.length >= 3) break;
+    }
+    return out;
+  }, [entries, now]);
+
+  const praying = useMemo(() => prayers.filter((p) => p.status === "active").slice(0, 3), [prayers]);
+
+  const recent = wroteToday ? today : entries.slice(0, 3);
+
+  // ── Render ──
+
+  const card = "bj-raised rounded-[20px]";
+  const eyebrow = "font-sans text-[10.5px] font-semibold uppercase tracking-[0.08em]";
+
   return (
-    <div className="min-h-full" style={{ background: "var(--bj-bg)" }}>
-      <div className="mx-auto px-5 md:px-12 pt-8 md:pt-12 pb-20" style={{ maxWidth: 960 }}>
-
-        {/* ── Header ─────────────────────────────────────── */}
-        <motion.div custom={0} variants={fadeUp} initial="hidden" animate="show"
-          className="flex items-start justify-between gap-4 mb-8"
-        >
-          <div>
-            <p className="font-sans text-xs mb-1" style={{ color: "var(--bj-gold-deep)", letterSpacing: "0.12em", textTransform: "uppercase" }}>
-              {formatDate()}
-            </p>
-            <h1 className="font-display leading-none" style={{ fontSize: "clamp(1.8rem, 4vw, 2.6rem)", color: "var(--bj-ink)", fontWeight: 400, letterSpacing: "-0.01em" }}>
-              {getGreeting()}, {firstName}.
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 pt-1 shrink-0">
-            <button
-              onClick={handleNewEntry}
-              className="bj-btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
-              style={{ background: "var(--bj-gold)", color: "white", boxShadow: "0 2px 14px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}
-            >
-              <NotebookPen size={14} />
-              <span className="hidden sm:inline">New Entry</span>
-            </button>
-            <Link href="/bible" className="bj-btn-ghost flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium" style={{ border: "1px solid var(--bj-line)", color: "var(--bj-ink2)" }}>
-              <BookOpen size={14} />
-              <span className="hidden sm:inline">Bible</span>
-            </Link>
-          </div>
-        </motion.div>
-
-        {/* ── Daily Verse ─────────────────────────────────── */}
-        <motion.div custom={1} variants={fadeUp} initial="hidden" animate="show" className="mb-7">
-          <div
-            className="relative overflow-hidden rounded-2xl px-6 md:px-10 py-7 md:py-9"
-            style={{
-              background: `radial-gradient(ellipse 70% 80% at 10% 50%, color-mix(in oklch, var(--bj-gold-soft) 50%, transparent), transparent 65%),
-                radial-gradient(ellipse 50% 60% at 90% 20%, color-mix(in oklch, var(--bj-gold-tint) 80%, transparent), transparent 60%),
-                var(--bj-bg-soft)`,
-              border: "1px solid var(--bj-gold-soft)",
-              boxShadow: "0 4px 32px color-mix(in oklch, var(--bj-gold) 10%, transparent)",
-            }}
-          >
-            <svg className="absolute -right-10 -top-10 pointer-events-none" style={{ opacity: 0.06 }} width="240" height="240" viewBox="0 0 240 240">
-              <circle cx="120" cy="120" r="110" stroke="var(--bj-gold)" strokeWidth="1" fill="none" />
-              <circle cx="120" cy="120" r="80" stroke="var(--bj-gold)" strokeWidth="0.6" fill="none" />
-            </svg>
-
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="font-sans text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--bj-gold-deep)" }}>Today's verse</span>
-                {dailyVerse && (
-                  <span className="font-sans text-[10px] px-2 py-0.5 rounded-full" style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}>{dailyVerse.version}</span>
-                )}
-              </div>
-
-              {dailyVerse ? (
-                <>
-                  <p className="font-sans mb-2" style={{ fontSize: "0.7rem", letterSpacing: "0.12em", color: "var(--bj-gold-deep)", fontWeight: 600, textTransform: "uppercase" }}>
-                    {dailyVerse.ref}
-                  </p>
-                  <blockquote className="font-display italic mb-6" style={{ fontSize: "clamp(1.2rem, 2.8vw, 1.7rem)", color: "var(--bj-ink)", fontWeight: 300, maxWidth: 580, lineHeight: 1.35 }}>
-                    &ldquo;{dailyVerse.text}&rdquo;
-                  </blockquote>
-                </>
-              ) : (
-                <div className="mb-6 flex flex-col gap-2.5">
-                  <div className="h-3 rounded-lg animate-pulse w-32" style={{ background: "var(--bj-gold-soft)" }} />
-                  <div className="h-7 rounded-lg animate-pulse w-full max-w-lg" style={{ background: "var(--bj-gold-soft)" }} />
-                  <div className="h-7 rounded-lg animate-pulse w-3/4" style={{ background: "var(--bj-gold-soft)" }} />
-                </div>
-              )}
-
-              {/* Streak */}
-              <div className="flex items-center gap-4 pt-5 border-t" style={{ borderColor: "var(--bj-gold-soft)" }}>
-                <div className="flex items-center gap-1.5">
-                  <Flame size={12} style={{ color: "var(--bj-gold)" }} />
-                  <span className="font-sans text-xs font-medium" style={{ color: "var(--bj-gold-deep)" }}>
-                    {streak > 0 ? `${streak} day streak` : "Start your streak today"}
-                  </span>
-                </div>
-                <div className="flex gap-1.5">
-                  {weekDots.map((dot, i) => (
-                    <div key={i} className="flex flex-col items-center gap-1">
-                      <div className="w-5 h-5 rounded-md" style={{ background: dot.on ? "var(--bj-gold)" : "var(--bj-gold-soft)", boxShadow: dot.on ? "0 1px 6px color-mix(in oklch, var(--bj-gold) 40%, transparent)" : "none" }} />
-                      <span className="font-sans" style={{ fontSize: 9, color: "var(--bj-gold-deep)" }}>{dot.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+    <div className="min-h-full">
+      <div className="max-w-[1180px] mx-auto px-4 md:px-8 pt-6 md:pt-10 pb-16 grid gap-6 xl:gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+        {/* ── Main column ── */}
+        <div className="min-w-0 flex flex-col gap-5 bj-stagger">
+          {/* Date hero */}
+          <header className="flex items-end gap-4 md:gap-5 px-1">
+            <span className="font-display leading-[0.8] select-none"
+              style={{
+                fontSize: "clamp(76px, 11vw, 112px)", fontWeight: 400, letterSpacing: "-0.04em",
+                background: "linear-gradient(180deg, color-mix(in oklch, var(--bj-gold), white 30%), var(--bj-gold) 55%, var(--bj-gold-deep))",
+                WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+                filter: "drop-shadow(0 6px 18px color-mix(in oklch, var(--bj-gold) 30%, transparent))",
+              }}>
+              {now.getDate()}
+            </span>
+            <div className="pb-1.5 min-w-0">
+              <p className="font-display text-[22px] md:text-[26px] leading-tight" style={{ color: "var(--bj-ink)" }}>
+                {now.toLocaleDateString("en-US", { weekday: "long" })}, {now.toLocaleDateString("en-US", { month: "long" })}
+              </p>
+              <p className="font-sans text-[13px] mt-1" style={{ color: "var(--bj-ink3)" }}>
+                {greeting(now.getHours())}{firstName ? `, ${firstName}` : ""}
+                {daysWritten > 0 && <> · <span style={{ color: "var(--bj-gold-deep)" }}>day {daysWritten.toLocaleString()} of writing</span></>}
+              </p>
             </div>
-          </div>
-        </motion.div>
+          </header>
 
-        {/* ── Loading ─────────────────────────────────────── */}
-        {allLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Skeleton h={180} />
-            <Skeleton h={180} />
-            <Skeleton h={140} />
-            <Skeleton h={140} />
-          </div>
-        )}
+          {/* From your reading */}
+          <section className={`${card} relative overflow-hidden p-5 md:p-7`} aria-label="From your reading">
+            <div aria-hidden="true" className="absolute -top-24 -right-16 w-72 h-72 rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(closest-side, color-mix(in oklch, var(--bj-gold) 22%, transparent), transparent)" }} />
+            <div className="relative flex items-center gap-2 mb-4">
+              <BookOpen size={13} style={{ color: "var(--bj-gold)" }} />
+              <span className={eyebrow} style={{ color: "var(--bj-gold-deep)" }}>From your reading</span>
+              {passage && <span className="font-sans text-[11.5px] truncate" style={{ color: "var(--bj-ink4)" }}>· {passage.why}</span>}
+            </div>
+            {passage ? (
+              <>
+                <blockquote className="relative font-read text-[18px] md:text-[20px] leading-[1.55]" style={{ color: "var(--bj-ink)" }}>
+                  <span style={{ display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical", overflow: "hidden" }}>“{passage.text}”</span>
+                  <footer className="font-sans text-[12.5px] mt-2.5 not-italic" style={{ color: "var(--bj-ink3)" }}>
+                    {passage.ref} <span style={{ color: "var(--bj-ink4)" }}>· {passage.version}</span>
+                  </footer>
+                </blockquote>
+                <div className="relative mt-5 pt-4 flex flex-wrap items-center gap-3" style={{ borderTop: "1px solid var(--bj-line-soft)" }}>
+                  <p className="font-display italic text-[16px] md:text-[17px] flex-1 min-w-[200px]" style={{ color: "var(--bj-ink2)" }}>
+                    {PROMPTS[prompt]}
+                  </p>
+                  <button type="button" onClick={() => setPrompt((p) => (p + 1) % PROMPTS.length)} title="Another question"
+                    aria-label="Another question" className="bj-btn-icon w-9 h-9 rounded-xl flex items-center justify-center" style={{ color: "var(--bj-ink3)" }}>
+                    <RefreshCw size={14} />
+                  </button>
+                  <button type="button" onClick={writeOnPassage} disabled={busy}
+                    className="bj-gold flex items-center gap-2 h-10 px-4 rounded-xl font-sans text-[13.5px] font-semibold">
+                    <Feather size={15} /> Write on this
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="h-[132px] rounded-xl animate-pulse" style={{ background: "var(--bj-bg-soft)" }} />
+            )}
+          </section>
 
-        {/* ── Onboarding (brand new user) ─────────────────── */}
-        {!allLoading && allEmpty && (
-          <OnboardingScreen firstName={firstName} />
-        )}
+          {/* Quick start */}
+          <section className="bj-paper rounded-[20px] p-4 md:p-5" aria-label="Start writing"
+            onDragOver={(e) => { if (Array.from(e.dataTransfer.types).includes("Files")) e.preventDefault(); }}
+            onDrop={(e) => { const f = imageFiles(e.dataTransfer.files); if (f.length) { e.preventDefault(); void withPhoto(f); } }}>
+            <textarea ref={draftRef} value={draft} onChange={(e) => setDraft(e.target.value)} rows={2}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); keepWriting(); } }}
+              onPaste={(e) => { const f = imageFiles(e.clipboardData.files); if (f.length) { e.preventDefault(); void withPhoto(f); } }}
+              placeholder={wroteToday ? "Something else on your heart?" : "What’s on your heart today?"}
+              aria-label="Start writing"
+              className="w-full bg-transparent outline-none resize-none font-write text-[18px] md:text-[19.5px] leading-[1.5] px-1"
+              style={{ color: "var(--bj-ink)", caretColor: "var(--bj-gold)", minHeight: 64 }} />
+            <div className="bj-rail flex items-center gap-1 overflow-x-auto -mx-1 px-1 pr-8 py-1 mt-1" role="radiogroup" aria-label="How I feel">
+              {FEELINGS.map((f) => {
+                const on = feeling === f.label;
+                return (
+                  <button key={f.label} type="button" role="radio" aria-checked={on} onClick={() => setFeeling(on ? null : f.label)}
+                    data-active={on || undefined} title={f.label}
+                    className="bj-chip shrink-0 flex items-center gap-1.5 h-8 px-2.5 rounded-full font-sans text-[12px] whitespace-nowrap"
+                    style={{
+                      color: on ? "var(--bj-ink)" : "var(--bj-ink3)",
+                      background: on ? `color-mix(in oklch, ${FEELING_COLORS[f.label]} 22%, transparent)` : undefined,
+                      border: `1px solid ${on ? FEELING_COLORS[f.label] : "transparent"}`,
+                    }}>
+                    <span aria-hidden="true">{f.emoji}</span>{f.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-1.5 mt-3 pt-3" style={{ borderTop: "1px solid var(--bj-line-soft)" }}>
+              <button type="button" onClick={() => void withPhoto()} className="bj-chip flex items-center gap-1.5 h-9 px-3 rounded-xl font-sans text-[12.5px] font-medium"
+                style={{ color: "var(--bj-ink2)" }} title="Take or add a photo of how you feel — or paste one">
+                <Camera size={15} style={{ color: "var(--bj-gold)" }} /> Photo
+              </button>
+              <button type="button" onClick={() => void begin(feeling ? { feeling } : undefined, "verse")}
+                className="bj-chip flex items-center gap-1.5 h-9 px-3 rounded-xl font-sans text-[12.5px] font-medium"
+                style={{ color: "var(--bj-ink2)" }}>
+                <BookOpen size={15} style={{ color: "var(--bj-gold)" }} /> Verse
+              </button>
+              <div className="flex-1" />
+              <button type="button" onClick={keepWriting} disabled={busy}
+                className="bj-raised bj-lift flex items-center gap-2 h-9 px-4 rounded-xl font-sans text-[13px] font-semibold whitespace-nowrap"
+                style={{ color: "var(--bj-ink)" }}>
+                {draft.trim() ? "Keep writing" : "Blank page"}
+                <kbd className="bj-kbd hidden md:inline-flex">{typeof navigator !== "undefined" && /Mac/.test(navigator.platform) ? "⌘" : "Ctrl"}↵</kbd>
+              </button>
+            </div>
+          </section>
 
-        {/* ── Dashboard (has data) ─────────────────────────── */}
-        {!allLoading && !allEmpty && (
-          <div className="flex flex-col gap-5">
-
-            {/* Stats bar */}
-            <motion.div custom={2} variants={fadeUp} initial="hidden" animate="show"
-              className="grid grid-cols-2 md:grid-cols-4 gap-3"
-            >
-              {[
-                { icon: NotebookPen, label: "Journal",      value: entries.length,        href: "/journal",       color: "var(--bj-gold)" },
-                { icon: HeartHandshake, label: "Prayers",   value: activePrayers.length,  href: "/prayer",        color: "var(--bj-ember)", suffix: " active" },
-                { icon: Mic,         label: "Sermons",      value: sermons.length,        href: "/sermons",       color: "var(--bj-gold)" },
-                { icon: Megaphone,   label: "Declarations", value: folders.reduce((a, f) => a + f.entryCount, 0), href: "/proclamations", color: "var(--bj-sage)" },
-              ].map(({ icon: Icon, label, value, href, color, suffix = "" }) => (
-                <Link
-                  key={label}
-                  href={href}
-                  className="bj-list-row flex items-center gap-3 px-4 py-4 rounded-2xl"
-                  style={{ background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line-soft)" }}
-                >
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: `color-mix(in oklch, ${color} 12%, var(--bj-bg))` }}>
-                    <Icon size={15} style={{ color }} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-sans font-bold text-lg leading-none" style={{ color: "var(--bj-ink)" }}>
-                      {value}<span className="font-sans text-xs font-normal" style={{ color: "var(--bj-ink4)" }}>{suffix}</span>
-                    </p>
-                    <p className="font-sans text-xs mt-0.5 truncate" style={{ color: "var(--bj-ink4)" }}>{label}</p>
-                  </div>
+          {/* Earlier today / recent */}
+          {recent.length > 0 && (
+            <section aria-label={wroteToday ? "Earlier today" : "Recent pages"}>
+              <div className="flex items-baseline gap-2 px-1 mb-2.5">
+                <h2 className={eyebrow} style={{ color: "var(--bj-ink4)" }}>{wroteToday ? "Earlier today" : "Recent pages"}</h2>
+                <Link href="/journal" className="ml-auto font-sans text-[12px] flex items-center gap-1 hover:underline" style={{ color: "var(--bj-ink3)" }}>
+                  All entries <ArrowRight size={12} />
                 </Link>
-              ))}
-            </motion.div>
-
-            {/* Journal + Prayers */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
-              {/* Recent Journal */}
-              <motion.div custom={3} variants={fadeUp} initial="hidden" animate="show">
-                <Card>
-                  <SectionHeader title="Journal" href="/journal" />
-                  {recentJournal.length === 0 ? (
-                    <SectionEmpty icon={NotebookPen} message="No entries yet. Start writing your thoughts, reflections, and discoveries." cta="Write first entry" href="/journal" />
-                  ) : (
-                    recentJournal.map((entry, i) => {
-                      const excerpt = extractExcerpt(entry.content);
-                      return (
-                        <Link
-                          key={entry.id}
-                          href="/journal"
-                          className="bj-list-row flex items-start gap-3 px-5 py-4 group"
-                          style={{ borderBottom: i < recentJournal.length - 1 ? "1px solid var(--bj-line-soft)" : "none" }}
-                        >
-                          {entry.isPinned && <div className="w-1.5 h-1.5 rounded-full mt-2 shrink-0" style={{ background: "var(--bj-gold)" }} />}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-sans text-sm font-semibold truncate mb-0.5" style={{ color: "var(--bj-ink)" }}>
-                              {entry.title || "Untitled entry"}
-                            </p>
-                            {excerpt && (
-                              <p className="font-sans text-xs mb-1.5" style={{ color: "var(--bj-ink3)", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                                {excerpt}
-                              </p>
-                            )}
-                            <span className="font-sans text-[10px]" style={{ color: "var(--bj-ink4)" }}>
-                              {entry.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                            </span>
-                          </div>
-                          <ArrowRight size={12} className="shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "var(--bj-ink4)" }} />
-                        </Link>
-                      );
-                    })
-                  )}
-                </Card>
-              </motion.div>
-
-              {/* Active Prayers */}
-              <motion.div custom={4} variants={fadeUp} initial="hidden" animate="show">
-                <Card>
-                  <SectionHeader title="Prayers" href="/prayer" />
-                  {activePrayers.length === 0 ? (
-                    <SectionEmpty icon={HeartHandshake} message="No active prayers. Bring your requests to God and track His faithfulness." cta="Add a prayer" href="/prayer" />
-                  ) : (
-                    activePrayers.slice(0, 3).map((p, i) => {
-                      const days = Math.max(1, Math.floor((Date.now() - p.createdAt.getTime()) / 86400000));
-                      return (
-                        <Link
-                          key={p.id}
-                          href="/prayer"
-                          className="bj-list-row flex items-center gap-3 px-5 py-4"
-                          style={{ borderBottom: i < Math.min(activePrayers.length, 3) - 1 ? "1px solid var(--bj-line-soft)" : "none" }}
-                        >
-                          <div className="w-2 h-2 rounded-full shrink-0" style={{ background: "var(--bj-ember)" }} />
-                          <span className="font-sans text-sm flex-1 truncate" style={{ color: "var(--bj-ink2)" }}>{p.title}</span>
-                          <span className="font-sans text-[10px] px-2 py-0.5 rounded-full shrink-0" style={{ background: "color-mix(in oklch, var(--bj-ember) 12%, var(--bj-bg))", color: "var(--bj-ember)", border: "1px solid color-mix(in oklch, var(--bj-ember) 25%, transparent)" }}>
-                            {days}d
-                          </span>
-                        </Link>
-                      );
-                    })
-                  )}
-                </Card>
-              </motion.div>
-            </div>
-
-            {/* Sermons */}
-            <motion.div custom={5} variants={fadeUp} initial="hidden" animate="show">
-              <Card>
-                <SectionHeader title="Sermon Notes" href="/sermons" />
-                {recentSermons.length === 0 ? (
-                  <SectionEmpty icon={Mic} message="No sermon notes yet. Follow a sermon with live notes, verse references, and a YouTube player." cta="Log a sermon" href="/sermons" />
-                ) : (
-                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {recentSermons.map((sermon) => (
-                      <Link
-                        key={sermon.id}
-                        href={`/sermons/${sermon.id}`}
-                        className="bj-list-row flex items-center gap-3 p-3 rounded-xl"
-                        style={{ border: "1px solid var(--bj-line-soft)" }}
-                      >
-                        <div className="w-16 h-10 rounded-lg overflow-hidden shrink-0 flex items-center justify-center" style={{ background: "var(--bj-bg-soft)" }}>
-                          {sermon.videoId ? (
-                            <img src={youTubeThumbnail(sermon.videoId)} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <Mic size={14} style={{ color: "var(--bj-ink4)" }} />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-sans text-sm font-semibold truncate" style={{ color: "var(--bj-ink)" }}>
-                            {sermon.title || "Untitled"}
-                          </p>
-                          {sermon.speaker && <p className="font-sans text-xs truncate" style={{ color: "var(--bj-ink4)" }}>{sermon.speaker}</p>}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            </motion.div>
-
-            {/* Quick Capture */}
-            <motion.div custom={6} variants={fadeUp} initial="hidden" animate="show">
-              <div
-                className="rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-4"
-                style={{ background: "var(--bj-bg-panel)", border: "1.5px dashed var(--bj-line)" }}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="font-sans text-[11px] mb-1 uppercase tracking-widest" style={{ color: "var(--bj-ink4)" }}>Quick Capture</p>
-                  <p className="font-display italic" style={{ fontSize: "1.1rem", color: "var(--bj-ink3)", fontWeight: 300 }}>
-                    A thought, a verse, a revelation…
-                  </p>
-                </div>
-                <button
-                  onClick={handleNewEntry}
-                  className="bj-btn-primary flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium shrink-0"
-                  style={{ background: "var(--bj-gold)", color: "white", boxShadow: "0 2px 12px color-mix(in oklch, var(--bj-gold) 35%, transparent)" }}
-                >
-                  <NotebookPen size={14} /> Write now
-                </button>
               </div>
-            </motion.div>
-          </div>
-        )}
+              <div className="grid gap-3 sm:grid-cols-2 bj-stagger">
+                {recent.slice(0, 4).map((e) => <EntryCard key={e.id} entry={e} showTime={wroteToday} />)}
+              </div>
+            </section>
+          )}
+          {!loading && entries.length === 0 && (
+            <p className="font-display italic text-center text-[18px] py-6" style={{ color: "var(--bj-ink4)" }}>Your first page is waiting.</p>
+          )}
+        </div>
+
+        {/* ── Rail ── */}
+        <aside className="flex flex-col gap-4 min-w-0 xl:sticky xl:top-6 xl:self-start bj-stagger" aria-label="Your week">
+          <section className="bj-glass rounded-[20px] p-4">
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className={eyebrow} style={{ color: "var(--bj-ink4)" }}>This week</h2>
+              <span className="font-sans text-[11.5px]" style={{ color: "var(--bj-ink3)", fontVariantNumeric: "tabular-nums" }}>{plural(weekWords, "word")}</span>
+            </div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {week.map((d) => {
+                const isToday = dayKey(d.date) === dayKey(now);
+                const fc = feelingColor(d.feeling);
+                const first = d.entries[0];
+                const tile = (
+                  <>
+                    <span className="bj-well relative block w-full aspect-square rounded-[10px] overflow-hidden"
+                      style={isToday ? { boxShadow: "0 0 0 1.5px var(--bj-gold)" } : undefined}>
+                      {d.cover ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={d.cover} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                      ) : d.entries.length > 0 && (
+                        <span className="absolute inset-0 m-auto w-2.5 h-2.5 rounded-full bj-glow" style={{ background: fc ?? "var(--bj-gold)" }} />
+                      )}
+                    </span>
+                    <span className="block text-center font-sans text-[10px] mt-1" style={{ color: isToday ? "var(--bj-gold-deep)" : "var(--bj-ink4)", fontWeight: isToday ? 600 : 400 }}>
+                      {d.date.toLocaleDateString("en-US", { weekday: "narrow" })}
+                    </span>
+                  </>
+                );
+                const title = `${d.date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}: ${d.entries.length ? plural(d.words, "word") : "no entry"}`;
+                return first ? (
+                  <Link key={dayKey(d.date)} href={`/journal?entry=${first.id}`} title={title} className="block min-w-0">{tile}</Link>
+                ) : (
+                  <div key={dayKey(d.date)} title={title} className="min-w-0">{tile}</div>
+                );
+              })}
+            </div>
+          </section>
+
+          {onThisDay && (
+            <section className="bj-glass rounded-[20px] p-4">
+              <h2 className={`${eyebrow} mb-2.5`} style={{ color: "var(--bj-ink4)" }}>{onThisDay.label}</h2>
+              <Link href={`/journal?entry=${onThisDay.entry.id}`} className="flex gap-3 group">
+                {onThisDay.entry.cover?.url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={onThisDay.entry.cover.url} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />
+                )}
+                <span className="min-w-0">
+                  <span className="block font-display text-[16px] leading-snug group-hover:underline" style={{ color: "var(--bj-ink)" }}>
+                    {onThisDay.entry.title || "Untitled"}
+                  </span>
+                  <span className="block font-sans text-[12px] mt-1 leading-relaxed" style={{ color: "var(--bj-ink3)", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    {cachedDocText(onThisDay.entry.content).slice(0, 220)}
+                  </span>
+                </span>
+              </Link>
+            </section>
+          )}
+
+          {questions.length > 0 && (
+            <section className="bj-glass rounded-[20px] p-4">
+              <h2 className={`${eyebrow} mb-2.5 flex items-center gap-1.5`} style={{ color: "var(--bj-ink4)" }}>
+                <Sparkles size={11} /> Still asking
+              </h2>
+              <ul className="flex flex-col gap-2.5">
+                {questions.map((q) => (
+                  <li key={q.id + q.q}>
+                    <Link href={`/journal?entry=${q.id}`} className="block font-display italic text-[15px] leading-snug hover:underline" style={{ color: "var(--bj-ink2)", overflowWrap: "anywhere" }}>
+                      {q.q}
+                    </Link>
+                    <span className="font-sans text-[11px]" style={{ color: "var(--bj-ink4)" }}>{q.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section className="bj-glass rounded-[20px] p-4">
+            <div className="flex items-baseline justify-between mb-2.5">
+              <h2 className={`${eyebrow} flex items-center gap-1.5`} style={{ color: "var(--bj-ink4)" }}>
+                <HeartHandshake size={11} /> Praying for
+              </h2>
+              <Link href="/prayer" className="font-sans text-[11.5px] hover:underline" style={{ color: "var(--bj-ink3)" }}>Prayer list</Link>
+            </div>
+            {praying.length ? (
+              <ul className="flex flex-col gap-1.5">
+                {praying.map((p) => (
+                  <li key={p.id} className="flex items-start gap-2 font-sans text-[13px] leading-snug" style={{ color: "var(--bj-ink2)" }}>
+                    <span className="mt-[7px] w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--bj-gold)" }} />
+                    <span className="min-w-0" style={{ overflowWrap: "anywhere" }}>{p.title}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="font-sans text-[12.5px]" style={{ color: "var(--bj-ink4)" }}>Nothing on your list yet.</p>
+            )}
+          </section>
+        </aside>
       </div>
     </div>
+  );
+}
+
+function EntryCard({ entry, showTime }: { entry: JournalEntry; showTime: boolean }) {
+  const text = cachedDocText(entry.content);
+  const f = feelingByLabel(entry.feeling);
+  const fc = feelingColor(entry.feeling);
+  return (
+    <Link href={`/journal?entry=${entry.id}`} className="bj-raised bj-lift relative rounded-[18px] overflow-hidden flex min-h-[112px]">
+      {fc && <span aria-hidden="true" className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full" style={{ background: fc }} />}
+      <span className="flex-1 min-w-0 p-4">
+        <span className="flex items-center gap-1.5 font-sans text-[11px]" style={{ color: "var(--bj-ink4)" }}>
+          {showTime ? timeOf(entry.createdAt) : entry.createdAt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+          {f && <><span>·</span><span style={{ color: fc ?? undefined }}>{f.emoji} {f.label}</span></>}
+        </span>
+        <span className="block font-display text-[17px] leading-snug mt-1 truncate" style={{ color: "var(--bj-ink)" }}>{entry.title || "Untitled"}</span>
+        {text && (
+          <span className="block font-sans text-[12.5px] mt-1 leading-relaxed" style={{ color: "var(--bj-ink3)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {text.slice(0, 200)}
+          </span>
+        )}
+      </span>
+      {entry.cover?.url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={entry.cover.url} alt="" loading="lazy" className="w-[96px] object-cover shrink-0" style={{ background: entry.cover.tint ?? "var(--bj-bg-soft)" }} />
+      )}
+    </Link>
   );
 }

@@ -368,9 +368,9 @@ kbd.bj-kbd {
 @media (hover: hover) { .bj-scripture-ref:hover { background: color-mix(in oklch, var(--bj-gold) 14%, transparent); } }
 .bj-scripture-ver { font-size: 10.5px; color: var(--bj-ink4); }
 .bj-scripture-text {
-  font-family: var(--bj-display, var(--font-cormorant, serif));
+  font-family: var(--bj-read, var(--font-eb-garamond, serif));
   font-style: italic;
-  font-size: 1.06em;
+  font-size: 1em;
   line-height: 1.55;
   color: var(--bj-ink);
 }
@@ -463,4 +463,331 @@ kbd.bj-kbd {
   float: left;
   height: 0;
   font-style: italic;
+}
+/* ── Bible reader ─────────────────────────────── */
+.bj-reader { color: var(--bj-ink); line-height: 1.75; }
+.bj-para { margin: 0 0 1.05em; text-wrap: pretty; }
+.bj-reader-verses .bj-para { margin-bottom: 0.45em; }
+.bj-verse {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0.04em 0;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.bj-verse[data-hl] {
+  background: color-mix(in oklch, var(--hl) 26%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in oklch, var(--hl) 55%, transparent);
+}
+.bj-verse[data-selected] {
+  background: color-mix(in oklch, var(--bj-gold) 16%, transparent);
+  box-shadow: inset 0 -2px 0 var(--bj-gold);
+}
+@media (hover: hover) and (pointer: fine) {
+  .bj-verse:not([data-selected]):not([data-hl]):hover { background: color-mix(in oklch, var(--bj-ink) 5%, transparent); }
+}
+.bj-vnum {
+  font-family: var(--bj-ui, var(--font-inter)), system-ui;
+  font-size: 0.58em;
+  font-weight: 600;
+  color: var(--bj-gold-deep);
+  vertical-align: 0.55em;
+  line-height: 0;
+  margin-right: 0.22em;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.bj-reader-verses .bj-vnum { display: inline-block; min-width: 1.7em; vertical-align: 0.35em; }
+.bj-vnote {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  background: var(--bj-sage);
+  vertical-align: 0.5em;
+  margin-left: 0.2em;
+  position: relative;
+}
+.bj-vnote::after { content: ""; position: absolute; inset: -10px; }
+.bj-prow { cursor: pointer; line-height: 1.6; transition: background-color 0.15s ease; }
+.bj-prow[data-hl] { background: color-mix(in oklch, var(--hl) 16%, transparent); }
+.bj-prow[data-selected] { background: color-mix(in oklch, var(--bj-gold) 13%, transparent); box-shadow: inset 2px 0 0 var(--bj-gold); }
+@media (hover: hover) and (pointer: fine) {
+  .bj-prow:not([data-selected]):not([data-hl]):hover { background: var(--bj-bg-soft); }
+}
+.bj-vnum-col {
+  font-family: var(--bj-ui, var(--font-inter)), system-ui;
+  font-size: 12px; font-weight: 600; padding-top: 0.35em;
+  color: var(--bj-gold-deep); font-variant-numeric: tabular-nums; text-align: right;
+}
+
+/* kbd.bj-kbd is unlayered, so it would beat Tailwind's `hidden`. */
+kbd.bj-kbd.hidden { display: none; }
+@media (min-width: 768px) { kbd.bj-kbd.md\:inline-flex { display: inline-flex; } }
+
+/* ── Materials ──────────────────────────────────────────────
+   Light comes from above: every surface has a lit top edge and a
+   soft shadow below. Four materials, each with one job:
+   paper (the page you write on) · raised (cards you pick up) ·
+   glass (things that float over content) · well (pressed in).
+──────────────────────────────────────────────────────────── */
+:root {
+  --m-hi: rgba(255, 255, 255, 0.085);
+  --m-edge: rgba(255, 255, 255, 0.075);
+  --m-shade: rgba(0, 0, 0, 0.62);
+  --m-shade-near: rgba(0, 0, 0, 0.38);
+  --m-raised-top: color-mix(in oklch, var(--bj-bg-soft), white 7%);
+  --m-raised-bot: color-mix(in oklch, var(--bj-bg-soft), white 2.5%);
+  --m-paper-top: color-mix(in oklch, var(--bj-bg-soft), white 3.5%);
+  --m-paper-bot: color-mix(in oklch, var(--bj-bg-soft) 80%, var(--bj-bg));
+  --m-desk: color-mix(in oklch, var(--bj-bg), black 22%);
+  --m-glass-top: rgba(255, 255, 255, 0.09);
+  --m-glass-bot: rgba(255, 255, 255, 0.035);
+  --m-glass-edge: rgba(255, 255, 255, 0.11);
+  --m-glass-hi: rgba(255, 255, 255, 0.15);
+  --m-hover: rgba(255, 255, 255, 0.075);
+  --m-hover-edge: rgba(255, 255, 255, 0.09);
+  --m-well: rgba(0, 0, 0, 0.3);
+  --m-well-shade: rgba(0, 0, 0, 0.45);
+  --m-gold-ink: color-mix(in oklch, var(--bj-gold) 18%, black);
+}
+:root[data-dark="false"] {
+  --m-hi: rgba(255, 255, 255, 0.95);
+  --m-edge: color-mix(in oklch, var(--bj-ink) 9%, transparent);
+  --m-shade: color-mix(in oklch, var(--bj-ink) 16%, transparent);
+  --m-shade-near: color-mix(in oklch, var(--bj-ink) 9%, transparent);
+  --m-raised-top: var(--bj-bg-panel);
+  --m-raised-bot: color-mix(in oklch, var(--bj-bg-panel), var(--bj-bg-soft) 45%);
+  --m-paper-top: var(--bj-bg-panel);
+  --m-paper-bot: var(--bj-bg-panel);
+  --m-glass-top: rgba(255, 255, 255, 0.78);
+  --m-glass-bot: rgba(255, 255, 255, 0.58);
+  --m-glass-edge: color-mix(in oklch, var(--bj-ink) 8%, transparent);
+  --m-glass-hi: rgba(255, 255, 255, 1);
+  --m-well: color-mix(in oklch, var(--bj-bg-soft), var(--bj-ink) 3%);
+  --m-desk: color-mix(in oklch, var(--bj-bg-soft), var(--bj-ink) 2%);
+  --m-hover: color-mix(in oklch, var(--bj-ink) 6.5%, transparent);
+  --m-hover-edge: color-mix(in oklch, var(--bj-ink) 8%, transparent);
+  --m-well-shade: color-mix(in oklch, var(--bj-ink) 8%, transparent);
+}
+
+.bj-ambient {
+  background:
+    radial-gradient(60% 50% at 18% 0%, color-mix(in oklch, var(--bj-gold) 17%, transparent), transparent 70%),
+    radial-gradient(50% 45% at 92% 18%, rgba(120, 160, 214, 0.12), transparent 70%),
+    radial-gradient(70% 60% at 60% 110%, rgba(168, 151, 214, 0.11), transparent 70%),
+    var(--m-desk);
+}
+:root[data-dark="false"] .bj-ambient {
+  background:
+    radial-gradient(60% 50% at 18% 0%, color-mix(in oklch, var(--bj-gold) 16%, transparent), transparent 70%),
+    radial-gradient(50% 45% at 92% 18%, rgba(120, 160, 214, 0.09), transparent 70%),
+    radial-gradient(70% 60% at 60% 110%, rgba(168, 151, 214, 0.08), transparent 70%),
+    var(--m-desk);
+}
+.bj-paper {
+  background: linear-gradient(180deg, var(--m-paper-top), var(--m-paper-bot));
+  border: 1px solid var(--m-edge);
+  box-shadow: inset 0 1px 0 var(--m-hi), 0 1px 2px var(--m-shade-near), 0 18px 50px -12px var(--m-shade);
+}
+.bj-raised {
+  background: linear-gradient(180deg, var(--m-raised-top), var(--m-raised-bot));
+  border: 1px solid var(--m-edge);
+  box-shadow: inset 0 1px 0 var(--m-hi), 0 2px 4px var(--m-shade-near), 0 12px 28px -8px var(--m-shade);
+}
+.bj-glass {
+  background: linear-gradient(180deg, var(--m-glass-top), var(--m-glass-bot));
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid var(--m-glass-edge);
+  box-shadow: inset 0 1px 0 var(--m-glass-hi), 0 16px 40px -12px var(--m-shade);
+}
+.bj-well {
+  background: var(--m-well);
+  border: 1px solid color-mix(in oklch, var(--bj-ink) 4%, transparent);
+  box-shadow: inset 0 1.5px 4px var(--m-well-shade);
+}
+.bj-gold {
+  background: linear-gradient(180deg, color-mix(in oklch, var(--bj-gold), white 22%), var(--bj-gold)) !important;
+  color: var(--m-gold-ink) !important;
+  border: 1px solid color-mix(in oklch, var(--bj-gold), white 35%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 0 rgba(0, 0, 0, 0.25),
+    0 8px 20px -8px color-mix(in oklch, var(--bj-gold) 70%, transparent);
+  transition: transform 0.12s var(--ease-out), filter 0.12s ease, box-shadow 0.12s ease;
+}
+.bj-gold:active { transform: translateY(1px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px -4px color-mix(in oklch, var(--bj-gold) 70%, transparent); }
+@media (hover: hover) and (pointer: fine) {
+  .bj-gold:hover { filter: brightness(1.06); }
+  .bj-raised.bj-lift { transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out); }
+  .bj-raised.bj-lift:hover { transform: translateY(-1px); box-shadow: inset 0 1px 0 var(--m-hi), 0 2px 4px var(--m-shade-near), 0 16px 32px -12px var(--m-shade); }
+}
+.bj-glow { box-shadow: 0 0 8px color-mix(in oklch, var(--bj-gold) 70%, transparent); }
+
+/* ── Photos in the page ── */
+.bj-photo { margin: 1.4em 0; }
+.bj-photo-frame {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  max-height: 520px;
+  min-height: 120px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 14px 34px -14px var(--m-shade);
+  transition: box-shadow 0.15s ease;
+}
+.bj-photo[data-selected] .bj-photo-frame { box-shadow: 0 0 0 2px var(--bj-gold), 0 14px 34px -14px var(--m-shade); }
+.bj-photo-frame img { display: block; width: 100%; height: 100%; max-height: 520px; object-fit: cover; }
+.bj-photo-status { position: absolute; right: 12px; bottom: 12px; display: flex; }
+.bj-photo-err {
+  font: 500 12px var(--bj-ui, var(--font-inter)), system-ui;
+  color: #fff; background: rgba(160, 40, 40, 0.75); padding: 4px 10px; border-radius: 999px;
+}
+.bj-photo-msg { display: flex; align-items: center; justify-content: center; height: 120px; font: 13px var(--bj-ui, var(--font-inter)), system-ui; color: var(--bj-ink4); }
+.bj-photo-remove {
+  position: absolute; top: 10px; right: 10px;
+  width: 30px; height: 30px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  opacity: 0; transition: opacity 0.15s ease;
+}
+.bj-photo:hover .bj-photo-remove, .bj-photo[data-selected] .bj-photo-remove { opacity: 1; }
+@media (hover: none) { .bj-photo-remove { opacity: 1; } }
+.bj-photo-caption {
+  margin-top: 0.55em;
+  font-style: italic;
+  font-size: 0.78em;
+  color: var(--bj-ink3);
+  text-align: center;
+}
+
+/* Horizontal chip rails: no scrollbar, a soft fade at the edge hints there's more. */
+.bj-rail { scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+.bj-rail::-webkit-scrollbar { display: none; }
+
+
+/* ── Interaction: hovers you can see, presses you can feel ──────
+   Hover lights the surface (a lifted pane with a lit edge), press
+   pushes it in. Fine pointers only for hover; press works on touch. */
+.bj-btn-icon, .bj-btn-action, .bj-btn-ghost, .bj-chip, .bj-nav-item, .bj-list-row {
+  border-color: transparent;
+}
+.bj-raised.bj-lift:active, .bj-glass.bj-lift:active { transform: translateY(0) scale(0.985); transition-duration: 0.08s; }
+.bj-gold:active { transform: translateY(1px) scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .bj-btn-icon:hover, .bj-btn-action:hover, .bj-btn-ghost:hover {
+    background: var(--m-hover) !important;
+    color: var(--bj-ink) !important;
+    box-shadow: inset 0 0 0 1px var(--m-hover-edge), inset 0 1px 0 var(--m-hi);
+  }
+  .bj-btn-action[data-danger]:hover { color: var(--bj-ember) !important; background: color-mix(in oklch, var(--bj-ember) 14%, transparent) !important; }
+  .bj-nav-item:not([data-active]):hover, .bj-list-row:not([data-active]):hover {
+    background: var(--m-hover) !important;
+    color: var(--bj-ink) !important;
+    box-shadow: inset 0 0 0 1px var(--m-hover-edge);
+  }
+  .bj-nav-item:not([data-active]):hover svg { color: var(--bj-gold); transform: translateX(1px); }
+  .bj-nav-item svg { transition: color 0.12s ease, transform 0.18s var(--ease-out); }
+  .bj-chip:not([data-active]):hover {
+    background: var(--m-hover) !important;
+    color: var(--bj-ink) !important;
+    box-shadow: inset 0 0 0 1px var(--m-hover-edge), 0 4px 12px -6px var(--m-shade);
+    transform: translateY(-1px);
+  }
+  .bj-gold:hover { filter: brightness(1.08) saturate(1.05); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 1px 0 rgba(0,0,0,.25), 0 12px 26px -8px color-mix(in oklch, var(--bj-gold) 80%, transparent); }
+  .bj-raised.bj-lift:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 var(--m-hi), 0 4px 8px var(--m-shade-near), 0 22px 40px -12px var(--m-shade); border-color: color-mix(in oklch, var(--bj-gold) 22%, var(--m-edge)); }
+}
+
+/* ── Motion ─────────────────────────────────────────────────────
+   Pages rise in; groups cascade once on arrival. Nothing here runs
+   on keyboard actions, and all of it stops for reduced motion. */
+@keyframes bj-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes bj-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bj-pop { from { opacity: 0; transform: scale(0.94) rotate(-4deg); } to { opacity: 1; transform: rotate(-1.5deg); } }
+@keyframes bj-settle { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.bj-page { animation: bj-rise 0.32s var(--ease-out) both; }
+.bj-stagger > * { animation: bj-rise 0.42s var(--ease-out) both; animation-delay: 40ms; }
+.bj-stagger > :nth-child(2) { animation-delay: 95ms; }
+.bj-stagger > :nth-child(3) { animation-delay: 150ms; }
+.bj-stagger > :nth-child(4) { animation-delay: 205ms; }
+.bj-stagger > :nth-child(5) { animation-delay: 260ms; }
+.bj-stagger > :nth-child(n+6) { animation-delay: 300ms; }
+.bj-enter { animation: bj-rise 0.26s var(--ease-out) both; }
+.bj-fade-in { animation: bj-fade 0.2s ease both; }
+.bj-photo { animation: bj-settle 0.3s var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) {
+  .bj-page, .bj-stagger > *, .bj-enter, .bj-fade-in, .bj-photo { animation: bj-fade 0.15s ease both !important; animation-delay: 0s !important; }
+}
+
+/* The page you write on: a solid sheet floating over the desk (desktop). */
+@media (min-width: 768px) {
+  .bj-sheet {
+    border-radius: 22px;
+    background: linear-gradient(180deg, var(--m-paper-top), var(--m-paper-bot));
+    border: 1px solid var(--m-edge);
+    box-shadow: inset 0 1px 0 var(--m-hi), 0 1px 2px var(--m-shade-near), 0 24px 60px -16px var(--m-shade);
+  }
+}
+
+/* ── Sermons ── */
+.sermon-controls { transition: opacity 0.25s ease, transform 0.25s var(--ease-out); }
+.sermon-controls[data-hidden] { opacity: 0; transform: translateY(6px); pointer-events: none; }
+.sermon-ctl { transition: background-color 0.12s ease, transform 0.12s var(--ease-out); }
+.sermon-ctl:active { transform: scale(0.92); }
+.sermon-mark i { transition: transform 0.15s var(--ease-out); }
+.sermon-bigplay { transition: transform 0.18s var(--ease-out); }
+.sermon-bigplay:active { transform: translate(-50%, -50%) scale(0.94) !important; }
+.sermon-moment { padding: 6px 8px; margin: -6px -8px; border-radius: 12px; transition: background-color 0.2s ease; }
+.sermon-moment[data-current] { background: color-mix(in oklch, var(--bj-gold) 7%, transparent); box-shadow: inset 2px 0 0 var(--bj-gold); }
+.sermon-tools { opacity: 0; transform: translateY(2px); transition: opacity 0.12s ease, transform 0.12s var(--ease-out); pointer-events: none; }
+.sermon-moment:focus-within .sermon-tools { opacity: 1; transform: none; pointer-events: auto; }
+.sermon-stamp { transition: transform 0.12s var(--ease-out), background-color 0.12s ease; }
+.sermon-stamp:active { transform: scale(0.94); }
+.sermon-kind { transition: background-color 0.12s ease, color 0.12s ease; }
+.sermon-kind[data-active] { background: var(--m-raised-top); box-shadow: inset 0 1px 0 var(--m-hi), 0 1px 3px var(--m-shade-near); }
+.sermon-check { transition: transform 0.12s var(--ease-out), background-color 0.15s ease; }
+.sermon-check:active { transform: scale(0.88); }
+.sermon-check[data-done] { animation: bj-settle 0.22s var(--ease-out); }
+.sermon-thumb-img { transition: transform 0.4s var(--ease-out); }
+.sermon-play { transition: transform 0.2s var(--ease-out), background-color 0.2s ease; }
+.sermon-avatar { transition: transform 0.12s var(--ease-out); box-shadow: 0 0 0 2px transparent; }
+.sermon-avatar[data-active] { box-shadow: 0 0 0 2px var(--bj-gold); }
+@media (hover: hover) and (pointer: fine) {
+  .sermon-ctl:hover { background: rgba(255, 255, 255, 0.14); }
+  .sermon-mark:hover i { transform: scaleY(1.35); }
+  .sermon-bigplay:hover { transform: translate(-50%, -50%) scale(1.06); }
+  .sermon-moment:hover { background: var(--m-hover); }
+  .sermon-moment:hover .sermon-tools { opacity: 1; transform: none; pointer-events: auto; }
+  .sermon-stamp:hover { background: color-mix(in oklch, var(--bj-gold) 18%, transparent) !important; }
+  .sermon-kind:not([data-active]):hover { background: var(--m-hover); color: var(--bj-ink2) !important; }
+  a:hover .sermon-thumb-img { transform: scale(1.04); }
+  a:hover .sermon-play { transform: translate(-50%, -50%) scale(1.08); background: rgba(20, 20, 24, 0.55) !important; }
+  .sermon-avatar:hover { transform: translateY(-1px); }
+}
+@media (hover: none) { .sermon-tools { opacity: 1; transform: none; pointer-events: auto; position: static; margin-left: 4px; align-self: flex-start; } }
+/* Phone: the note box rides above the tab bar. */
+@media (max-width: 767px) {
+  .sermon-dock { position: sticky; bottom: calc(78px + env(safe-area-inset-bottom)); z-index: 5; }
+}
+
+/* Type picker rows */
+.type-row { transition: background-color 0.12s ease; border: 1px solid transparent; }
+@media (hover: hover) and (pointer: fine) { .type-row:not([data-active]):hover { background: var(--m-hover); } }
+.type-row:active { transform: scale(0.99); }
+
+/* Commentary: one line per entry, the focused one as a note */
+.commentary-lede { transition: background-color 0.12s ease; }
+@media (hover: hover) and (pointer: fine) { .commentary-lede:hover { background: var(--m-hover); } .commentary-lede:hover span:last-child { color: var(--bj-ink2) !important; } }
+.commentary-lede:active { transform: scale(0.99); }
+.commentary-focus { animation: bj-settle 0.26s var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) { .commentary-focus { animation: bj-fade 0.15s ease both; } }
+
+/* Reading panel */
+.dock-item { background: color-mix(in oklch, var(--m-raised-top) 70%, transparent); border: 1px solid var(--m-edge); transition: background-color 0.12s ease, transform 0.12s var(--ease-out); }
+.dock-item:active { transform: scale(0.99); }
+.dock-verse { transition: background-color 0.12s ease; }
+.dock-group[data-active] .dock-item { border-color: color-mix(in oklch, var(--bj-gold) 28%, var(--m-edge)); }
+@media (hover: hover) and (pointer: fine) {
+  .dock-item:hover { background: var(--m-raised-top); }
+  .dock-verse:hover { background: var(--m-hover); }
 }

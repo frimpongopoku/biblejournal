@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Volume2 } from "lucide-react";
-import { useWritingStore, WRITING_FONTS, type WritingWidth } from "@/store/writing.store";
+import { useWritingStore, type WritingWidth } from "@/store/writing.store";
+import { FaceList } from "@/components/TypePicker";
 import { SWITCHES, previewSwitch, type SwitchId } from "@/lib/typing/keySounds";
 
 function Toggle({ on, onChange, label }: { on: boolean; onChange: () => void; label: string }) {
@@ -48,7 +49,8 @@ function Row({ title, hint, children }: { title: string; hint: string; children:
 
 const label = "font-sans text-[11px] font-medium mb-2";
 
-export function WritingSettingsButton({ showZen = false }: { showZen?: boolean }) {
+/** The Aa menu. `role="read"` is the Bible's version: just the reading face, size and width. */
+export function WritingSettingsButton({ showZen = false, role = "write" }: { showZen?: boolean; role?: "write" | "read" }) {
   const [open, setOpen] = useState(false);
   const [showAllSwitches, setShowAllSwitches] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -72,9 +74,9 @@ export function WritingSettingsButton({ showZen = false }: { showZen?: boolean }
         type="button"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => setOpen((o) => !o)}
-        aria-label="Writing settings"
+        aria-label={role === "read" ? "Reading settings" : "Writing settings"}
         aria-expanded={open}
-        title="Writing settings"
+        title={role === "read" ? "Reading settings" : "Writing settings"}
         className="bj-btn-icon h-8 w-9 rounded-lg flex items-center justify-center"
         style={{
           background: open ? "var(--bj-gold-tint)" : "transparent",
@@ -103,44 +105,12 @@ export function WritingSettingsButton({ showZen = false }: { showZen?: boolean }
           >
             {/* Typeface, size, width */}
             <div className="p-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
-              <p className={label} style={{ color: "var(--bj-ink4)" }}>Typeface</p>
-              <div className="grid grid-cols-3 gap-1.5">
-                {WRITING_FONTS.map((f) => {
-                  const active = s.font === f.id;
-                  return (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => s.set({ font: f.id })}
-                      className="bj-chip h-14 rounded-xl flex flex-col items-center justify-center gap-0.5"
-                      data-active={active || undefined}
-                      style={{
-                        border: `1px solid ${active ? "var(--bj-gold-soft)" : "var(--bj-line-soft)"}`,
-                        background: active ? "var(--bj-gold-tint)" : "transparent",
-                        color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)",
-                      }}
-                    >
-                      <span style={{ fontFamily: `var(${f.cssVar}), serif`, fontStyle: f.italic ? "italic" : "normal", fontSize: 20 * f.scale + 2, lineHeight: 1 }}>Aa</span>
-                      <span className="font-sans text-[10px]" style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink4)" }}>{f.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <p className={label} style={{ color: "var(--bj-ink4)" }}>{role === "read" ? "Reading typeface" : "Writing typeface"}</p>
+              <div className="-mx-1.5"><FaceList role={role} /></div>
 
-              <div className="flex gap-4 mt-4">
+              <div className="flex gap-4 mt-4 items-end">
                 <div className="flex-1 min-w-0">
-                  <p className={label} style={{ color: "var(--bj-ink4)" }}>Size</p>
-                  <div className="flex items-center gap-2">
-                    <span className="font-sans text-[11px]" style={{ color: "var(--bj-ink4)" }}>A</span>
-                    <input
-                      type="range" min={15} max={28} step={1} value={s.size}
-                      onChange={(e) => s.set({ size: Number(e.target.value) })}
-                      aria-label="Text size"
-                      className="flex-1"
-                      style={{ accentColor: "var(--bj-gold)" }}
-                    />
-                    <span className="font-sans text-[15px]" style={{ color: "var(--bj-ink4)" }}>A</span>
-                  </div>
+                  <p className="font-sans text-[11px]" style={{ color: "var(--bj-ink4)" }}>Interface and the other faces: sidebar → Appearance.</p>
                 </div>
                 <div style={{ width: 150 }}>
                   <p className={label} style={{ color: "var(--bj-ink4)" }}>Width</p>
@@ -162,6 +132,7 @@ export function WritingSettingsButton({ showZen = false }: { showZen?: boolean }
               </div>
             </div>
 
+            {role === "write" && <>
             {/* Keyboard sounds */}
             <div className="px-4 pt-3 pb-3 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
               <Row title="Keyboard sounds" hint="Real switch recordings, press and release">
@@ -245,6 +216,7 @@ export function WritingSettingsButton({ showZen = false }: { showZen?: boolean }
                 </select>
               </Row>
             </div>
+            </>}
             {showZen && (
               <button type="button"
                 onClick={() => { setOpen(false); s.set({ zen: true }); }}

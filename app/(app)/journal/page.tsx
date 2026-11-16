@@ -10,11 +10,17 @@ import { useJournalEntries } from "@/hooks/useJournalEntries";
 import { useAutosave, saveStatusLabel, type SaveStatus } from "@/hooks/useAutosave";
 import { createEntry, updateEntry, deleteEntry } from "@/services/journal.service";
 import { useAuthStore } from "@/store/auth.store";
+import { EntryCover, AddCoverChip, CoverWash, PhotoDropOverlay, useCoverSrc } from "@/components/journal/EntryCover";
+import { attachCover } from "@/lib/photos";
+import { getActiveEditor } from "@/lib/editor/quote";
+import { feelingColor } from "@/lib/feelings";
+import { lastInputWasKeyboard } from "@/lib/inputMode";
+import { Companion } from "@/components/journal/Companion";
 import { useJournalStore } from "@/store/journal.store";
 import { useWritingStore } from "@/store/writing.store";
 import { TipTapEditor } from "@/components/journal/TipTapEditor";
 import { WritingSettingsButton } from "@/components/journal/WritingSettings";
-import { TagEditor, FeelingPicker, TableView, feelingByLabel, cachedDocText, plural } from "@/components/journal/JournalParts";
+import { TagEditor, FeelingPicker, TableView, cachedDocText } from "@/components/journal/JournalParts";
 import type { JournalEntry } from "@/types";
 
 type Patch = Partial<Omit<JournalEntry, "id" | "userId" | "createdAt" | "updatedAt">>;
@@ -130,6 +136,8 @@ function JournalView() {
   const hasAutoSelected = useRef(false);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const focusTitleFor = useRef<string | null>(null);
+  const focusBodyFor = useRef<string | null>(null);
+  const openVerseFor = useRef<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const autosave = useAutosave<Patch>((id, patch) => (user ? updateEntry(user.uid, id, patch) : Promise.resolve()));
@@ -137,6 +145,25 @@ function JournalView() {
   // A just-created entry is shown at once from a local draft until Firestore reports it.
   const [draft, setDraft] = useState<JournalEntry | null>(null);
   const selected = entries.find((e) => e.id === selectedId) ?? (draft && draft.id === selectedId ? draft : null);
+  const { src: coverSrc } = useCoverSrc(selected);
+  const [dropping, setDropping] = useState(false);
+  const [companionOpen, setCompanionOpen] = useState(() => {
+    try { return localStorage.getItem("bj-companion") !== "0"; } catch { return true; }
+  });
+  useEffect(() => { try { localStorage.setItem("bj-companion", companionOpen ? "1" : "0"); } catch { /* ignore */ } }, [companionOpen]);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  // Switching pages by pointer: the new page settles in. By keyboard: instant.
+  const shownId = useRef<string | null>(null);
+  useEffect(() => {
+    const id = selected?.id ?? null;
+    if (shownId.current && id && id !== shownId.current && !lastInputWasKeyboard()) {
+      sheetRef.current?.querySelector("[data-writing-surface]")?.animate(
+        [{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }],
+        { duration: 280, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
+      );
+    }
+    shownId.current = id;
+  }, [selected?.id]);
 
   const derived = useMemo(() => new Map(entries.map((e) => [e.id, derive(e)])), [entries]);
 
@@ -150,13 +177,21 @@ function JournalView() {
     if (!loading && entries.length > 0 && !hasAutoSelected.current) {
       hasAutoSelected.current = true;
       const paramId = searchParams.get("entry");
-      setSelectedId(paramId && entries.some((e) => e.id === paramId) ? paramId : entries[0].id);
+      // A just-started entry (?new=) may not be in the list yet — select it anyway.
+      setSelectedId(paramId && (searchParams.get("new") || entries.some((e) => e.id === paramId)) ? paramId : entries[0].id);
     }
   }, [loading, entries, searchParams]);
 
   // Later ⌘K jumps while already on the journal (?entry= / ?tag=).
   const paramEntry = searchParams.get("entry");
   const paramTag = searchParams.get("tag");
+  const paramNew = searchParams.get("new");
+  useEffect(() => {
+    if (!paramEntry || !paramNew) return;
+    if (paramNew === "title") focusTitleFor.current = paramEntry;
+    else focusBodyFor.current = paramEntry;
+    openVerseFor.current = paramNew === "verse" ? paramEntry : null;
+  }, [paramEntry, paramNew]);
   useEffect(() => {
     if (paramEntry && hasAutoSelected.current) { autosave.flush(); setSelectedId(paramEntry); setWriting({ zen: false }); }
   }, [paramEntry]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -169,6 +204,22 @@ function JournalView() {
     if (selected && focusTitleFor.current === selected.id) {
       focusTitleFor.current = null;
       titleRef.current?.focus();
+    }
+    if (selected && focusBodyFor.current === selected.id) {
+      focusBodyFor.current = null;
+      // The editor mounts its content a microtask later.
+      setTimeout(() => {
+        const pm = document.querySelector("[data-writing-surface] .ProseMirror") as HTMLElement | null;
+        if (!pm) return;
+        pm.focus();
+        const sel = window.getSelection();
+        sel?.selectAllChildren(pm);
+        sel?.collapseToEnd();
+        if (openVerseFor.current === selected.id) {
+          openVerseFor.current = null;
+          pm.dispatchEvent(new CustomEvent("bj:verse-picker"));
+        }
+      }, 60);
     }
   }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -276,6 +327,13 @@ function JournalView() {
     function onKey(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.shiftKey && e.code === "KeyN") { e.preventDefault(); void handleNew(); return; }
+      if (mod && !e.shiftKey && e.code === "KeyJ") { e.preventDefault(); setCompanionOpen((o) => !o); return; }
+      // ⌘⇧P — a photo into the page, where the cursor is.
+      if (mod && e.shiftKey && e.code === "KeyP") {
+        const ed = getActiveEditor();
+        if (ed) { e.preventDefault(); ed.view.dom.dispatchEvent(new CustomEvent("bj:photo-picker")); }
+        return;
+      }
       if (mod && e.code === "Period") { e.preventDefault(); setWriting({ zen: !useWritingStore.getState().zen }); return; }
       if (e.key === "Escape" && useWritingStore.getState().zen && !document.querySelector('[role="dialog"]')) { setWriting({ zen: false }); return; }
       if (mod && !e.shiftKey && e.code === "KeyZ" && pendingDelete.current) {
@@ -325,7 +383,8 @@ function JournalView() {
   const listRow = (entry: JournalEntry, compact = false) => {
     const isSel = entry.id === selectedId;
     const d = derived.get(entry.id);
-    const feeling = feelingByLabel(entry.feeling);
+    const fc = feelingColor(entry.feeling);
+    const thumb = entry.cover?.url;
     return (
       <button
         type="button"
@@ -333,33 +392,47 @@ function JournalView() {
         onClick={() => { select(entry.id); setShowSheet(false); }}
         data-active={isSel || undefined}
         aria-current={isSel || undefined}
-        className="bj-list-row w-full text-left rounded-xl px-3 py-2.5 mb-0.5 block"
-        style={{
-          background: isSel ? "var(--bj-gold-tint)" : "transparent",
-          boxShadow: isSel ? "inset 0 0 0 1px color-mix(in oklch, var(--bj-gold-soft) 60%, transparent)" : "none",
-        }}
+        className="bj-list-row relative w-full text-left rounded-[14px] p-2.5 mb-1 flex gap-3 items-start"
+        style={{ border: "1px solid transparent" }}
       >
-        <div className="flex items-center gap-1.5 min-w-0">
-          {entry.isPinned && filter !== "All" && <Pin size={10} className="shrink-0" style={{ color: "var(--bj-gold)" }} />}
-          {entry.isFavorite && <Star size={10} className="shrink-0" fill="var(--bj-gold)" style={{ color: "var(--bj-gold)" }} />}
-          <span className="font-sans text-[13.5px] font-medium truncate flex-1" style={{ color: isSel ? "var(--bj-ink)" : "var(--bj-ink2)" }}>
-            {entry.title || <span style={{ color: "var(--bj-ink4)", fontWeight: 400 }}>Untitled</span>}
-          </span>
-        </div>
-        {!compact && d?.excerpt && (
-          <p className="font-sans text-[12px] mt-1"
-            style={{ color: "var(--bj-ink4)", lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-            {d.excerpt}
-          </p>
+        {isSel && (
+          <motion.span layoutId={compact ? "entry-pill-sheet" : "entry-pill"} aria-hidden="true" className="bj-raised absolute inset-0 rounded-[14px]"
+            transition={lastInputWasKeyboard() ? { duration: 0 } : { type: "spring", duration: 0.36, bounce: 0.12 }} />
         )}
-        <div className="flex items-center gap-1.5 mt-1.5 font-sans text-[11px] min-w-0" style={{ color: "var(--bj-ink4)" }}>
-          {feeling && <span className="shrink-0">{feeling.label}</span>}
-          {feeling && (entry.tags.length > 0 || (d?.words ?? 0) > 0) && <span>·</span>}
-          {entry.tags.length > 0
-            ? <span className="truncate">{entry.tags.slice(0, 3).map((t) => `#${t}`).join(" ")}</span>
-            : (d?.words ?? 0) > 0 && <span>{plural(d!.words, "word")}</span>}
-          <span className="ml-auto shrink-0" style={{ fontVariantNumeric: "tabular-nums" }}>{rowTime(entry.updatedAt)}</span>
-        </div>
+        {!compact && (thumb ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumb} alt="" loading="lazy" className="relative w-[52px] h-[52px] rounded-[10px] object-cover shrink-0"
+            style={{ background: entry.cover?.tint ?? "var(--bj-bg-soft)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,.12)" }} />
+        ) : (
+          <span className="bj-well relative w-[52px] h-[52px] rounded-[10px] shrink-0 flex flex-col items-center justify-center">
+            <span className="font-display text-[20px] leading-none" style={{ color: isSel ? "var(--bj-ink)" : "var(--bj-ink2)" }}>{entry.createdAt.getDate()}</span>
+            <span className="font-sans text-[9px] font-medium uppercase mt-0.5" style={{ color: "var(--bj-ink4)" }}>
+              {entry.createdAt.toLocaleDateString("en-US", { weekday: "short" })}
+            </span>
+          </span>
+        ))}
+        <span className="relative flex-1 min-w-0 block pt-0.5">
+          <span className="flex items-center gap-1.5 min-w-0">
+            {fc && <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: fc, boxShadow: `0 0 6px ${fc}` }} title={entry.feeling} />}
+            {entry.isPinned && filter !== "All" && <Pin size={10} className="shrink-0" style={{ color: "var(--bj-gold)" }} />}
+            {entry.isFavorite && <Star size={10} className="shrink-0" fill="var(--bj-gold)" style={{ color: "var(--bj-gold)" }} />}
+            <span className="font-sans text-[13.5px] font-medium truncate flex-1" style={{ color: isSel ? "var(--bj-ink)" : "var(--bj-ink2)" }}>
+              {entry.title || <span style={{ color: "var(--bj-ink4)", fontWeight: 400 }}>Untitled</span>}
+            </span>
+            <span className="shrink-0 font-sans text-[10.5px]" style={{ color: "var(--bj-ink4)", fontVariantNumeric: "tabular-nums" }}>{rowTime(entry.updatedAt)}</span>
+          </span>
+          {d?.excerpt ? (
+            <span className="block font-write text-[14px] mt-1"
+              style={{ color: "var(--bj-ink3)", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+              {d.excerpt}
+            </span>
+          ) : (
+            <span className="block font-display italic text-[14px] mt-1" style={{ color: "var(--bj-ink4)" }}>Nothing yet</span>
+          )}
+          {entry.tags.length > 0 && (
+            <span className="block font-sans text-[11px] mt-1 truncate" style={{ color: "var(--bj-ink4)" }}>{entry.tags.slice(0, 3).map((t) => `#${t}`).join(" ")}</span>
+          )}
+        </span>
       </button>
     );
   };
@@ -396,33 +469,30 @@ function JournalView() {
 
   return (
     <>
-      <div className="flex h-full" style={{ background: "var(--bj-bg)" }}>
+      <div className="flex h-full">
 
         {/* ── Entry list ── */}
         {!zen && (
           <aside
             aria-label="Journal entries"
-            className={`${viewMode === "table" ? "hidden" : selectedId ? "hidden md:flex" : "flex"} w-full md:w-[300px] flex-col border-r h-full overflow-hidden shrink-0`}
-            style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}
+            className={`${viewMode === "table" ? "hidden" : selectedId ? "hidden md:flex" : "flex"} w-full md:w-[316px] flex-col h-full overflow-hidden shrink-0`}
           >
             <div className="px-4 pt-5 pb-2 flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <h1 className="font-display text-2xl" style={{ color: "var(--bj-ink)", fontWeight: 500 }}>Journal</h1>
+                <h1 className="font-display text-[28px]" style={{ color: "var(--bj-ink)", fontWeight: 500 }}>Journal</h1>
                 <div className="flex items-center gap-1">
                   <button type="button" onClick={() => setViewMode("table")} title="Table view" aria-label="Table view"
                     className="bj-btn-icon w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
                     <Table2 size={14} />
                   </button>
                   <button type="button" onClick={handleNew} disabled={creating}
-                    className="bj-btn-primary h-8 pl-2.5 pr-3 rounded-lg flex items-center gap-1.5 font-sans text-[12px] font-semibold disabled:opacity-60"
-                    style={{ background: "var(--bj-gold)", color: "var(--bj-bg)" }}
+                    className="bj-gold h-9 pl-2.5 pr-3.5 rounded-xl flex items-center gap-1.5 font-sans text-[12.5px] font-semibold disabled:opacity-60"
                     title="New entry (⌘⇧N)">
                     <Plus size={14} strokeWidth={2.4} /> New
                   </button>
                 </div>
               </div>
-              <label className="flex items-center gap-2 px-3 h-9 rounded-xl"
-                style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
+              <label className="bj-well flex items-center gap-2 px-3 h-9 rounded-xl">
                 <Search size={13} style={{ color: "var(--bj-ink4)" }} aria-hidden="true" />
                 <input
                   ref={searchRef}
@@ -438,17 +508,16 @@ function JournalView() {
                   <button type="button" onClick={() => setSearch("")} aria-label="Clear search" style={{ color: "var(--bj-ink4)" }}><X size={12} /></button>
                 ) : <kbd className="bj-kbd hidden md:inline-flex">/</kbd>}
               </label>
-              <div className="flex gap-0.5 p-0.5 rounded-[10px]" role="tablist" style={{ background: "var(--bj-bg-soft)" }}>
+              <div className="bj-well flex gap-0.5 p-[3px] rounded-xl" role="tablist">
                 {FILTERS.map((f) => (
                   <button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}
-                    className="flex-1 h-7 rounded-lg font-sans text-[12px]"
-                    style={{
-                      background: filter === f ? "var(--bj-line)" : "transparent",
-                      color: filter === f ? "var(--bj-ink)" : "var(--bj-ink3)",
-                      fontWeight: filter === f ? 500 : 400,
-                      transition: "background-color 0.12s ease, color 0.12s ease",
-                    }}>
-                    {f}
+                    className="relative flex-1 h-7 rounded-[9px] font-sans text-[12px]"
+                    style={{ color: filter === f ? "var(--bj-ink)" : "var(--bj-ink3)", fontWeight: filter === f ? 500 : 400, transition: "color 0.15s ease" }}>
+                    {filter === f && (
+                      <motion.span layoutId="journal-filter" aria-hidden="true" className="bj-raised absolute inset-0 rounded-[9px]"
+                        transition={lastInputWasKeyboard() ? { duration: 0 } : { type: "spring", duration: 0.32, bounce: 0.12 }} />
+                    )}
+                    <span className="relative">{f}</span>
                   </button>
                 ))}
               </div>
@@ -482,8 +551,9 @@ function JournalView() {
         <section
           aria-label="Entry"
           data-writing-surface
-          className={`${viewMode === "table" && !zen ? "hidden" : selectedId ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0 h-full overflow-hidden`}
+          className={`${viewMode === "table" && !zen ? "hidden" : selectedId ? "flex" : "hidden md:flex"} flex-1 min-w-0 h-full overflow-hidden ${zen ? "" : "md:p-3 md:pl-1 gap-3"}`}
         >
+          <div ref={sheetRef} className={`relative flex-1 flex flex-col min-w-0 h-full overflow-hidden ${zen ? "" : "bj-sheet"}`}>
           {selected ? (
             <>
               {/* Header */}
@@ -491,7 +561,7 @@ function JournalView() {
                 className="flex items-center gap-1 px-2 md:pl-6 md:pr-3 shrink-0"
                 style={{
                   height: 48,
-                  borderBottom: zen ? "1px solid transparent" : "1px solid var(--bj-line-soft)",
+                  position: "relative", zIndex: 2,
                   opacity: zen && !chromeVisible ? 0 : 1,
                   transition: "opacity 0.3s ease",
                 }}
@@ -531,7 +601,16 @@ function JournalView() {
                 </button>
               </header>
 
-              <div className="flex-1 min-h-0">
+              <div className="relative flex-1 min-h-0"
+                onDragEnter={(e) => { if (user && Array.from(e.dataTransfer.types).includes("Files")) setDropping(true); }}>
+                <CoverWash src={coverSrc} tint={selected.cover?.tint} />
+                {dropping && user && (
+                  <PhotoDropOverlay
+                    onLeave={() => setDropping(false)}
+                    onCover={([f]) => attachCover(user.uid, selected.id, f)}
+                    onPage={(files) => getActiveEditor()?.commands.insertPhotos(files)}
+                  />
+                )}
                 <TipTapEditor
                   entryId={selected.id}
                   content={selected.content}
@@ -541,12 +620,19 @@ function JournalView() {
                   zen={zen}
                   statsExtra={<span className="md:hidden"><SaveIndicator status={autosave.status} /></span>}
                   header={
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 flex-wrap mb-3 font-sans text-[12px]" style={{ color: "var(--bj-ink4)" }}>
-                        <span>{selected.createdAt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
-                        <span aria-hidden="true">·</span>
-                        <FeelingPicker value={selected.feeling} onChange={(feeling) => patchSelected({ feeling: feeling ?? "" })} />
-                        <TagEditor tags={selected.tags} onChange={(tags) => patchSelected({ tags })} />
+                    <div className="relative mb-6">
+                      <div className="flex flex-wrap items-end gap-x-5 gap-y-4 mb-5">
+                        {user && <EntryCover entry={selected} uid={user.uid} />}
+                        <div className="min-w-0 pb-1">
+                          <p className="font-sans text-[12.5px] font-medium mb-2.5" style={{ color: "var(--bj-ink3)" }}>
+                            {selected.createdAt.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} · {selected.createdAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap font-sans text-[12px]" style={{ color: "var(--bj-ink4)" }}>
+                            <FeelingPicker value={selected.feeling} onChange={(feeling) => patchSelected({ feeling: feeling ?? "" })} />
+                            {user && <AddCoverChip entry={selected} uid={user.uid} />}
+                            <TagEditor tags={selected.tags} onChange={(tags) => patchSelected({ tags })} />
+                          </div>
+                        </div>
                       </div>
                       <textarea
                         ref={titleRef}
@@ -578,12 +664,17 @@ function JournalView() {
                 {entries.length ? "Pick an entry, or begin a new page" : "A quiet place to begin"}
               </p>
               <button type="button" onClick={handleNew}
-                className="bj-btn-primary font-sans text-sm font-medium px-4 h-9 rounded-xl flex items-center gap-2"
-                style={{ background: "var(--bj-gold)", color: "var(--bj-bg)" }}>
+                className="bj-gold font-sans text-sm font-semibold px-4 h-10 rounded-xl flex items-center gap-2">
                 <Plus size={14} /> New entry <span className="opacity-60 text-xs">⌘⇧N</span>
               </button>
             </div>
           ) : null}
+          </div>
+          {selected && companionOpen && !zen && (
+            <aside aria-label="Beside this page" className="hidden xl:block w-[300px] shrink-0 h-full">
+              <Companion entry={selected} entries={entries} onClose={() => setCompanionOpen(false)} />
+            </aside>
+          )}
         </section>
       </div>
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Keyboard } from "lucide-react";
+import { Keyboard, Camera, BookOpen, MessageSquare } from "lucide-react";
 import type { Editor } from "@tiptap/core";
 import { useWritingStore } from "@/store/writing.store";
 import { useBibleStore } from "@/store/bible.store";
@@ -72,37 +72,49 @@ export function WritingStats({ editor, docKey, whisper = false, extra }: {
   const pct = goal ? Math.min(1, stats.session / goal) : 0;
   const C = 2 * Math.PI * 8;
 
+  const tool = "bj-btn-ghost flex items-center gap-1.5 h-8 px-2.5 rounded-[10px] font-medium";
+  const fire = (name: string) => editor.view.dom.dispatchEvent(new CustomEvent(name, { bubbles: true }));
+
+  if (whisper) {
+    return (
+      <div className="absolute left-0 right-0 bottom-3 flex justify-center pointer-events-none font-sans text-[12px]"
+        style={{ color: "var(--bj-ink4)", opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>
+        {plural(stats.words, "word")}{stats.session > 0 && <span style={{ color: "var(--bj-sage)" }}>&nbsp;· +{stats.session.toLocaleString()}</span>}
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={`flex items-center gap-3.5 font-sans text-[12px] shrink-0 whitespace-nowrap overflow-hidden ${whisper ? "justify-center" : ""}`}
-      style={{
-        height: 36, padding: "0 24px",
-        borderTop: whisper ? "none" : "1px solid var(--bj-line-soft)",
-        color: "var(--bj-ink4)", opacity: whisper ? 0.7 : 1,
-        fontVariantNumeric: "tabular-nums",
-      }}
-    >
-      <span className="shrink-0">{plural(stats.words, "word")}</span>
-      {!whisper && <span className="hidden sm:inline">{minutes} min read</span>}
-      {stats.session > 0 && <span style={{ color: "var(--bj-sage)" }}>+{stats.session.toLocaleString()}<span className="hidden sm:inline"> this session</span></span>}
-      {stats.wpm > 0 && <span className="hidden sm:inline">{stats.wpm} wpm</span>}
-      {goal > 0 && (
-        <span className="flex items-center gap-1.5" title={`Session goal: ${goal} words`}>
-          <svg width="18" height="18" viewBox="0 0 20 20" role="img" aria-label={`${stats.session} of ${goal} words`}>
+    <div role="toolbar" aria-label="Writing"
+      className="bj-glass absolute left-1/2 -translate-x-1/2 bottom-3 md:bottom-4 z-10 flex items-center gap-0.5 p-1 rounded-[14px] font-sans text-[12.5px] whitespace-nowrap max-w-[calc(100%-24px)]"
+      style={{ color: "var(--bj-ink3)", fontVariantNumeric: "tabular-nums" }}>
+      <span className="px-2.5 flex items-center gap-2" title={`${minutes} min read${stats.wpm ? ` · ${stats.wpm} wpm` : ""}`}>
+        {plural(stats.words, "word")}
+        {stats.session > 0 && <span className="hidden sm:inline" style={{ color: "var(--bj-sage)" }}>+{stats.session.toLocaleString()}</span>}
+        {goal > 0 && (
+          <svg width="16" height="16" viewBox="0 0 20 20" role="img" aria-label={`${stats.session} of ${goal} words`}>
+            <title>{`${Math.min(stats.session, goal)} / ${goal} words this session`}</title>
             <circle cx="10" cy="10" r="8" fill="none" stroke="var(--bj-line)" strokeWidth="2.5" />
             <circle cx="10" cy="10" r="8" fill="none" stroke={pct >= 1 ? "var(--bj-sage)" : "var(--bj-gold)"} strokeWidth="2.5"
               strokeDasharray={`${pct * C} ${C}`} strokeLinecap="round" transform="rotate(-90 10 10)"
               style={{ transition: "stroke-dasharray 0.4s var(--ease-out)" }} />
           </svg>
-          {Math.min(stats.session, goal)} / {goal}
-        </span>
-      )}
-      {!whisper && <div className="flex-1" />}
-      {!whisper && extra}
-      {!whisper && keySounds && (
-        <span className="hidden md:flex items-center gap-1.5"><Keyboard size={13} />{SWITCHES[switchId]?.name}</span>
-      )}
-      {!whisper && typewriter && <span className="hidden md:inline">Typewriter</span>}
+        )}
+      </span>
+      <span className="w-px h-4 mx-0.5" style={{ background: "var(--bj-line)" }} />
+      <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => fire("bj:photo-picker")}
+        title="Add a photo (⌘⇧P) — or paste / drop one" style={{ color: "var(--bj-gold-deep)" }}>
+        <Camera size={14} /><span className="hidden sm:inline">Photo</span>
+      </button>
+      <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => fire("bj:verse-picker")} title="Quote a verse (/verse)">
+        <BookOpen size={14} /><span className="hidden sm:inline">Verse</span>
+      </button>
+      <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => useFloatWindowsStore.getState().toggleAsk()} title="Ask (⌘⇧A)">
+        <MessageSquare size={14} /><span className="hidden sm:inline">Ask</span>
+      </button>
+      {extra && <span className="px-1.5 flex items-center">{extra}</span>}
+      {keySounds && <span className="hidden lg:flex items-center gap-1.5 px-2" style={{ color: "var(--bj-ink4)" }} title="Key sounds"><Keyboard size={13} />{SWITCHES[switchId]?.name}</span>}
+      {typewriter && <span className="hidden lg:inline px-2" style={{ color: "var(--bj-ink4)" }}>Typewriter</span>}
     </div>
   );
 }
@@ -179,7 +191,7 @@ export function VerseHoverCard({ editor, hover, onEnter, onLeave, onDone }: {
               ))}
             </div>
           </div>
-          <div className="font-display italic mb-3.5 overflow-y-auto" style={{ fontSize: 17, lineHeight: 1.5, color: "var(--bj-ink)", maxHeight: 200 }}>
+          <div className="font-read italic mb-3.5 overflow-y-auto" style={{ fontSize: 16.5, lineHeight: 1.5, color: "var(--bj-ink)", maxHeight: 200 }}>
             {failed ? (
               <span className="font-sans not-italic text-[13px]" style={{ color: "var(--bj-ink4)" }}>Couldn&apos;t load this passage in {version}.</span>
             ) : !verses ? (

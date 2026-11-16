@@ -22,7 +22,9 @@ import {
   Quote,
   Minus,
   BookMarked,
+  ImagePlus,
 } from "lucide-react";
+import { pickPhotos } from "@/lib/photos";
 
 // ── Command definitions ───────────────────────────────────
 
@@ -35,6 +37,16 @@ interface SlashItem {
 }
 
 const COMMANDS: SlashItem[] = [
+  {
+    label: "Photo",
+    description: "Take or add a photo",
+    icon: <ImagePlus size={14} />,
+    keywords: ["photo", "image", "picture", "camera", "img"],
+    action: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      void pickPhotos({ multiple: true }).then((files) => { if (files.length) editor.commands.insertPhotos(files); });
+    },
+  },
   {
     label: "Paragraph",
     description: "Plain body text",

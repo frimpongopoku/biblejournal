@@ -5,7 +5,9 @@ interface VideoState {
   sermonId: string | null;
   title: string;
   isVisible: boolean;
-  setVideo: (videoId: string, sermonId: string, title: string) => void;
+  /** Second to start from — set when a sermon page hands its player off. */
+  start: number;
+  setVideo: (videoId: string, sermonId: string, title: string, start?: number) => void;
   setVisible: (visible: boolean) => void;
   clearVideo: () => void;
 }
@@ -15,9 +17,10 @@ export const useVideoStore = create<VideoState>((set) => ({
   sermonId: null,
   title: "",
   isVisible: false,
-  setVideo: (videoId, sermonId, title) =>
-    set({ videoId, sermonId, title, isVisible: true }),
+  start: 0,
+  setVideo: (videoId, sermonId, title, start = 0) =>
+    set({ videoId, sermonId, title, isVisible: true, start: Math.floor(start) }),
   setVisible: (isVisible) => set({ isVisible }),
   clearVideo: () =>
-    set({ videoId: null, sermonId: null, title: "", isVisible: false }),
+    set({ videoId: null, sermonId: null, title: "", isVisible: false, start: 0 }),
 }));

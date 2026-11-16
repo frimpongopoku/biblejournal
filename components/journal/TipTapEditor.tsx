@@ -11,6 +11,8 @@ import {
   BookOpen, MessageSquareQuote, Quote, MessageSquare,
 } from "lucide-react";
 import { ScriptureBlock } from "@/extensions/ScriptureBlock";
+import { PhotoBlock } from "@/extensions/PhotoBlock";
+import { pickPhotos } from "@/lib/photos";
 import { CalloutBlock } from "@/extensions/CalloutBlock";
 import { SlashCommands } from "@/extensions/SlashCommands";
 import { CurrentBlock, ScriptureRefs } from "@/extensions/WritingAids";
@@ -113,9 +115,10 @@ export function TipTapEditor({
       heading: { levels: [1, 2, 3] },
       link: { openOnClick: false, autolink: true },
     }),
-    Placeholder.configure({ placeholder: () => promptRef.current }),
+    Placeholder.configure({ placeholder: ({ node }) => (node.type.name === "photo" ? "Add a caption…" : promptRef.current) }),
     CharacterCount,
     ScriptureBlock,
+    PhotoBlock,
     CalloutBlock,
     SlashCommands,
     CurrentBlock,
@@ -224,6 +227,8 @@ export function TipTapEditor({
       } catch { /* ignore */ }
     };
     const typing = () => setHover(null);
+    const photos = () => { void pickPhotos({ multiple: true }).then((files) => { if (files.length && !editor.isDestroyed) editor.commands.insertPhotos(files); }); };
+    dom.addEventListener("bj:photo-picker", photos);
     dom.addEventListener("mouseover", over);
     dom.addEventListener("mouseout", out);
     dom.addEventListener("bj:verse-picker", picker);
@@ -231,6 +236,7 @@ export function TipTapEditor({
     const scroller = scrollerRef.current;
     scroller?.addEventListener("scroll", typing, { passive: true });
     return () => {
+      dom.removeEventListener("bj:photo-picker", photos);
       dom.removeEventListener("mouseover", over);
       dom.removeEventListener("mouseout", out);
       dom.removeEventListener("bj:verse-picker", picker);
@@ -268,6 +274,7 @@ export function TipTapEditor({
         </div>
       )}
 
+      <div className="relative flex-1 min-h-0 flex flex-col">
       <div ref={scrollerRef} className="flex-1 min-h-0 overflow-y-auto" data-writing-surface>
         <div
           className={compact ? "px-4 pt-4" : "px-5 md:px-12 pt-10 md:pt-14"}
@@ -289,6 +296,7 @@ export function TipTapEditor({
       </div>
 
       {stats && <WritingStats editor={editor} docKey={entryId} whisper={zen} extra={statsExtra} />}
+      </div>
 
       <BubbleMenu
         editor={editor}

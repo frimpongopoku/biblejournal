@@ -6,6 +6,15 @@ export interface User {
   createdAt: Date;
 }
 
+export interface EntryPhoto {
+  url: string;
+  path: string;
+  w: number;
+  h: number;
+  /** Average colour, used to tint the page before the image loads. */
+  tint?: string;
+}
+
 export interface JournalEntry {
   id: string;
   userId: string;
@@ -16,6 +25,8 @@ export interface JournalEntry {
   isPinned: boolean;
   isFavorite: boolean;
   feeling?: string;
+  /** "How I felt" photo — the entry's cover. */
+  cover?: EntryPhoto | null;
   scriptures: ScriptureRef[];
   createdAt: Date;
   updatedAt: Date;
@@ -115,6 +126,21 @@ export interface SermonRef {
   addedAt: string; // ISO date string
 }
 
+export type SermonMomentKind = "note" | "takeaway" | "question";
+
+export interface SermonMoment {
+  id: string;
+  /** Seconds into the video; null when written without a video. */
+  t: number | null;
+  text: string;
+  kind: SermonMomentKind;
+  /** A verse caught at this moment. */
+  ref?: { book: string; chapter: number; verse?: number; endVerse?: number; text?: string };
+  /** Takeaways can be lived out and ticked off. */
+  done?: boolean;
+  at: string; // ISO
+}
+
 export interface Sermon {
   id: string;
   userId: string;
@@ -126,6 +152,11 @@ export interface Sermon {
   content: string; // TipTap JSON
   references: SermonRef[];
   sermonDate: string; // YYYY-MM-DD
+  /** Notes stamped with the moment in the video they were written at. */
+  moments?: SermonMoment[];
+  /** Where playback was left, in seconds, and the video's length. */
+  position?: number;
+  duration?: number;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -40,9 +40,14 @@ export function subscribeToEntries(
   });
 }
 
+/** Id for an entry before it exists — lets a photo upload start first. */
+export function newEntryId(uid: string): string {
+  return doc(col(uid)).id;
+}
+
 export async function createEntry(
   uid: string,
-  seed?: Partial<Pick<JournalEntry, "title" | "content" | "tags" | "scriptures">>
+  seed?: Partial<Pick<JournalEntry, "title" | "content" | "tags" | "scriptures" | "feeling" | "cover">>
 ): Promise<string> {
   // Id is generated locally and the write lands in the offline cache at once,
   // so the new entry appears (and can be typed into) without a server round trip.
@@ -56,6 +61,8 @@ export async function createEntry(
     isPinned: false,
     isFavorite: false,
     scriptures: seed?.scriptures ?? [],
+    ...(seed?.feeling ? { feeling: seed.feeling } : {}),
+    ...(seed?.cover ? { cover: seed.cover } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   }).catch((err) => console.error("createEntry failed", err));

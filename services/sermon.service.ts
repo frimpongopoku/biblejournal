@@ -3,7 +3,7 @@ import {
   onSnapshot, query, orderBy, serverTimestamp, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Sermon, SermonRef } from "@/types";
+import type { Sermon, SermonRef, SermonMoment } from "@/types";
 
 type RawSermon = Omit<Sermon, "id" | "createdAt" | "updatedAt"> & {
   createdAt: Timestamp; updatedAt: Timestamp;
@@ -43,10 +43,13 @@ export function subscribeToSermon(
   });
 }
 
-export async function createSermon(uid: string): Promise<string> {
+export async function createSermon(
+  uid: string,
+  seed: { title?: string; speaker?: string; videoUrl?: string; videoId?: string } = {},
+): Promise<string> {
   const ref = await addDoc(col(uid), {
-    userId: uid, title: "", speaker: "", church: "",
-    videoUrl: "", videoId: "",
+    userId: uid, title: seed.title ?? "", speaker: seed.speaker ?? "", church: "",
+    videoUrl: seed.videoUrl ?? "", videoId: seed.videoId ?? "", moments: [],
     content: JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] }),
     references: [], sermonDate: today(),
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
@@ -94,4 +97,13 @@ export async function removeSermonRef(
     references: refs.filter((r) => r.id !== refId),
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function setSermonMoments(uid: string, id: string, moments: SermonMoment[]): Promise<void> {
+  await updateDoc(doc(db, "users", uid, "sermons", id), { moments, updatedAt: serverTimestamp() });
+}
+
+/** Playback position: saved quietly, without bumping updatedAt (so the list order stays put). */
+export async function saveSermonPosition(uid: string, id: string, position: number, duration: number): Promise<void> {
+  await updateDoc(doc(db, "users", uid, "sermons", id), { position: Math.floor(position), duration: Math.floor(duration) });
 }
