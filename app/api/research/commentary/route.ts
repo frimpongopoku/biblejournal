@@ -36,15 +36,16 @@ export async function POST(req: Request) {
 
   try {
     const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 700,
+      model: "claude-haiku-5-5",
+      max_tokens: 4000, // room for adaptive thinking + the JSON answer
+      output_config: { effort: "low" },
       system: [
         { type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } },
       ] as Parameters<typeof client.messages.create>[0]["system"],
       messages: [{ role: "user", content: `${book} ${chapter} (${ver}):\n${chapterText}` }],
     });
 
-    const raw = (message.content[0] as { type: string; text: string }).text.replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
+    const raw = message.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("").replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
     return NextResponse.json(JSON.parse(raw));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";

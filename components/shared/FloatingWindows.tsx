@@ -10,6 +10,7 @@ import { parseRef } from "@/lib/bible-ref-parser";
 import { PROTESTANT_BOOKS, CHAPTER_COUNTS } from "@/lib/bible-books";
 import { useBibleStore } from "@/store/bible.store";
 import { useFloatWindowsStore } from "@/store/floatWindows.store";
+import { fetchChapter, getCachedChapter } from "@/lib/bible-client";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -229,9 +230,10 @@ export function FloatingBible({ onClose }: { onClose: () => void }) {
   useEffect(() => { setSugOpen(sugs.length > 0 && query.trim().length > 0); }, [sugs, query]);
 
   useEffect(() => {
+    const hit = getCachedChapter(version, book, chapter);
+    if (hit) { setData({ verses: hit.verses, totalChapters: hit.totalChapters }); return; }
     setLoading(true);
-    fetch(`/api/bible/${version}/${encodeURIComponent(book)}/${chapter}`)
-      .then((r) => r.json())
+    fetchChapter(version, book, chapter)
       .then((d) => setData({ verses: d.verses ?? [], totalChapters: d.totalChapters ?? 1 }))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
@@ -390,14 +392,24 @@ export function FloatingAsk({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const askQuery = useFloatWindowsStore((s) => s.askQuery);
+  const clearAskQuery = useFloatWindowsStore((s) => s.clearAskQuery);
 
-  async function handleAsk() {
-    if (!question.trim() || loading) return;
+  useEffect(() => {
+    if (!askQuery) return;
+    setQuestion(askQuery);
+    clearAskQuery();
+    void handleAsk(askQuery);
+  }, [askQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleAsk(override?: string) {
+    const q = (override ?? question).trim();
+    if (!q || loading) return;
     setLoading(true); setResult(null); setError("");
     try {
       const res = await fetch("/api/research/ask", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, version }),
+        body: JSON.stringify({ question: q, version }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Something went wrong"); return; }
@@ -424,7 +436,7 @@ export function FloatingAsk({ onClose }: { onClose: () => void }) {
             style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)", color: "var(--bj-ink)", caretColor: "var(--bj-gold)", lineHeight: 1.6 }}
           />
           <button
-            onClick={handleAsk}
+            onClick={() => handleAsk()}
             disabled={loading || !question.trim()}
             className="w-full font-sans text-sm py-2 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 transition-all duration-150"
             style={{ background: "var(--bj-gold)", color: "white" }}

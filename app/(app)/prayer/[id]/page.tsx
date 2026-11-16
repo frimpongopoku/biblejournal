@@ -1,5 +1,6 @@
 "use client";
 
+import { useAutosave } from "@/hooks/useAutosave";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,10 +32,8 @@ export default function PrayerWritingPage() {
 
   const [localTitle, setLocalTitle] = useState("");
   const [editing, setEditing] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle">("idle");
   const [testimonyOpen, setTestimonyOpen] = useState(false);
   const hasInit = useRef(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (prayer && !hasInit.current) {
@@ -45,18 +44,13 @@ export default function PrayerWritingPage() {
     }
   }, [prayer, isAnswered]);
 
+  const autosave = useAutosave<{ title?: string; body?: string }>((id, patch) =>
+    user ? updatePrayer(user.uid, id, patch) : Promise.resolve(),
+  );
+  const saveStatus = autosave.status === "pending" || autosave.status === "saving" ? "saving" : autosave.status === "idle" ? "idle" : "saved";
   const scheduleSave = useCallback(
-    (patch: { title?: string; body?: string }) => {
-      if (!user) return;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      setSaveStatus("saving");
-      saveTimer.current = setTimeout(async () => {
-        await updatePrayer(user.uid, prayerId, patch);
-        setSaveStatus("saved");
-        setTimeout(() => setSaveStatus("idle"), 2000);
-      }, 1200);
-    },
-    [user, prayerId]
+    (patch: { title?: string; body?: string }) => { if (user) autosave.schedule(prayerId, patch); },
+    [user, prayerId, autosave.schedule], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   function handleTitleChange(v: string) { setLocalTitle(v); scheduleSave({ title: v }); }

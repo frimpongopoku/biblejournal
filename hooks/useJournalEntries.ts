@@ -1,24 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { subscribeToEntries } from "@/services/journal.service";
+import { useEffect, useMemo } from "react";
 import { useAuthStore } from "@/store/auth.store";
-import type { JournalEntry } from "@/types";
+import { ensureJournalSubscription, useJournalStore } from "@/store/journal.store";
 
 export function useJournalEntries() {
-  const user = useAuthStore((s) => s.user);
-  const [entries, setEntries] = useState<JournalEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const uid = useAuthStore((s) => s.user?.uid ?? null);
+  const all = useJournalStore((s) => s.entries);
+  const hidden = useJournalStore((s) => s.hidden);
+  const loading = useJournalStore((s) => s.loading);
 
-  useEffect(() => {
-    if (!user) return;
-    setLoading(true);
-    const unsub = subscribeToEntries(user.uid, (data) => {
-      setEntries(data);
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [user?.uid]);
+  useEffect(() => { ensureJournalSubscription(uid); }, [uid]);
 
-  return { entries, loading };
+  const entries = useMemo(() => (hidden.size ? all.filter((e) => !hidden.has(e.id)) : all), [all, hidden]);
+  return { entries, loading: loading || !uid };
 }

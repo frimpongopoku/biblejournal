@@ -1,5 +1,6 @@
 "use client";
 
+import { useAutosave } from "@/hooks/useAutosave";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -43,7 +44,6 @@ export default function SermonDetailPage() {
   const toggleBible = useFloatWindowsStore((s) => s.toggleBible);
   const toggleAsk = useFloatWindowsStore((s) => s.toggleAsk);
   const [editingUrl, setEditingUrl] = useState(false);
-  const saveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialised = useRef(false);
 
   // Sync from Firestore (only on first load)
@@ -58,11 +58,12 @@ export default function SermonDetailPage() {
     setVideoId(sermon.videoId);
   }, [sermon]);
 
+  const autosave = useAutosave<Record<string, unknown>>((sid, patch) =>
+    user ? updateSermon(user.uid, sid, patch) : Promise.resolve(),
+  );
   const scheduleSave = useCallback((patch: object) => {
-    if (!user) return;
-    if (saveRef.current) clearTimeout(saveRef.current);
-    saveRef.current = setTimeout(() => updateSermon(user.uid, id, patch), 1200);
-  }, [user, id]);
+    if (user) autosave.schedule(id, patch as Record<string, unknown>);
+  }, [user, id, autosave.schedule]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleTitleChange(v: string) {
     setTitle(v);

@@ -19,6 +19,9 @@ import {
   ListOrdered,
   BookOpen,
   MessageSquareQuote,
+  Quote,
+  Minus,
+  BookMarked,
 } from "lucide-react";
 
 // ── Command definitions ───────────────────────────────────
@@ -73,10 +76,20 @@ const COMMANDS: SlashItem[] = [
       editor.chain().focus().deleteRange(range).toggleOrderedList().run(),
   },
   {
-    label: "Scripture Verse",
-    description: "Highlighted Bible verse block",
+    label: "Quote a verse",
+    description: "Look up a reference and quote it",
+    icon: <BookMarked size={14} />,
+    keywords: ["verse", "bible", "scripture", "quote", "reference", "passage", "v"],
+    action: (editor, range) => {
+      editor.chain().focus().deleteRange(range).run();
+      editor.view.dom.dispatchEvent(new CustomEvent("bj:verse-picker", { bubbles: true }));
+    },
+  },
+  {
+    label: "Scripture block",
+    description: "Empty block for a verse you'll type",
     icon: <BookOpen size={14} />,
-    keywords: ["bible", "verse", "scripture", "quote", "reference"],
+    keywords: ["bible", "verse", "scripture", "block"],
     action: (editor, range) =>
       editor.chain().focus().deleteRange(range).setNode("scriptureBlock").run(),
   },
@@ -84,9 +97,25 @@ const COMMANDS: SlashItem[] = [
     label: "Callout",
     description: "Accented insight or reflection",
     icon: <MessageSquareQuote size={14} />,
-    keywords: ["callout", "quote", "insight", "highlight", "reflection"],
+    keywords: ["callout", "insight", "highlight", "reflection", "revelation"],
     action: (editor, range) =>
       editor.chain().focus().deleteRange(range).setNode("calloutBlock").run(),
+  },
+  {
+    label: "Quote",
+    description: "Someone else's words",
+    icon: <Quote size={14} />,
+    keywords: ["quote", "blockquote", "citation"],
+    action: (editor, range) =>
+      editor.chain().focus().deleteRange(range).toggleBlockquote().run(),
+  },
+  {
+    label: "Divider",
+    description: "A quiet break between thoughts",
+    icon: <Minus size={14} />,
+    keywords: ["divider", "hr", "line", "break", "separator"],
+    action: (editor, range) =>
+      editor.chain().focus().deleteRange(range).setHorizontalRule().run(),
   },
 ];
 
@@ -108,6 +137,9 @@ const SlashMenu = forwardRef<MenuRef, MenuProps>(function SlashMenu(
   const [selected, setSelected] = useState(0);
 
   useEffect(() => setSelected(0), [items]);
+  useEffect(() => {
+    document.querySelector(`[data-slash-index="${selected}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [selected]);
 
   const select = useCallback(
     (item: SlashItem) => command(item),
@@ -157,6 +189,7 @@ const SlashMenu = forwardRef<MenuRef, MenuProps>(function SlashMenu(
       {items.map((item, i) => (
         <button
           key={item.label}
+          data-slash-index={i}
           onMouseDown={(e) => {
             e.preventDefault();
             select(item);
@@ -187,14 +220,6 @@ const SlashMenu = forwardRef<MenuRef, MenuProps>(function SlashMenu(
               {item.description}
             </span>
           </span>
-          {i < 2 && (
-            <span
-              className="font-sans shrink-0"
-              style={{ fontSize: 9, color: "var(--bj-ink4)", opacity: 0.6 }}
-            >
-              {i === 0 ? "⌘⇧P" : i === 1 ? "⌘⇧H" : ""}
-            </span>
-          )}
         </button>
       ))}
     </div>

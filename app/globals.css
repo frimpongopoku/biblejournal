@@ -167,121 +167,89 @@
   }
 }
 
-/* Smooth theme transitions */
-*, *::before, *::after {
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
+/* ── Motion tokens ────────────────────────────────────────── */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --bj-shadow-sm: 0 1px 2px color-mix(in oklch, black 10%, transparent);
+  --bj-shadow-md: 0 1px 2px color-mix(in oklch, black 8%, transparent), 0 8px 24px -6px color-mix(in oklch, black 22%, transparent);
+  --bj-shadow-lg: 0 2px 4px color-mix(in oklch, black 8%, transparent), 0 24px 64px -12px color-mix(in oklch, black 38%, transparent);
+}
+
+/* Theme switches crossfade, but ONLY while a theme is changing.
+   (A permanent `* { transition }` made every hover, re-render and list
+   update pay for a colour transition — the main source of sluggishness.) */
+html.bj-theme-fade *,
+html.bj-theme-fade *::before,
+html.bj-theme-fade *::after {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease, fill 0.2s ease !important;
 }
 
 /* ── Interactive primitives ─────────────────────────────────
-   Use these classes on interactive elements instead of
-   onMouseEnter/Leave handlers. CSS handles transforms too.
+   Hover is gated to real pointers (no sticky hover on touch).
+   Press gives a small, fast scale — never a big bounce.
 ──────────────────────────────────────────────────────────── */
-
-/* Small icon button (toolbar, topbar, sidebar icons) */
-.bj-btn-icon {
-  transition: background 0.12s ease, color 0.12s ease, transform 0.1s ease !important;
-}
-.bj-btn-icon:hover {
-  background: var(--bj-bg-soft) !important;
-  color: var(--bj-ink2) !important;
-  transform: scale(1.1);
-}
-.bj-btn-icon:active {
-  transform: scale(0.88) !important;
-  transition-duration: 0.05s !important;
-}
-
-/* Primary gold button (new entry, FAB, CTA) */
-.bj-btn-primary {
-  transition: transform 0.13s ease, box-shadow 0.15s ease, filter 0.13s ease !important;
-}
-.bj-btn-primary:hover {
-  transform: scale(1.08);
-  filter: brightness(1.1);
-  box-shadow: 0 6px 22px color-mix(in oklch, var(--bj-gold) 52%, transparent) !important;
-}
-.bj-btn-primary:active {
-  transform: scale(0.92) !important;
-  transition-duration: 0.05s !important;
-}
-
-/* Sidebar nav link */
+.bj-btn-icon,
+.bj-btn-action,
+.bj-btn-ghost,
+.bj-chip,
+.bj-swatch,
+.bj-btn-primary,
 .bj-nav-item {
-  transition: background 0.14s ease, color 0.12s ease, transform 0.1s ease !important;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease, box-shadow 0.15s ease, transform 0.16s var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
 }
-.bj-nav-item:not([data-active]):hover {
-  background: var(--bj-bg-soft) !important;
-  transform: translateX(2px);
-}
-.bj-nav-item:active {
-  transform: scale(0.97) !important;
-  transition-duration: 0.06s !important;
-}
+.bj-btn-icon:active,
+.bj-btn-action:active,
+.bj-chip:active,
+.bj-swatch:active { transform: scale(0.94); }
+.bj-btn-primary:active,
+.bj-btn-ghost:active,
+.bj-nav-item:active { transform: scale(0.97); }
 
-/* Ghost button (sidebar text rows: Appearance, Dark mode, Profile) */
-.bj-btn-ghost {
-  transition: background 0.12s ease, color 0.12s ease, transform 0.08s ease !important;
-}
-.bj-btn-ghost:hover {
-  background: var(--bj-bg-soft) !important;
-}
-.bj-btn-ghost:active {
-  transform: scale(0.98) !important;
-  transition-duration: 0.05s !important;
+@media (hover: hover) and (pointer: fine) {
+  .bj-btn-icon:hover,
+  .bj-btn-action:hover { background: var(--bj-bg-soft) !important; color: var(--bj-ink2) !important; }
+  .bj-btn-action[data-danger]:hover { color: var(--bj-ember) !important; }
+  .bj-btn-primary:hover { filter: brightness(1.08); }
+  .bj-btn-ghost:hover { background: var(--bj-bg-soft) !important; }
+  .bj-nav-item:not([data-active]):hover { background: var(--bj-bg-soft) !important; color: var(--bj-ink) !important; }
+  .bj-chip:not([data-active]):hover { background: var(--bj-line-soft) !important; color: var(--bj-ink2) !important; }
+  .bj-list-row:not([data-active]):hover { background: var(--bj-bg-soft) !important; }
+  .bj-swatch:hover { transform: translateY(-1px); }
 }
 
 /* List row (journal entries, collections) */
 .bj-list-row {
-  transition: background 0.12s ease, border-color 0.1s ease !important;
+  transition: background-color 0.1s ease;
   cursor: pointer;
-}
-.bj-list-row:not([data-active]):hover {
-  background: var(--bj-bg-soft) !important;
-}
-.bj-list-row:active {
-  opacity: 0.85;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Tag / filter chip */
-.bj-chip {
-  transition: background 0.12s ease, color 0.1s ease, transform 0.1s ease,
-              border-color 0.1s ease, filter 0.1s ease !important;
-}
-.bj-chip:not([data-active]):hover {
-  transform: scale(1.06);
-  filter: brightness(0.94);
-}
-.bj-chip:active {
-  transform: scale(0.94) !important;
-  transition-duration: 0.05s !important;
+/* Visible keyboard focus everywhere, never on mouse click */
+:where(button, a, input, [role="option"], [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--bj-gold) 70%, transparent);
+  outline-offset: 2px;
 }
 
-/* Action button (pin, star, delete — small icon-only buttons in editor) */
-.bj-btn-action {
-  transition: color 0.12s ease, background 0.12s ease, transform 0.1s ease !important;
-}
-.bj-btn-action:hover {
-  background: var(--bj-bg-soft) !important;
-  transform: scale(1.14);
-}
-.bj-btn-action:active {
-  transform: scale(0.86) !important;
-  transition-duration: 0.05s !important;
-}
-/* Delete button specific: ember on hover */
-.bj-btn-action[data-danger]:hover {
-  color: var(--bj-ember) !important;
+kbd.bj-kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: 5px;
+  font: 500 10.5px/1 var(--bj-ui, var(--font-inter)), system-ui;
+  color: var(--bj-ink3);
+  background: var(--bj-bg-soft);
+  border: 1px solid var(--bj-line);
+  box-shadow: inset 0 -1px 0 var(--bj-line);
 }
 
-/* Theme swatch in appearance panel */
-.bj-swatch {
-  transition: transform 0.12s ease, box-shadow 0.12s ease !important;
-}
-.bj-swatch:hover {
-  transform: scale(1.15);
-}
-.bj-swatch:active {
-  transform: scale(0.9) !important;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @keyframes bj-shake {
@@ -292,47 +260,59 @@
   80% { transform: translateX(3px); }
 }
 
-/* TipTap editor prose styles */
+/* TipTap editor prose styles — font family/size come from the writing
+   surface (Writing settings), so the editor inherits them. */
 .bj-editor {
   min-height: 360px;
-  font-family: var(--bj-ui, var(--font-inter, sans-serif));
   color: var(--bj-ink2);
-  line-height: 1.9;
-  font-size: 17px;
-  letter-spacing: 0.01em;
+  line-height: 1.75;
+  font-feature-settings: "kern", "liga", "onum";
+  text-rendering: optimizeLegibility;
+  outline: none;
+  overflow-wrap: break-word;
 }
 .bj-editor > *:first-child { margin-top: 0 !important; }
-.bj-editor p {
-  margin-bottom: 1.25rem;
-}
+.bj-editor[contenteditable="false"] { min-height: 0; }
+.bj-editor p { margin: 0 0 1.05em; }
 .bj-editor h1 {
   font-family: var(--bj-display, var(--font-cormorant, serif));
-  font-size: 2.25rem;
-  font-weight: 400;
+  font-size: 1.75em;
+  font-weight: 500;
   color: var(--bj-ink);
-  margin-top: 2.5rem;
-  margin-bottom: 0.75rem;
+  margin: 1.6em 0 0.45em;
   line-height: 1.15;
   letter-spacing: -0.01em;
 }
 .bj-editor h2 {
   font-family: var(--bj-display, var(--font-cormorant, serif));
-  font-size: 1.6rem;
+  font-size: 1.32em;
   font-weight: 500;
   color: var(--bj-ink);
-  margin-top: 1.75rem;
-  margin-bottom: 0.5rem;
+  margin: 1.4em 0 0.35em;
   line-height: 1.25;
 }
-.bj-editor ul { list-style: disc; padding-left: 1.6rem; margin-bottom: 1.25rem; }
-.bj-editor ol { list-style: decimal; padding-left: 1.6rem; margin-bottom: 1.25rem; }
-.bj-editor li { margin-bottom: 0.4rem; line-height: 1.8; }
+.bj-editor h3 { font-size: 1.1em; font-weight: 600; color: var(--bj-ink); margin: 1.2em 0 0.3em; }
+.bj-editor ul { list-style: disc; padding-left: 1.4em; margin: 0 0 1.05em; }
+.bj-editor ol { list-style: decimal; padding-left: 1.5em; margin: 0 0 1.05em; }
+.bj-editor li { margin-bottom: 0.25em; }
+.bj-editor li > p { margin: 0; }
+.bj-editor li::marker { color: var(--bj-ink4); }
 .bj-editor strong { font-weight: 650; color: var(--bj-ink); }
 .bj-editor em { font-style: italic; }
-.bj-editor u { text-decoration: underline; text-underline-offset: 3px; }
-.bj-editor ::selection {
-  background: color-mix(in oklch, var(--bj-gold) 22%, transparent);
+.bj-editor u { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--bj-ink4); }
+.bj-editor s { color: var(--bj-ink4); }
+.bj-editor a { color: var(--bj-gold-deep); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--bj-gold-soft); }
+.bj-editor blockquote {
+  margin: 0 0 1.05em; padding-left: 1em;
+  border-left: 2px solid var(--bj-line); color: var(--bj-ink3); font-style: italic;
 }
+.bj-editor hr { border: 0; text-align: center; margin: 2em 0; }
+.bj-editor hr::after { content: "· · ·"; color: var(--bj-ink4); letter-spacing: 0.6em; }
+.bj-editor code {
+  font-family: var(--font-geist-mono, ui-monospace, monospace); font-size: 0.82em;
+  background: var(--bj-bg-soft); border: 1px solid var(--bj-line-soft); border-radius: 5px; padding: 0.05em 0.35em;
+}
+.bj-editor ::selection { background: color-mix(in oklch, var(--bj-gold) 28%, transparent); }
 .bj-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--bj-ink4);
@@ -340,8 +320,102 @@
   float: left;
   height: 0;
   font-style: italic;
-  font-size: 17px;
 }
+
+/* Scripture references found in prose */
+.bj-ref {
+  color: var(--bj-ink);
+  background: color-mix(in oklch, var(--bj-gold) 9%, transparent);
+  border-bottom: 1.5px solid color-mix(in oklch, var(--bj-gold) 55%, transparent);
+  border-radius: 2px;
+  cursor: help;
+}
+.bj-ref-hint {
+  font: 500 11px/1 var(--bj-ui, var(--font-inter)), system-ui;
+  font-style: normal;
+  color: var(--bj-ink4);
+  margin-left: 0.5em;
+  user-select: none;
+  pointer-events: none;
+  white-space: nowrap;
+  vertical-align: 0.15em;
+}
+.bj-ref-hint kbd {
+  font: inherit; border: 1px solid var(--bj-line); border-radius: 4px; padding: 1px 4px; margin-right: 3px;
+}
+
+/* Scripture block */
+.bj-scripture {
+  margin: 0.4em 0 1.2em;
+  padding: 0.95em 1.15em;
+  border-radius: 14px;
+  background: var(--bj-gold-tint);
+  border: 1px solid color-mix(in oklch, var(--bj-gold-soft) 70%, transparent);
+}
+.bj-scripture-head {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 0.45em; user-select: none;
+  font: 500 10.5px/1.4 var(--bj-ui, var(--font-inter)), system-ui;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--bj-gold-deep); opacity: 0.85;
+}
+.bj-scripture-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--bj-ink4); }
+.bj-scripture-ref {
+  display: inline-flex; align-items: center; gap: 5px;
+  font: 500 12px/1.4 var(--bj-ui, var(--font-inter)), system-ui;
+  letter-spacing: 0; text-transform: none; color: var(--bj-gold-deep);
+  border-radius: 6px; padding: 1px 4px; margin: -1px -4px;
+  transition: background-color 0.12s ease;
+}
+@media (hover: hover) { .bj-scripture-ref:hover { background: color-mix(in oklch, var(--bj-gold) 14%, transparent); } }
+.bj-scripture-ver { font-size: 10.5px; color: var(--bj-ink4); }
+.bj-scripture-text {
+  font-family: var(--bj-display, var(--font-cormorant, serif));
+  font-style: italic;
+  font-size: 1.06em;
+  line-height: 1.55;
+  color: var(--bj-ink);
+}
+
+/* Focus paragraph: everything but the caret's block recedes */
+.bj-dim .bj-editor > * { transition: opacity 0.25s ease; }
+.bj-dim .bj-editor > *:not(.bj-current-block) { opacity: 0.26; }
+.bj-dim .bj-editor:not(.ProseMirror-focused) > * { opacity: 1; }
+
+/* Smooth caret — the native caret is hidden only while ours is showing */
+.bj-smooth .bj-editor.ProseMirror-focused { caret-color: transparent; }
+.bj-smooth.bj-composing .bj-editor { caret-color: var(--bj-gold) !important; }
+.bj-editor { caret-color: var(--bj-gold); }
+.bj-caret {
+  position: absolute; left: 0; top: 0;
+  width: 2px; border-radius: 1px;
+  background: var(--bj-gold-deep);
+  pointer-events: none;
+  will-change: transform;
+  transition: transform 90ms var(--ease-out), height 90ms var(--ease-out), opacity 0.12s ease;
+  animation: bj-caret-blink 1.1s steps(1, end) infinite;
+  z-index: 1;
+}
+.bj-caret[data-moving] { animation: none; opacity: 1; }
+.bj-caret[data-jump] { transition: none; }
+.bj-caret[hidden] { display: block; opacity: 0; animation: none; }
+@keyframes bj-caret-blink { 0%, 55% { opacity: 1; } 56%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .bj-caret { transition: none; animation: none; }
+}
+
+/* Floating bubble menu for selected text */
+.bj-bubble {
+  display: flex; align-items: center; gap: 1px; padding: 3px;
+  background: var(--bj-bg-panel); border: 1px solid var(--bj-line); border-radius: 10px;
+  box-shadow: var(--bj-shadow-md);
+}
+.bj-bubble button {
+  height: 28px; min-width: 28px; padding: 0 6px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  color: var(--bj-ink3); font: 500 12px var(--bj-ui, var(--font-inter)), system-ui;
+}
+@media (hover: hover) { .bj-bubble button:hover { background: var(--bj-bg-soft); color: var(--bj-ink); } }
+.bj-bubble button[data-active] { color: var(--bj-gold-deep); background: var(--bj-gold-tint); }
+.bj-bubble .sep { width: 1px; height: 16px; background: var(--bj-line); margin: 0 3px; }
 
 /* Compact TipTap instance for the Study side panel — smaller footprint than .bj-editor */
 .bj-study-composer {

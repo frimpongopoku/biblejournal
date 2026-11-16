@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import StarterKit from "@tiptap/starter-kit";
 import { ScriptureBlock } from "@/extensions/ScriptureBlock";
 import { CalloutBlock } from "@/extensions/CalloutBlock";
-import { fontPairs, type FontPairId } from "@/lib/fonts";
+import { useWritingStore, writingFontStyle, WIDTHS } from "@/store/writing.store";
 
 /** Parse any body string into a TipTap-compatible content value */
 export function parseBodyContent(body: string): object | string | undefined {
@@ -17,14 +17,17 @@ export function parseBodyContent(body: string): object | string | undefined {
   }
 }
 
-/** Render saved TipTap JSON (or plain text) read-only, with correct fonts */
+/** Render saved TipTap JSON (or plain text) read-only, in the writer's typography. */
 export function TipTapViewer({
   content,
-  fontKey,
 }: {
   content: string;
+  /** Kept for older call sites; typography comes from Writing settings. */
   fontKey?: string;
 }) {
+  const font = useWritingStore((s) => s.font);
+  const size = useWritingStore((s) => s.size);
+  const width = useWritingStore((s) => s.width);
   const editor = useEditor({
     immediatelyRender: false,
     editable: false,
@@ -32,28 +35,28 @@ export function TipTapViewer({
     content: parseBodyContent(content),
     editorProps: {
       attributes: {
-        class: `bj-editor bj-editor-${fontKey ?? "default"} outline-none`,
+        class: "bj-editor"
       },
     },
   });
 
+  // Content can change underneath (e.g. after an edit is saved).
   useEffect(() => {
     if (!editor) return;
-    const fKey = `bj-font-editor-${fontKey ?? "default"}`;
-    const szKey = `bj-font-size-editor-${fontKey ?? "default"}`;
-    const savedId = (localStorage.getItem(fKey) as FontPairId) ?? "classic";
-    const savedSize = Number(localStorage.getItem(szKey)) || 17;
-    const pair = fontPairs.find((f) => f.id === savedId) ?? fontPairs[0];
-    const dom = editor.view.dom as HTMLElement;
-    dom.style.fontFamily = `var(${pair.displayVar})`;
-    dom.style.fontSize = `${savedSize}px`;
-  }, [editor, fontKey]);
+    const next = parseBodyContent(content);
+    queueMicrotask(() => {
+      if (editor.isDestroyed || next === undefined) return;
+      if (JSON.stringify(next) !== JSON.stringify(editor.getJSON())) {
+        editor.commands.setContent(next as Parameters<typeof editor.commands.setContent>[0], { emitUpdate: false });
+      }
+    });
+  }, [editor, content]);
 
   if (!editor) return null;
 
   return (
     <div className="px-5 md:px-12 lg:px-16 py-10 md:py-12">
-      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      <div style={{ maxWidth: WIDTHS[width], margin: "0 auto", ...writingFontStyle(font, size) }}>
         <EditorContent editor={editor} />
       </div>
     </div>

@@ -1,7 +1,7 @@
 import {
   collection,
   doc,
-  addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   onSnapshot,
@@ -28,7 +28,7 @@ export function subscribeToEntries(
   return onSnapshot(q, (snap) => {
     cb(
       snap.docs.map((d) => {
-        const raw = d.data() as RawEntry;
+        const raw = d.data({ serverTimestamps: "estimate" }) as RawEntry;
         return {
           ...raw,
           id: d.id,
@@ -44,7 +44,10 @@ export async function createEntry(
   uid: string,
   seed?: Partial<Pick<JournalEntry, "title" | "content" | "tags" | "scriptures">>
 ): Promise<string> {
-  const ref = await addDoc(col(uid), {
+  // Id is generated locally and the write lands in the offline cache at once,
+  // so the new entry appears (and can be typed into) without a server round trip.
+  const ref = doc(col(uid));
+  void setDoc(ref, {
     userId: uid,
     title: seed?.title ?? "",
     content: seed?.content ?? JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] }),
@@ -55,7 +58,7 @@ export async function createEntry(
     scriptures: seed?.scriptures ?? [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  }).catch((err) => console.error("createEntry failed", err));
   return ref.id;
 }
 

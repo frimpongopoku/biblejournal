@@ -213,3 +213,35 @@ export function getChapterCount(version: string, book: string): number {
   const bible = getBible(version);
   return bible.get(book)?.size ?? 0;
 }
+
+/**
+ * Keyword search: every term must appear as a word (prefix match on the last
+ * term, so results arrive while you're still typing). Ranked: exact whole-word
+ * matches first, then shorter verses (more focused), then canonical order.
+ */
+export function searchVerses(version: string, query: string, limit = 8) {
+  const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length >= 2).slice(0, 6);
+  if (!terms.length) return [];
+  const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const res = terms.map((t, i) => new RegExp(`\\b${esc(t)}${i === terms.length - 1 ? "" : "\\b"}`, "i"));
+  const exact = terms.map((t) => new RegExp(`\\b${esc(t)}\\b`, "i"));
+  const hits: { book: string; chapter: number; verse: number; text: string; score: number; order: number }[] = [];
+  const bible = getBible(version);
+  let order = 0;
+  for (const book of PROTESTANT_BOOKS) {
+    const chapters = bible.get(book);
+    if (!chapters) continue;
+    for (const [chapter, verses] of chapters) {
+      for (const v of verses) {
+        order++;
+        if (res.every((r) => r.test(v.text))) {
+          const whole = exact.filter((r) => r.test(v.text)).length;
+          hits.push({ book, chapter, verse: v.n, text: v.text, score: whole * 1000 - v.text.length, order });
+          if (hits.length >= 4000) break;
+        }
+      }
+    }
+  }
+  hits.sort((x, y) => y.score - x.score || x.order - y.order);
+  return hits.slice(0, limit).map(({ book, chapter, verse, text }) => ({ book, chapter, verse, text }));
+}

@@ -17,6 +17,10 @@ interface FloatWindowsState {
   /** Opens (or jumps, if already open) the floating Bible to a specific reference. */
   openBibleAt: (target: BibleTarget) => void;
   clearBibleTarget: () => void;
+  /** A question to ask as soon as the Ask window opens (from ⌘K). */
+  askQuery: string | null;
+  openAsk: (query?: string) => void;
+  clearAskQuery: () => void;
 }
 
 export const useFloatWindowsStore = create<FloatWindowsState>((set) => ({
@@ -29,4 +33,7 @@ export const useFloatWindowsStore = create<FloatWindowsState>((set) => ({
   closeAsk: () => set({ askOpen: false }),
   openBibleAt: (target) => set({ bibleOpen: true, bibleTarget: target }),
   clearBibleTarget: () => set({ bibleTarget: null }),
+  askQuery: null,
+  openAsk: (query) => set({ askOpen: true, askQuery: query ?? null }),
+  clearAskQuery: () => set({ askQuery: null }),
 }));

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/auth.store";
 import type { User } from "@/types";
+import { ensureJournalSubscription } from "@/store/journal.store";
 
 const IS_FIREBASE_CONFIGURED =
   typeof process !== "undefined" &&
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         import("firebase/firestore").then(({ doc, getDoc, setDoc, serverTimestamp }) => {
           unsub = onAuthStateChanged(auth, async (firebaseUser) => {
             if (!firebaseUser) {
+              ensureJournalSubscription(null); // drop the previous account's live journal
               setUser(null);
               setLoading(false);
               return;

@@ -40,8 +40,9 @@ export async function POST(req: Request) {
 
   try {
     const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 750,
+      model: "claude-haiku-5-5",
+      max_tokens: 4000, // room for adaptive thinking + the JSON answer
+      output_config: { effort: "low" },
       system: [
         { type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } },
       ] as Parameters<typeof client.messages.create>[0]["system"],
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
       }],
     });
 
-    const raw = (message.content[0] as { type: string; text: string }).text.replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
+    const raw = message.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("").replace(/^```[a-z]*\n?/i, "").replace(/```$/,"").trim();
     const parsed = JSON.parse(raw);
     return NextResponse.json({ ...parsed, semanticSearch: isIndexReady(), version: ver });
   } catch (e) {

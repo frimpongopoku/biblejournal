@@ -1,5 +1,6 @@
 "use client";
 
+import { useAutosave } from "@/hooks/useAutosave";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { NotebookPen, Plus, ChevronDown, ArrowUpRight } from "lucide-react";
@@ -29,7 +30,9 @@ export function FloatingNotepad({ onClose }: { onClose: () => void }) {
   const [localTitle, setLocalTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [showSwitcher, setShowSwitcher] = useState(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosave = useAutosave<{ title?: string; content?: string }>((id, patch) =>
+    user ? updateEntry(user.uid, id, patch) : Promise.resolve(),
+  );
   const hasDefaulted = useRef(false);
 
   const active = activeEntryId ? entries.find((e) => e.id === activeEntryId) ?? null : null;
@@ -53,10 +56,7 @@ export function FloatingNotepad({ onClose }: { onClose: () => void }) {
 
   function scheduleSave(patch: { title?: string; content?: string }) {
     if (!user || !activeEntryId) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      updateEntry(user.uid, activeEntryId, patch);
-    }, 1200);
+    autosave.schedule(activeEntryId, patch);
   }
 
   async function handleNew() {
@@ -156,7 +156,7 @@ export function FloatingNotepad({ onClose }: { onClose: () => void }) {
                 entryId={active.id}
                 content={active.content}
                 onChange={(json) => scheduleSave({ content: json })}
-                fontKey="journal"
+                compact
               />
             </div>
           </>

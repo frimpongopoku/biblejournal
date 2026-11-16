@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { X, Keyboard } from "lucide-react";
+import { NAV_ITEMS } from "@/lib/nav";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -19,43 +19,45 @@ interface Group {
 
 const GROUPS: Group[] = [
   {
-    title: "Navigate",
+    title: "Anywhere",
     shortcuts: [
-      { keys: ["⌘", "J"], desc: "Journal" },
-      { keys: ["⌘", "K"], desc: "Prayer" },
-      { keys: ["⌘", "P"], desc: "Proclamations" },
-      { keys: ["⌘", "B"], desc: "Bible" },
-      { keys: ["⌘", "D"], desc: "Dashboard" },
-      { keys: ["⌘", "S"], desc: "Sermons" },
-      { keys: ["⌘", "L"], desc: "Learning" },
-      { keys: ["⌘", "E"], desc: "Research" },
-      { keys: ["⌘", "O"], desc: "Promises" },
-      { keys: ["⌘", "T"], desc: "Principles" },
-      { keys: ["⌘", "W"], desc: "Wealth" },
-      { keys: ["⌘", "A"], desc: "Authority" },
-      { keys: ["⌘", "I"], desc: "Intercession" },
-      { keys: ["⌘", "R"], desc: "Parables" },
-      { keys: ["⌘", "U"], desc: "Study" },
-      { keys: ["⌘", "H"], desc: "Timeline" },
-      { keys: ["⌘", "/"], desc: "Show shortcuts" },
-      { keys: ["⌘", "⌥", "B"], desc: "Toggle floating Bible (anywhere)" },
-      { keys: ["⌘", "⇧", "A"], desc: "Toggle floating Ask (anywhere)" },
+      { keys: ["⌘", "K"], desc: "Search & commands" },
+      { keys: ["⌘", "⌥", "B"], desc: "Floating Bible" },
+      { keys: ["⌘", "⇧", "A"], desc: "Ask about Scripture" },
+      { keys: ["⌘", "/"], desc: "This panel" },
     ],
+  },
+  {
+    title: "Go to",
+    shortcuts: NAV_ITEMS.filter((n) => n.g).map((n) => ({ keys: ["G", n.g!.toUpperCase()], desc: n.label })),
   },
   {
     title: "Journal",
     shortcuts: [
       { keys: ["⌘", "⇧", "N"], desc: "New entry" },
+      { keys: ["⌘", "."], desc: "Zen mode" },
+      { keys: ["⌥", "↑ ↓"], desc: "Previous / next entry" },
+      { keys: ["/"], desc: "Search entries" },
+      { keys: ["⌘", "Z"], desc: "Undo delete" },
     ],
   },
   {
-    title: "Editor",
+    title: "Writing",
     shortcuts: [
+      { keys: ["/"], desc: "Insert block (verse, callout…)" },
+      { keys: ["Tab"], desc: "Quote the reference you just typed" },
+      { keys: ["⌘", "click"], desc: "Open a reference in the Bible" },
       { keys: ["⌘", "B"], desc: "Bold" },
       { keys: ["⌘", "I"], desc: "Italic" },
-      { keys: ["⌘", "U"], desc: "Underline" },
-      { keys: ["⌘", "⇧", "H"], desc: "Heading 1" },
-      { keys: ["/"], desc: "Slash commands" },
+      { keys: ["⌘", "⇧", "S"], desc: "Scripture block" },
+    ],
+  },
+  {
+    title: "In ⌘K",
+    shortcuts: [
+      { keys: ["⌘", "↵"], desc: "Quote verse into entry" },
+      { keys: [">"], desc: "Commands only" },
+      { keys: ["#"], desc: "Browse tags" },
     ],
   },
   {
@@ -106,40 +108,19 @@ export function ShortcutsPanel({ open, onClose }: Props) {
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
+  if (!open) return null;
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            key="sc-bd"
-            className="fixed inset-0 z-50"
-            style={{ background: "rgba(0,0,0,0.5)" }}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={onClose}
-          />
-
-          {/* Panel */}
-          <motion.div
-            key="sc-panel"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ pointerEvents: "none" }}
-          >
-            <motion.div
-              className="w-full rounded-2xl overflow-hidden"
-              style={{
-                maxWidth: 580,
-                background: "var(--bj-bg-panel)",
-                border: "1px solid var(--bj-line)",
-                boxShadow: "0 24px 64px color-mix(in oklch, var(--bj-ink) 24%, transparent)",
-                pointerEvents: "auto",
-              }}
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.22 }}
-            >
+    <div className="fixed inset-0 z-[95] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose} />
+      <div
+        className="relative w-full rounded-2xl overflow-hidden"
+        style={{
+          maxWidth: 640,
+          background: "var(--bj-bg-panel)",
+          border: "1px solid var(--bj-line)",
+          boxShadow: "var(--bj-shadow-lg)",
+        }}
+      >
               {/* Header */}
               <div className="flex items-center gap-3 px-5 py-4 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
                 <Keyboard size={15} style={{ color: "var(--bj-gold)" }} />
@@ -147,6 +128,8 @@ export function ShortcutsPanel({ open, onClose }: Props) {
                   Keyboard Shortcuts
                 </h2>
                 <button
+                  type="button"
+                  aria-label="Close"
                   onClick={onClose}
                   className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"
                   style={{ color: "var(--bj-ink4)" }}
@@ -177,20 +160,11 @@ export function ShortcutsPanel({ open, onClose }: Props) {
                 ))}
               </div>
 
-              {/* Footer */}
               <div className="px-5 py-3 border-t flex items-center justify-between" style={{ borderColor: "var(--bj-line-soft)" }}>
-                <p className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>
-                  ⌘ on Mac · Ctrl on Windows/Linux
-                </p>
-                <div className="flex items-center gap-1">
-                  <Key>⌘</Key><Key>/</Key>
-                  <span className="font-sans text-xs ml-1" style={{ color: "var(--bj-ink4)" }}>to toggle</span>
-                </div>
+                <p className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>⌘ on Mac · Ctrl on Windows/Linux · G-shortcuts work outside text fields</p>
+                <div className="flex items-center gap-1"><Key>esc</Key></div>
               </div>
-            </motion.div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+      </div>
+    </div>
   );
 }

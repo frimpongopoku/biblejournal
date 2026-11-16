@@ -153,9 +153,18 @@ export const themes: Theme[] = [
 
 export const defaultTheme = themes.find((t) => t.id === "midnight")!;
 
+let fadeTimer = 0;
+
 export function applyTheme(themeId: ThemeId) {
   const theme = themes.find((t) => t.id === themeId) ?? defaultTheme;
   const root = document.documentElement;
+  // Crossfade only when the theme actually changes (not on first paint).
+  const changing = root.getAttribute("data-theme") && root.getAttribute("data-theme") !== themeId;
+  if (changing) {
+    root.classList.add("bj-theme-fade");
+    window.clearTimeout(fadeTimer);
+    fadeTimer = window.setTimeout(() => root.classList.remove("bj-theme-fade"), 320);
+  }
   Object.entries(theme.vars).forEach(([key, value]) => {
     root.style.setProperty(key, value);
   });

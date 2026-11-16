@@ -71,7 +71,7 @@ export function parseRef(raw: string): ParsedRef | null {
 
   // Regex: optional leading digit (for "1 John", "2 Cor" etc),
   // book name, then chapter, then optional :verse or :verse-verseEnd
-  const m = s.match(/^(\d\s*)?([a-z\s.]+?)\s+(\d+)(?::(\d+)(?:-(\d+))?)?$/i);
+  const m = s.match(/^(\d\s*)?([a-z\s.]+?)\s+(\d+)(?::(\d+)(?:[-–](\d+))?)?$/i);
   if (!m) return null;
 
   const prefix = (m[1] ?? "").replace(/\s/, "");
@@ -105,4 +105,51 @@ function resolveBook(raw: string): string | null {
   if (abbrevKey) return ABBREVS[abbrevKey];
 
   return null;
+}
+
+
+/**
+ * Strict book resolution for references found in free prose: only an exact
+ * book name or a known abbreviation counts (so "Is 3:4" or "Act 2:1" in a
+ * sentence doesn't light up by prefix accident).
+ */
+export function resolveBookStrict(raw: string): string | null {
+  const lower = raw.toLowerCase().replace(/\.$/, "").replace(/\s+/g, " ").trim();
+  if (ABBREVS[lower]) return ABBREVS[lower];
+  const nospace = lower.replace(/^(\d) /, "$1");
+  if (ABBREVS[nospace]) return ABBREVS[nospace];
+  return PROTESTANT_BOOKS.find((b) => b.toLowerCase() === lower) ?? null;
+}
+
+/** Matches "John 3:16", "1 Cor 13:4-7", "Ps. 23:1", "Song of Solomon 2:4". */
+export const PROSE_REF_RE =
+  /\b((?:[1-3]\s?)?[A-Z][a-z]+\.?(?:\s(?:of\s)?[A-Z][a-z]+)?)\s(\d{1,3}):(\d{1,3})(?:\s?[-–]\s?(\d{1,3}))?\b/g;
+
+export function findProseRefs(text: string): { from: number; to: number; ref: ParsedRef; label: string }[] {
+  const out: { from: number; to: number; ref: ParsedRef; label: string }[] = [];
+  PROSE_REF_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = PROSE_REF_RE.exec(text))) {
+    let bookRaw = m[1];
+    let start = m.index;
+    let book = resolveBookStrict(bookRaw);
+    // "Read Song of Solomon 2:4" — the regex may swallow a leading word; retry without it.
+    if (!book && bookRaw.includes(" ")) {
+      const tail = bookRaw.slice(bookRaw.indexOf(" ") + 1);
+      book = resolveBookStrict(tail);
+      if (book) { start += bookRaw.length - tail.length; bookRaw = tail; }
+    }
+    if (!book) continue;
+    const chapter = parseInt(m[2], 10);
+    const verse = parseInt(m[3], 10);
+    const verseEnd = m[4] ? parseInt(m[4], 10) : undefined;
+    if (!chapter || !verse) continue;
+    out.push({
+      from: start,
+      to: m.index + m[0].length,
+      ref: { book, chapter, verse, ...(verseEnd && verseEnd > verse ? { verseEnd } : {}) },
+      label: `${book} ${chapter}:${verse}${verseEnd && verseEnd > verse ? `–${verseEnd}` : ""}`,
+    });
+  }
+  return out;
 }

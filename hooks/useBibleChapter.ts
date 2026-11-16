@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PROTESTANT_BOOKS, CHAPTER_COUNTS } from "@/lib/bible-books";
 import { useBibleStore } from "@/store/bible.store";
+import { fetchChapter as fetchClientChapter, getCachedChapter, prefetchChapter } from "@/lib/bible-client";
 
 export interface Verse { n: number; text: string }
 export interface ChapterData {
@@ -51,12 +52,13 @@ export function useBibleChapter() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchChapter = useCallback(async (ver: string, bk: string, ch: number) => {
+    // Cached chapters render synchronously — no loading flash on prev/next.
+    const hit = getCachedChapter(ver, bk, ch);
+    if (hit) { setData(hit); setLoading(false); setError(null); return; }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/bible/${ver}/${encodeURIComponent(bk)}/${ch}`);
-      if (!res.ok) throw new Error();
-      setData(await res.json());
+      setData(await fetchClientChapter(ver, bk, ch));
     } catch {
       setError("Could not load this chapter.");
     } finally {
@@ -67,6 +69,15 @@ export function useBibleChapter() {
   useEffect(() => {
     fetchChapter(version, book, chapter);
   }, [version, book, chapter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Warm the neighbours so turning the page is instant.
+  useEffect(() => {
+    if (!data || data.book !== book || data.chapter !== chapter) return;
+    const p = prevLoc(book, chapter);
+    const n = nextLoc(book, chapter, data.totalChapters);
+    if (n) prefetchChapter(version, n.book, n.chapter);
+    if (p) prefetchChapter(version, p.book, p.chapter);
+  }, [data, version, book, chapter]);
 
   // Scroll to target verse after data loads
   useEffect(() => {

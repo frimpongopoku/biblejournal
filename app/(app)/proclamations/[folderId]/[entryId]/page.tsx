@@ -1,5 +1,6 @@
 "use client";
 
+import { useAutosave } from "@/hooks/useAutosave";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,9 +30,7 @@ export default function EntryWritingPage() {
 
   const [localTitle, setLocalTitle] = useState("");
   const [editing, setEditing] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle">("idle");
   const hasInit = useRef(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (entry && !hasInit.current) {
@@ -42,18 +41,13 @@ export default function EntryWritingPage() {
     }
   }, [entry]);
 
+  const autosave = useAutosave<{ title?: string; body?: string }>((id, patch) =>
+    user ? updateProclamationEntry(user.uid, folderId, id, patch) : Promise.resolve(),
+  );
+  const saveStatus = autosave.status === "pending" || autosave.status === "saving" ? "saving" : autosave.status === "idle" ? "idle" : "saved";
   const scheduleSave = useCallback(
-    (patch: { title?: string; body?: string }) => {
-      if (!user) return;
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      setSaveStatus("saving");
-      saveTimer.current = setTimeout(async () => {
-        await updateProclamationEntry(user.uid, folderId, entryId, patch);
-        setSaveStatus("saved");
-        setTimeout(() => setSaveStatus("idle"), 2000);
-      }, 1200);
-    },
-    [user, folderId, entryId]
+    (patch: { title?: string; body?: string }) => { if (user) autosave.schedule(entryId, patch); },
+    [user, entryId, autosave.schedule], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   function handleTitleChange(v: string) {
