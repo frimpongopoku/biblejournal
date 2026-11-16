@@ -7,8 +7,11 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, Moon, Sun, LogOut, Flame, Palette, X, Keyboard,
-  ChevronLeft, ChevronRight, ChevronDown, BookOpen, PenLine, Wrench,
+  ChevronLeft, ChevronRight, ChevronDown, BookOpen, PenLine, Wrench, Settings,
 } from "lucide-react";
+import { SettingsModal } from "@/components/settings/SettingsModal";
+import { usePrefsStore, useSettingsUi } from "@/store/prefs.store";
+import { useKeySounds } from "@/hooks/useWritingSurface";
 import { ShortcutsPanel } from "@/components/ShortcutsPanel";
 import { CommandPalette } from "@/components/CommandPalette";
 import { BibleFloatTriggers, FloatingBible, FloatingAsk } from "@/components/shared/FloatingWindows";
@@ -146,7 +149,18 @@ export function AppShell({ children, rightRail }: AppShellProps) {
   const [showDrawer, setShowDrawer] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
-  const [isCompact, setIsCompact] = useState(() => readBool("bj-sidebar-compact", false));
+  const isCompact = usePrefsStore((s) => s.compactSidebar);
+  const setPrefs = usePrefsStore((s) => s.set);
+  const showSettings = useSettingsUi((s) => s.show);
+  // Phones get the Settings page; anything wider gets the ⌘, window.
+  const openSettings = useCallback((section?: string) => {
+    if (window.matchMedia("(min-width: 768px)").matches) showSettings(section);
+    else router.push("/settings");
+  }, [showSettings, router]);
+  const openSettingsRef = useRef(openSettings);
+  useEffect(() => { openSettingsRef.current = openSettings; }, [openSettings]);
+  // Keyboard sounds anywhere you type (the listener is shared and ref-counted).
+  useKeySounds();
   const [toolsOpen, setToolsOpen] = useState(() => readBool("bj-sidebar-tools", false));
   const [gPending, setGPending] = useState(false);
   const [mac, setMac] = useState(true);
@@ -161,14 +175,14 @@ export function AppShell({ children, rightRail }: AppShellProps) {
   useEffect(() => { setMac(isMac()); }, []);
   useEffect(() => { setShowDrawer(false); setShowProfile(null); }, [pathname]);
 
-  function toggleCompact() { setIsCompact((c) => { writeBool("bj-sidebar-compact", !c); return !c; }); }
+  function toggleCompact() { setPrefs({ compactSidebar: !isCompact }); }
   function toggleTools() { setToolsOpen((o) => { writeBool("bj-sidebar-tools", !o); return !o; }); }
   const write = useCallback(() => { if (user) void startEntry(user.uid, router.push); }, [user, router]);
   const writeRef = useRef(write);
   useEffect(() => { writeRef.current = write; }, [write]);
 
   const isDark = themeId === "midnight" || themeId === "dusk";
-  const toggleTheme = () => setTheme(isDark ? "warm" : "dusk");
+  const toggleTheme = () => { setPrefs({ mode: "manual" }); setTheme(isDark ? "warm" : "dusk"); };
 
   // ── Global keyboard ──
   // ⌘K palette · ⌘/ shortcuts · ⌘⌥B Bible · ⌘⇧A Ask — all work inside editors.
@@ -189,6 +203,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && !e.shiftKey && !e.altKey && e.code === "KeyK") { e.preventDefault(); setShowPalette((o) => !o); return; }
       if (mod && e.code === "Slash") { e.preventDefault(); setShowShortcuts((o) => !o); return; }
+      if (mod && !e.shiftKey && !e.altKey && e.code === "Comma") { e.preventDefault(); const ui = useSettingsUi.getState(); if (ui.open) ui.close(); else openSettingsRef.current(); return; }
       if (mod && e.altKey && e.code === "KeyB") { e.preventDefault(); toggleBible(); return; }
       if (mod && e.shiftKey && e.code === "KeyA") { e.preventDefault(); toggleAsk(); return; }
       // The journal handles its own ⌘⇧N (it keeps the list in place).
@@ -241,7 +256,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       className={`absolute rounded-xl overflow-hidden border w-60 ${where === "sidebar" ? "bottom-full mb-1.5 left-0" : "top-full mt-2 right-0"}`}
       style={{
         transformOrigin: where === "sidebar" ? "bottom left" : "top right",
-        background: "var(--bj-bg-panel)", borderColor: "var(--bj-line)", boxShadow: "var(--bj-shadow-lg)", zIndex: 100,
+        background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", borderColor: "var(--m-edge)", boxShadow: "var(--bj-shadow-lg)", zIndex: 100,
       }}
     >
       <div className="px-4 py-3.5 border-b flex items-center gap-3" style={{ borderColor: "var(--bj-line-soft)" }}>
@@ -251,6 +266,11 @@ export function AppShell({ children, rightRail }: AppShellProps) {
           <p className="font-sans text-xs truncate" style={{ color: "var(--bj-ink4)" }}>{user?.email ?? "—"}</p>
         </div>
       </div>
+      <button type="button" onClick={() => { setShowProfile(null); openSettings(); }}
+        className="bj-btn-ghost flex items-center gap-2 w-full px-4 h-10 font-sans text-[13px]" style={{ color: "var(--bj-ink2)" }}>
+        <Settings size={13} /> <span className="flex-1 text-left">Settings</span>
+        <kbd className="bj-kbd">{modKey},</kbd>
+      </button>
       <button type="button" onClick={() => { setShowProfile(null); setShowShortcuts(true); }}
         className="bj-btn-ghost flex items-center gap-2 w-full px-4 h-10 font-sans text-[13px]" style={{ color: "var(--bj-ink2)" }}>
         <Keyboard size={13} /> <span className="flex-1 text-left">Keyboard shortcuts</span>
@@ -437,7 +457,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                       // Fixed, so the sidebar never clips it.
                       left: isCompact ? 76 : 12, bottom: 64, width: 330, maxWidth: "calc(100vw - 24px)", maxHeight: "min(80vh, 680px)",
                       transformOrigin: "bottom left",
-                      background: "var(--bj-bg-panel)", borderColor: "var(--bj-line)", boxShadow: "var(--bj-shadow-lg)", zIndex: 100,
+                      background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", borderColor: "var(--m-edge)", boxShadow: "var(--bj-shadow-lg)", zIndex: 100,
                     }}
                   >
                     <div className="px-3 pt-3 pb-2.5 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
@@ -459,6 +479,10 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                       <p className="font-sans text-[11px] font-medium mb-2" style={{ color: "var(--bj-ink4)" }}>Type</p>
                       <TypePicker />
                     </div>
+                    <button type="button" onClick={() => { setShowAppearance(false); openSettings("appearance"); }}
+                      className="bj-btn-ghost w-full flex items-center gap-2 px-3 h-10 border-t font-sans text-[12.5px]" style={{ color: "var(--bj-ink3)", borderColor: "var(--bj-line-soft)" }}>
+                      <Settings size={13} /> <span className="flex-1 text-left">All settings</span><kbd className="bj-kbd">{modKey},</kbd>
+                    </button>
                   </motion.div>
                 )}
                 </AnimatePresence>,
@@ -569,13 +593,13 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       <AnimatePresence>
         {showDrawer && (
           <>
-            <motion.div key="drawer-bd" className="fixed inset-0 md:hidden" style={{ background: "rgba(0,0,0,0.4)", zIndex: 55 }}
+            <motion.div key="drawer-bd" className="fixed inset-0 md:hidden" style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", zIndex: 55 }}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
               onClick={() => setShowDrawer(false)} />
             <motion.div key="drawer" role="dialog" aria-label="Menu"
               className="fixed top-0 left-0 bottom-0 md:hidden flex flex-col w-[280px] max-w-[85vw]"
               style={{
-                zIndex: 60, background: "var(--bj-bg-panel)", borderRight: "1px solid var(--bj-line-soft)",
+                zIndex: 60, background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", borderRight: "1px solid var(--bj-line-soft)",
                 boxShadow: "var(--bj-shadow-lg)", paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)",
               }}
               initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
@@ -607,9 +631,9 @@ export function AppShell({ children, rightRail }: AppShellProps) {
                   className="bj-btn-icon w-10 h-10 rounded-xl flex items-center justify-center" style={{ color: "var(--bj-ink3)" }}>
                   {isDark ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
-                <button type="button" onClick={() => signOutUser()} aria-label="Sign out"
-                  className="bj-btn-icon w-10 h-10 rounded-xl flex items-center justify-center" style={{ color: "var(--bj-ember)" }}>
-                  <LogOut size={16} />
+                <button type="button" onClick={() => { setShowDrawer(false); router.push("/settings"); }} aria-label="Settings"
+                  className="bj-btn-icon w-10 h-10 rounded-xl flex items-center justify-center" style={{ color: "var(--bj-ink3)" }}>
+                  <Settings size={16} />
                 </button>
               </div>
             </motion.div>
@@ -618,6 +642,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
       </AnimatePresence>
 
       <ShortcutsPanel open={showShortcuts} onClose={() => setShowShortcuts(false)} />
+      <SettingsModal />
       <CommandPalette open={showPalette} onClose={() => setShowPalette(false)} onShortcuts={() => setShowShortcuts(true)} />
 
       <AnimatePresence>

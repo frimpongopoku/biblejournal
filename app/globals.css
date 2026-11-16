@@ -174,7 +174,7 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --bj-shadow-sm: 0 1px 2px color-mix(in oklch, black 10%, transparent);
   --bj-shadow-md: 0 1px 2px color-mix(in oklch, black 8%, transparent), 0 8px 24px -6px color-mix(in oklch, black 22%, transparent);
-  --bj-shadow-lg: 0 2px 4px color-mix(in oklch, black 8%, transparent), 0 24px 64px -12px color-mix(in oklch, black 38%, transparent);
+  --bj-shadow-lg: inset 0 1px 0 var(--m-hi, rgba(255,255,255,.06)), 0 4px 10px color-mix(in oklch, black 12%, transparent), 0 32px 80px -16px color-mix(in oklch, black 50%, transparent);
 }
 
 /* Theme switches crossfade, but ONLY while a theme is changing.
@@ -228,7 +228,7 @@ html.bj-theme-fade *::after {
 }
 
 /* Visible keyboard focus everywhere, never on mouse click */
-:where(button, a, input, [role="option"], [tabindex]):focus-visible {
+:where(button, a, input:is([type="checkbox"], [type="radio"], [type="range"]), [role="option"], [tabindex]:not(input, textarea, [contenteditable])):focus-visible {
   outline: 2px solid color-mix(in oklch, var(--bj-gold) 70%, transparent);
   outline-offset: 2px;
 }
@@ -790,4 +790,100 @@ kbd.bj-kbd.hidden { display: none; }
 @media (hover: hover) and (pointer: fine) {
   .dock-item:hover { background: var(--m-raised-top); }
   .dock-verse:hover { background: var(--m-hover); }
+}
+
+/* ── Windows, popovers, menus, scrims ──────────────────────────
+   One family for everything that floats: windows are paper with a
+   glass title bar, popovers and menus are dense glass, scrims blur. */
+.bj-window {
+  border-radius: 20px;
+  background: linear-gradient(180deg, var(--m-paper-top), var(--m-paper-bot));
+  border: 1px solid var(--m-edge);
+  box-shadow: inset 0 1px 0 var(--m-hi), 0 2px 6px var(--m-shade-near), 0 40px 90px -24px var(--m-shade), 0 0 0 0.5px rgba(0, 0, 0, 0.35);
+}
+.bj-window-bar {
+  cursor: grab;
+  background: linear-gradient(180deg, var(--m-glass-top), transparent);
+  border-bottom: 1px solid var(--bj-line-soft);
+}
+.bj-window-bar:active { cursor: grabbing; }
+.bj-window-phone {
+  border-radius: 26px 26px 0 0;
+  background: linear-gradient(180deg, var(--m-paper-top), var(--m-paper-bot));
+  border-top: 1px solid var(--m-edge);
+  box-shadow: inset 0 1px 0 var(--m-hi), 0 -24px 60px -20px var(--m-shade);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.bj-pop {
+  background: linear-gradient(180deg, color-mix(in oklch, var(--m-raised-top) 94%, transparent), color-mix(in oklch, var(--m-raised-bot) 94%, transparent));
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  backdrop-filter: blur(24px) saturate(170%);
+  border: 1px solid var(--m-edge);
+  box-shadow: inset 0 1px 0 var(--m-hi), 0 4px 10px var(--m-shade-near), 0 24px 56px -14px var(--m-shade);
+}
+.bj-scrim {
+  background: color-mix(in oklch, #05070b 52%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+:root[data-dark="false"] .bj-scrim { background: color-mix(in oklch, #1b1f27 22%, transparent); }
+.bj-menu-item { transition: background-color 0.08s ease; }
+.bj-menu-item[data-active] { background: var(--m-hover); box-shadow: inset 0 0 0 1px var(--m-hover-edge); }
+.float-verse { border-radius: 4px; transition: background-color 0.4s ease; }
+.float-verse[data-target] { background: color-mix(in oklch, var(--bj-gold) 16%, transparent); box-shadow: 0 0 0 3px color-mix(in oklch, var(--bj-gold) 16%, transparent); }
+
+/* Shared values for anything floating (inline styles point at these). */
+:root {
+  --m-scrim: color-mix(in oklch, #05070b 52%, transparent);
+  --m-pop-bg: linear-gradient(180deg, color-mix(in oklch, var(--m-raised-top) 95%, transparent), color-mix(in oklch, var(--m-raised-bot) 95%, transparent));
+}
+:root[data-dark="false"] { --m-scrim: color-mix(in oklch, #1b1f27 24%, transparent); }
+
+/* ── Settings-driven switches ─────────────────────────────────
+   Glass off: the same surfaces, solid and without backdrop blur. */
+:root[data-solid] .bj-glass,
+:root[data-solid] .bj-pop {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: linear-gradient(180deg, var(--m-raised-top), var(--m-raised-bot));
+}
+:root[data-solid] .bj-scrim { -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root[data-solid] { --m-pop-bg: linear-gradient(180deg, var(--m-raised-top), var(--m-raised-bot)); }
+
+/* Hide previews: list text blurs until you hover or focus the row. */
+:root[data-hide-previews] .bj-preview { filter: blur(5px); transition: filter 0.2s ease; }
+:root[data-hide-previews] :is(a, button, [role="button"], [data-row]):is(:hover, :focus-visible) .bj-preview,
+:root[data-hide-previews] .bj-preview:hover { filter: none; }
+
+/* Reduced motion (from Settings): keep fades, drop movement in CSS too. */
+:root[data-motion="reduced"] *, :root[data-motion="reduced"] *::before, :root[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Small switch used across Settings. */
+.bj-switch {
+  position: relative; width: 38px; height: 22px; border-radius: 999px; flex-shrink: 0;
+  background: var(--m-well); box-shadow: inset 0 1px 3px var(--m-well-shade);
+  border: 1px solid color-mix(in oklch, var(--bj-ink) 6%, transparent);
+  transition: background-color 0.18s ease;
+}
+.bj-switch[aria-checked="true"] { background: var(--bj-gold); border-color: color-mix(in oklch, var(--bj-gold), white 25%); }
+.bj-switch > i {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: #f6f2ea; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s var(--ease-out);
+}
+.bj-switch[aria-checked="true"] > i { transform: translateX(16px); }
+
+/* Pray now: one request at a time, nothing else on screen. */
+.pray-room {
+  background:
+    radial-gradient(50% 45% at 50% 38%, color-mix(in oklch, var(--bj-gold) 14%, transparent), transparent 70%),
+    color-mix(in oklch, var(--bj-bg), black 45%);
+}
+:root[data-dark="false"] .pray-room {
+  background:
+    radial-gradient(50% 45% at 50% 38%, color-mix(in oklch, var(--bj-gold) 16%, transparent), transparent 70%),
+    var(--bj-bg);
 }

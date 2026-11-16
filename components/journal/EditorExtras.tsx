@@ -173,7 +173,7 @@ export function VerseHoverCard({ editor, hover, onEnter, onLeave, onDone }: {
             left, width: cardW,
             ...(below ? { top: hover.rect.bottom + 8 } : { bottom: window.innerHeight - hover.rect.top + 8 }),
             transformOrigin: below ? "top left" : "bottom left",
-            background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-lg)",
+            background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", border: "1px solid var(--m-edge)", boxShadow: "var(--bj-shadow-lg)",
           }}
         >
           <div className="flex items-center gap-x-2 gap-y-1 mb-2.5 flex-wrap">
@@ -258,7 +258,7 @@ export function VersePicker({ editor, at, onClose }: {
       style={{
         left: Math.max(12, Math.min(at.left, window.innerWidth - Math.min(320, window.innerWidth - 24) - 12)),
         top: at.top + 6, width: Math.min(320, window.innerWidth - 24),
-        background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-lg)",
+        background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", border: "1px solid var(--m-edge)", boxShadow: "var(--bj-shadow-lg)",
       }}>
       <input
         autoFocus

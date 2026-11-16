@@ -76,7 +76,7 @@ function UndoToast({ title, onUndo }: { title: string; onUndo: () => void }) {
       className="fixed z-[70] left-1/2 flex items-center gap-3 pl-4 pr-1.5 h-11 rounded-xl"
       style={{
         bottom: "calc(5.5rem + env(safe-area-inset-bottom))", translate: "-50% 0",
-        background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-lg)",
+        background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", border: "1px solid var(--m-edge)", boxShadow: "var(--bj-shadow-lg)",
       }}
     >
       <span className="font-sans text-[13px] max-w-[220px] truncate" style={{ color: "var(--bj-ink2)" }}>
@@ -422,7 +422,7 @@ function JournalView() {
             <span className="shrink-0 font-sans text-[10.5px]" style={{ color: "var(--bj-ink4)", fontVariantNumeric: "tabular-nums" }}>{rowTime(entry.updatedAt)}</span>
           </span>
           {d?.excerpt ? (
-            <span className="block font-write text-[14px] mt-1"
+            <span className="bj-preview block font-write text-[14px] mt-1"
               style={{ color: "var(--bj-ink3)", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
               {d.excerpt}
             </span>
@@ -683,7 +683,7 @@ function JournalView() {
         {showSheet && (
           <>
             <motion.div key="es-bd" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
-              className="fixed inset-0 z-40 md:hidden" style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setShowSheet(false)} />
+              className="fixed inset-0 z-40 md:hidden" style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }} onClick={() => setShowSheet(false)} />
             <motion.div key="es-sheet" initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
               className="fixed bottom-0 left-0 right-0 z-50 md:hidden flex flex-col rounded-t-2xl overflow-hidden"

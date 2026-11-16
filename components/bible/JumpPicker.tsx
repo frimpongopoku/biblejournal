@@ -54,7 +54,7 @@ export function JumpPicker({ book, chapter, version, onGo, onClose }: Props) {
       <div className="absolute inset-0 pointer-events-none" style={{ background: "color-mix(in oklch, var(--bj-bg) 50%, transparent)" }} />
       <div role="dialog" aria-modal="true" aria-label="Go to passage"
         className="relative w-full self-start rounded-2xl overflow-hidden flex flex-col"
-        style={{ maxWidth: 720, maxHeight: "min(80vh, 640px)", background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-lg)" }}>
+        style={{ maxWidth: 720, maxHeight: "min(80vh, 640px)", background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", border: "1px solid var(--m-edge)", boxShadow: "var(--bj-shadow-lg)" }}>
         <div className="flex items-center gap-3 px-4 shrink-0" style={{ height: 54, borderBottom: "1px solid var(--bj-line-soft)" }}>
           <Search size={16} style={{ color: "var(--bj-ink4)" }} aria-hidden="true" />
           <input

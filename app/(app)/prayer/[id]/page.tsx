@@ -1,295 +1,326 @@
 "use client";
 
-import { useAutosave } from "@/hooks/useAutosave";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, CheckCircle2, Clock, Flame, Pencil, Check, Trash2 } from "lucide-react";
-import { TipTapEditor } from "@/components/journal/TipTapEditor";
-import { TipTapViewer } from "@/components/shared/TipTapViewer";
-import { TestimonyDialog } from "@/components/prayer/TestimonyDialog";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowLeft, Check, HandHeart, MoreHorizontal, Plus, Trash2, Undo2, X } from "lucide-react";
+import { useAutosave } from "@/hooks/useAutosave";
 import { usePrayers } from "@/hooks/usePrayers";
-import { updatePrayer, markAnswered, deletePrayer } from "@/services/prayer.service";
+import { deletePrayer, logPrayer, markAnswered, removePrayerLog, reopenPrayer, updatePrayer } from "@/services/prayer.service";
 import { useAuthStore } from "@/store/auth.store";
+import { useBibleStore } from "@/store/bible.store";
+import { useWritingStore, writingFontStyle } from "@/store/writing.store";
+import { parseRef } from "@/lib/bible-ref-parser";
+import { fetchPassage } from "@/lib/bible-client";
+import { dayNumber, docToText, logOf, plural, prayedDays, shortDate, textToDoc } from "@/lib/prayer";
+import { DayStrip, PersonDot, VerseCard, forLabel, refLabel } from "@/components/prayer/parts";
+import { PrayNow } from "@/components/prayer/PrayNow";
+import { AnsweredDialog } from "@/components/prayer/AnsweredDialog";
+import type { PrayerLogEntry, ScriptureRef } from "@/types";
 
-function formatDate(date: Date): string {
-  const diff = Math.floor((Date.now() - date.getTime()) / 86400000);
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Yesterday";
-  if (diff < 7) return `${diff} days ago`;
-  return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+const EASE: [number, number, number, number] = [0.23, 1, 0.32, 1];
+
+function useAutoGrow(ref: React.RefObject<HTMLTextAreaElement | null>, value: string) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [ref, value]);
 }
 
-export default function PrayerWritingPage() {
+const LABEL = "font-sans text-[10.5px] font-semibold uppercase";
+
+export default function PrayerPage() {
   const params = useParams();
   const prayerId = params.id as string;
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-
+  const version = useBibleStore((s) => s.version);
+  const font = useWritingStore((s) => s.font);
   const { prayers, loading } = usePrayers();
   const prayer = prayers.find((p) => p.id === prayerId) ?? null;
   const isAnswered = prayer?.status === "answered";
 
-  const [localTitle, setLocalTitle] = useState("");
-  const [editing, setEditing] = useState(false);
-  const [testimonyOpen, setTestimonyOpen] = useState(false);
-  const hasInit = useRef(false);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [who, setWho] = useState("");
+  const [editingWho, setEditingWho] = useState(false);
+  const [today, setToday] = useState("");
+  const [addingVerse, setAddingVerse] = useState(false);
+  const [verseText, setVerseText] = useState("");
+  const [menu, setMenu] = useState(false);
+  const [praying, setPraying] = useState(false);
+  const [answering, setAnswering] = useState(false);
+  const initialised = useRef(false);
+  // What's there right now, so a prayer left blank can be removed on the way out.
+  const titleNow = useRef("");
+  const bodyNow = useRef("");
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const todayRef = useRef<HTMLTextAreaElement>(null);
+  useAutoGrow(titleRef, title);
+  useAutoGrow(bodyRef, body);
+  useAutoGrow(todayRef, today);
 
   useEffect(() => {
-    if (prayer && !hasInit.current) {
-      hasInit.current = true;
-      setLocalTitle(prayer.title);
-      // Auto-enter edit mode for new prayers with no title
-      if (!prayer.title.trim() && !isAnswered) setEditing(true);
-    }
-  }, [prayer, isAnswered]);
+    if (!prayer || initialised.current) return;
+    initialised.current = true;
+    const b = docToText(prayer.body);
+    setTitle(prayer.title); setBody(b); setWho(prayer.for ?? "");
+    titleNow.current = prayer.title; bodyNow.current = b;
+    if (!prayer.title.trim()) setTimeout(() => titleRef.current?.focus(), 50);
+  }, [prayer]);
 
-  const autosave = useAutosave<{ title?: string; body?: string }>((id, patch) =>
+  const autosave = useAutosave<{ title?: string; body?: string; for?: string }>((id, patch) =>
     user ? updatePrayer(user.uid, id, patch) : Promise.resolve(),
   );
-  const saveStatus = autosave.status === "pending" || autosave.status === "saving" ? "saving" : autosave.status === "idle" ? "idle" : "saved";
-  const scheduleSave = useCallback(
-    (patch: { title?: string; body?: string }) => { if (user) autosave.schedule(prayerId, patch); },
+  const save = useCallback(
+    (patch: { title?: string; body?: string; for?: string }) => { if (user) autosave.schedule(prayerId, patch); },
     [user, prayerId, autosave.schedule], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  function handleTitleChange(v: string) { setLocalTitle(v); scheduleSave({ title: v }); }
-  function handleBodyChange(json: string) { scheduleSave({ body: json }); }
+  useEffect(() => () => {
+    const log = prayers.find((p) => p.id === prayerId)?.log?.length ?? 0;
+    if (initialised.current && user && !titleNow.current.trim() && !bodyNow.current.trim() && !log) void deletePrayer(user.uid, prayerId);
+  }, [user, prayerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleDelete() {
-    if (!user) return;
-    await deletePrayer(user.uid, prayerId);
-    router.push("/prayer");
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(false);
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [menu]);
+
+  function amen() {
+    if (!user || !prayer) return;
+    void logPrayer(user.uid, prayer.id, today);
+    setToday("");
   }
 
-  async function handleMarkAnswered(testimony: string) {
-    if (!user) return;
-    await markAnswered(user.uid, prayerId, testimony);
+  async function addVerse() {
+    const r = parseRef(verseText);
+    if (!user || !prayer || !r) return;
+    const ref: ScriptureRef = { book: r.book, chapter: r.chapter, verse: r.verse ?? 1, ...(r.verseEnd ? { endVerse: r.verseEnd } : {}), version };
+    setVerseText(""); setAddingVerse(false);
+    let text: string | undefined;
+    try { text = (await fetchPassage(version, { ...r, verse: r.verse ?? 1 })).verses.map((v) => v.text).join(" "); } catch { /* keep the reference */ }
+    await updatePrayer(user.uid, prayer.id, { scriptures: [...(prayer.scriptures ?? []), { ...ref, ...(text ? { text } : {}) }] });
   }
-
-  const accentColor = isAnswered ? "var(--bj-sage)" : "var(--bj-ember)";
 
   if (!loading && !prayer) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="font-display italic text-xl" style={{ color: "var(--bj-ink4)", fontWeight: 300 }}>Prayer not found.</p>
+      <div className="flex flex-col items-center justify-center h-full gap-3">
+        <p className="font-display italic text-xl" style={{ color: "var(--bj-ink4)" }}>This prayer isn’t here any more.</p>
+        <button type="button" onClick={() => router.push("/prayer")} className="font-sans text-[13px]" style={{ color: "var(--bj-ink3)" }}>← Back to Prayer</button>
       </div>
     );
   }
 
+  const log = prayer ? [...logOf(prayer)].sort((a, b) => b.at - a.at) : [];
+  const others = prayer && prayer.for?.trim()
+    ? prayers.filter((p) => p.id !== prayer.id && p.status === "active" && p.for?.trim().toLowerCase() === prayer.for?.trim().toLowerCase())
+    : [];
+  const saving = autosave.status === "pending" || autosave.status === "saving";
+
   return (
-    <>
-      <div className="flex flex-col h-full" style={{ background: "var(--bj-bg)" }}>
-
-        {/* Header */}
-        <div
-          className="flex items-center gap-2 px-4 md:px-6 border-b shrink-0"
-          style={{
-            height: 52,
-            background: "color-mix(in oklch, var(--bj-bg-panel) 96%, transparent)",
-            backdropFilter: "blur(12px)",
-            borderColor: "var(--bj-line-soft)",
-          }}
-        >
-          <button
-            onClick={() => router.push("/prayer")}
-            className="bj-btn-ghost flex items-center gap-1.5 px-3 py-1.5 rounded-xl shrink-0"
-            style={{ color: "var(--bj-ink3)" }}
-          >
-            <ArrowLeft size={15} />
-            <span className="font-sans text-sm hidden sm:inline">Prayer Journal</span>
+    <div className="min-h-full w-full px-4 md:px-9 pt-4 md:pt-5">
+      <div className="max-w-[1080px] mx-auto">
+        {/* Bar */}
+        <div className="flex items-center gap-2 h-11 mb-5">
+          <button type="button" onClick={() => router.push("/prayer")} className="flex items-center gap-1.5 h-9 pr-2 font-sans text-[13px]" style={{ color: "var(--bj-ink3)" }}>
+            <ArrowLeft size={15} /> Prayer
           </button>
-
-          <div className="flex-1 min-w-0 text-center">
-            <p className="font-sans text-sm" style={{ color: "var(--bj-ink4)" }}>
-              {saveStatus === "saving" ? "Saving…" : saveStatus === "saved" ? "Saved" : ""}
-            </p>
-          </div>
-
-          {/* Mark answered — only for active prayers in view mode */}
-          {!isAnswered && prayer && !editing && (
-            <button
-              onClick={() => setTestimonyOpen(true)}
-              className="bj-chip font-sans text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shrink-0"
-              style={{
-                background: "var(--bj-sage-tint)",
-                color: "var(--bj-sage)",
-                border: "1px solid color-mix(in oklch, var(--bj-sage) 30%, transparent)",
-                minHeight: 34,
-              }}
-            >
-              <CheckCircle2 size={12} />
-              <span className="hidden sm:inline">Mark answered</span>
-            </button>
-          )}
-
-          {/* Edit / Done toggle — only for active prayers */}
-          {!isAnswered && prayer && !editing && (
-            <button
-              onClick={() => setEditing(true)}
-              className="bj-chip font-sans text-sm px-4 py-2 rounded-xl flex items-center gap-2 shrink-0"
-              style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}
-            >
-              <Pencil size={13} /> Edit
-            </button>
-          )}
-
-          {!isAnswered && prayer && editing && (
-            <button
-              onClick={() => setEditing(false)}
-              className="bj-chip font-sans text-sm px-4 py-2 rounded-xl flex items-center gap-2 shrink-0"
-              style={{ background: "var(--bj-bg-soft)", color: "var(--bj-ink3)", border: "1px solid var(--bj-line-soft)" }}
-            >
-              <Check size={13} /> Done
-            </button>
-          )}
-
-          <button
-            onClick={handleDelete}
-            className="bj-btn-action w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            data-danger style={{ color: "var(--bj-ink4)" }}
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-
-        {/* Title + meta */}
-        {loading || !prayer ? (
-          <div className="px-5 md:px-16 pt-8 animate-pulse shrink-0" style={{ maxWidth: 760, margin: "0 auto", width: "100%" }}>
-            <div className="h-9 rounded-xl w-1/2 mb-3" style={{ background: "var(--bj-bg-soft)" }} />
-            <div className="h-4 rounded-xl w-1/4" style={{ background: "var(--bj-bg-soft)" }} />
-          </div>
-        ) : (
-          <div
-            className="px-5 md:px-16 pt-7 md:pt-9 pb-5 border-b shrink-0"
-            style={{
-              maxWidth: 760, margin: "0 auto", width: "100%",
-              borderColor: isAnswered ? "color-mix(in oklch, var(--bj-sage) 20%, transparent)" : "var(--bj-line-soft)",
-              background: "var(--bj-bg-panel)",
-            }}
-          >
-            <div className="flex items-start gap-4">
-              <div
-                className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-0.5"
-                style={{
-                  background: isAnswered ? "var(--bj-sage-tint)" : "color-mix(in oklch, var(--bj-ember) 12%, var(--bj-bg))",
-                }}
-              >
-                {isAnswered
-                  ? <CheckCircle2 size={20} style={{ color: accentColor }} />
-                  : <Flame size={20} style={{ color: accentColor }} />
-                }
-              </div>
-              <div className="flex-1 min-w-0">
-                {editing && !isAnswered ? (
-                  <input
-                    value={localTitle}
-                    onChange={(e) => handleTitleChange(e.target.value)}
-                    placeholder="What are you praying about?"
-                    className="w-full bg-transparent outline-none font-sans font-bold"
-                    style={{
-                      fontSize: "clamp(1.3rem, 4vw, 1.9rem)",
-                      color: "var(--bj-ink)",
-                      caretColor: "var(--bj-gold)",
-                      lineHeight: 1.2,
-                    }}
-                  />
-                ) : (
-                  <p
-                    className="font-sans font-bold leading-snug"
-                    style={{
-                      fontSize: "clamp(1.3rem, 4vw, 1.9rem)",
-                      color: localTitle ? "var(--bj-ink)" : "var(--bj-ink4)",
-                      fontStyle: localTitle ? "normal" : "italic",
-                    }}
-                  >
-                    {localTitle || "Untitled prayer"}
-                  </p>
+          <span className="font-sans text-[11.5px] ml-1" style={{ color: "var(--bj-ink4)" }} aria-live="polite">{saving ? "Saving…" : ""}</span>
+          <div className="ml-auto flex items-center gap-2">
+            {prayer && !isAnswered && (
+              <>
+                <button type="button" onClick={() => setPraying(true)} className="bj-raised bj-lift h-8 px-3 rounded-[10px] flex items-center gap-1.5 font-sans text-[12.5px] font-medium" style={{ color: "var(--bj-ink2)" }}>
+                  <HandHeart size={13} style={{ color: "var(--bj-gold)" }} /> <span className="hidden sm:inline">Pray now</span>
+                </button>
+                <button type="button" onClick={() => setAnswering(true)} className="h-8 px-3 rounded-[10px] flex items-center gap-1.5 font-sans text-[12.5px] font-semibold active:scale-[0.97] transition-transform"
+                  style={{ background: "color-mix(in oklch, var(--bj-sage) 13%, transparent)", border: "1px solid color-mix(in oklch, var(--bj-sage) 30%, transparent)", color: "var(--bj-sage)" }}>
+                  <Check size={13} strokeWidth={2.4} /> God answered
+                </button>
+              </>
+            )}
+            {isAnswered && (
+              <span className="h-8 px-3 rounded-[10px] flex items-center gap-1.5 font-sans text-[12.5px] font-semibold" style={{ background: "color-mix(in oklch, var(--bj-sage) 13%, transparent)", color: "var(--bj-sage)" }}>
+                <Check size={13} strokeWidth={2.4} /> Answered {prayer?.answeredAt ? shortDate(prayer.answeredAt) : ""}
+              </span>
+            )}
+            <div className="relative">
+              <button type="button" onClick={() => setMenu((m) => !m)} onPointerDown={(e) => e.stopPropagation()} aria-label="Prayer options" aria-expanded={menu}
+                className="bj-btn-icon w-8 h-8 rounded-[10px] flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
+                <MoreHorizontal size={16} />
+              </button>
+              <AnimatePresence>
+                {menu && (
+                  <motion.div onPointerDown={(e) => e.stopPropagation()} role="menu"
+                    initial={{ opacity: 0, scale: 0.97, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                    transition={{ duration: 0.15, ease: EASE }} style={{ transformOrigin: "top right" }}
+                    className="bj-pop absolute right-0 top-full mt-1.5 w-52 rounded-[14px] p-1 z-30">
+                    {isAnswered && (
+                      <button type="button" role="menuitem" onClick={() => { setMenu(false); if (user && prayer) void reopenPrayer(user.uid, prayer.id); }}
+                        className="bj-menu-item w-full flex items-center gap-2.5 h-9 px-2.5 rounded-[10px] font-sans text-[13px]" style={{ color: "var(--bj-ink2)" }}>
+                        <Undo2 size={14} /> Still praying
+                      </button>
+                    )}
+                    <button type="button" role="menuitem" onClick={async () => { setMenu(false); if (!user) return; initialised.current = false; await deletePrayer(user.uid, prayerId); router.push("/prayer"); }}
+                      className="bj-menu-item w-full flex items-center gap-2.5 h-9 px-2.5 rounded-[10px] font-sans text-[13px]" style={{ color: "var(--bj-ember)" }}>
+                      <Trash2 size={14} /> Delete prayer
+                    </button>
+                  </motion.div>
                 )}
-                <div className="flex items-center gap-1.5 mt-2">
-                  {isAnswered ? (
-                    <span className="font-sans text-sm font-medium" style={{ color: accentColor }}>
-                      Answered · {formatDate(prayer.answeredAt ?? prayer.updatedAt)}
-                    </span>
-                  ) : (
-                    <>
-                      <Clock size={12} style={{ color: "var(--bj-ink4)" }} />
-                      <span className="font-sans text-sm" style={{ color: "var(--bj-ink4)" }}>
-                        Since {formatDate(prayer.createdAt)}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
+              </AnimatePresence>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Body */}
-        {prayer && (
-          <AnimatePresence mode="wait">
-            {isAnswered ? (
-              /* Answered — always read-only */
-              <motion.div key="answered" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 overflow-y-auto">
-                <TipTapViewer content={prayer.body} fontKey="prayer" />
-                {prayer.testimony && (
-                  <div
-                    className="mx-5 md:mx-16 mb-16 px-6 py-5 rounded-2xl"
-                    style={{
-                      background: "var(--bj-sage-tint)",
-                      border: "1px solid color-mix(in oklch, var(--bj-sage) 25%, transparent)",
-                    }}
-                  >
-                    <p className="font-sans text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: "var(--bj-sage)" }}>
-                      Testimony
-                    </p>
-                    <TipTapViewer content={prayer.testimony} fontKey="prayer" />
-                  </div>
-                )}
-              </motion.div>
-            ) : editing ? (
-              /* Edit mode */
-              <motion.div key="edit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="flex-1 overflow-hidden">
-                <TipTapEditor
-                  key={prayer.id}
-                  entryId={prayer.id}
-                  content={prayer.body}
-                  onChange={handleBodyChange}
-                  fontKey="prayer"
-                  autoFocus
-                />
-              </motion.div>
-            ) : (
-              /* View mode */
-              <motion.div key="view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="flex-1 overflow-y-auto" onDoubleClick={() => setEditing(true)}>
-                {prayer.body ? (
-                  <TipTapViewer content={prayer.body} fontKey="prayer" />
+        {loading || !prayer ? (
+          <div className="max-w-[680px] animate-pulse">
+            <div className="h-4 w-1/3 rounded mb-4" style={{ background: "var(--bj-bg-soft)" }} />
+            <div className="h-11 w-2/3 rounded-lg mb-5" style={{ background: "var(--bj-bg-soft)" }} />
+            <div className="h-20 rounded-lg" style={{ background: "var(--bj-bg-soft)" }} />
+          </div>
+        ) : (
+          <div className="flex flex-col lg:flex-row gap-8 lg:gap-10">
+            <section className="flex-1 min-w-0 max-w-[680px]">
+              {/* Who it's for */}
+              <div className="flex items-center gap-2.5 mb-3 flex-wrap">
+                <PersonDot name={who} size={26} />
+                {editingWho ? (
+                  <input autoFocus value={who} onChange={(e) => { setWho(e.target.value); save({ for: e.target.value.trim() }); }} placeholder="Who is it for?" aria-label="Who it’s for"
+                    onBlur={() => setEditingWho(false)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditingWho(false); }}
+                    className="bj-well h-7 px-2.5 rounded-lg outline-none font-sans text-[13px] w-[180px]" style={{ color: "var(--bj-ink)" }} />
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-full gap-3 py-20">
-                    <p className="font-display italic text-lg" style={{ color: "var(--bj-ink4)", fontWeight: 300 }}>
-                      Nothing written yet
-                    </p>
-                    <button
-                      onClick={() => setEditing(true)}
-                      className="font-sans text-sm px-4 py-2 rounded-xl flex items-center gap-2"
-                      style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}
-                    >
-                      <Pencil size={13} /> Start writing
+                  <button type="button" onClick={() => setEditingWho(true)} className="font-sans text-[13px] font-medium" style={{ color: "var(--bj-ink2)" }} title="Change who it’s for">
+                    {forLabel(who)}
+                  </button>
+                )}
+                <span className="font-sans text-[12px]" style={{ color: "var(--bj-ink4)" }}>
+                  · since {shortDate(prayer.createdAt, true).replace(/^(Today|Yesterday)$/, (m) => m.toLowerCase())} · day {dayNumber(prayer)}{log.length ? ` · prayed ${plural(log.length, "time")}` : ""}
+                </span>
+              </div>
+
+              <textarea data-writing-surface ref={titleRef} value={title} rows={1} readOnly={isAnswered}
+                onChange={(e) => { setTitle(e.target.value); titleNow.current = e.target.value; save({ title: e.target.value }); }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); bodyRef.current?.focus(); } }}
+                placeholder="What are you praying for?" aria-label="Prayer"
+                className="w-full bg-transparent outline-none resize-none overflow-hidden font-display block"
+                style={{ fontSize: "clamp(32px, 5vw, 44px)", fontWeight: 500, lineHeight: 1.08, color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }} />
+
+              <textarea data-writing-surface ref={bodyRef} value={body} rows={1} readOnly={isAnswered}
+                onChange={(e) => { setBody(e.target.value); bodyNow.current = e.target.value; save({ body: e.target.value.trim() ? textToDoc(e.target.value) : "" }); }}
+                placeholder="Say more, if you want…" aria-label="Details"
+                className="w-full bg-transparent outline-none resize-none overflow-hidden block mt-3.5"
+                style={{ ...writingFontStyle(font, 19), lineHeight: 1.6, color: "var(--bj-ink2)", caretColor: "var(--bj-gold)" }} />
+
+              <div className="flex items-center gap-2.5 mt-4 mb-8 overflow-hidden">
+                <DayStrip days={prayedDays(prayer, 42)} size={9} gap={3} />
+                <span className="font-sans text-[11.5px] shrink-0" style={{ color: "var(--bj-ink4)" }}>6 weeks</span>
+              </div>
+
+              {isAnswered && prayer.testimony && (
+                <div className="rounded-2xl px-4 py-3.5 mb-7" style={{ background: "color-mix(in oklch, var(--bj-sage) 10%, transparent)", border: "1px solid color-mix(in oklch, var(--bj-sage) 22%, transparent)" }}>
+                  <p className={LABEL + " mb-1.5"} style={{ color: "var(--bj-sage)", letterSpacing: "0.07em" }}>How he answered · {prayer.answeredAt ? shortDate(prayer.answeredAt, true) : ""}</p>
+                  <p style={{ ...writingFontStyle(font, 18), lineHeight: 1.55, color: "var(--bj-ink)", whiteSpace: "pre-line" }}>{docToText(prayer.testimony)}</p>
+                </div>
+              )}
+
+              <p className={LABEL + " mb-3"} style={{ color: "var(--bj-ink4)", letterSpacing: "0.08em" }}>Each time you pray</p>
+              {log.length === 0 && (
+                <p className="font-sans text-[13px] mb-6" style={{ color: "var(--bj-ink4)" }}>Nothing yet. Write below and press Amen; each time goes here with its date.</p>
+              )}
+              <div>
+                <AnimatePresence initial={false}>
+                  {log.map((e, k) => <LogItem key={e.at} e={e} first={k === 0} font={font} onRemove={() => user && removePrayerLog(user.uid, prayer.id, e)} />)}
+                </AnimatePresence>
+              </div>
+
+              {!isAnswered && (
+                <div className="sticky bottom-[92px] md:bottom-5 z-20 mt-4 mb-6">
+                  <div className="bj-raised rounded-[18px] pl-4 pr-2.5 py-2.5 flex items-end gap-2.5" style={{ boxShadow: "var(--bj-shadow-lg)" }}>
+                    <span className="h-[22px] px-[7px] mb-[5px] rounded-[7px] font-sans text-[11px] font-semibold flex items-center shrink-0" style={{ background: "color-mix(in oklch, var(--bj-gold) 15%, transparent)", color: "var(--bj-gold)" }}>Today</span>
+                    <textarea data-writing-surface ref={todayRef} value={today} onChange={(e) => setToday(e.target.value)} rows={1}
+                      onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); amen(); } }}
+                      placeholder="What are you praying today?" aria-label="What you’re praying today"
+                      className="flex-1 min-w-0 bg-transparent outline-none resize-none overflow-hidden py-1 max-h-[40vh]"
+                      style={{ ...writingFontStyle(font, 18), lineHeight: 1.45, color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }} />
+                    <button type="button" onClick={amen} className="bj-gold h-8 px-3 rounded-[10px] font-sans text-[12px] font-semibold flex items-center gap-1.5 shrink-0">
+                      Amen <span className="hidden sm:inline" style={{ opacity: 0.6 }}>⌘↵</span>
                     </button>
                   </div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                </div>
+              )}
+            </section>
+
+            <aside className="lg:w-[330px] shrink-0 flex flex-col gap-3 pb-28">
+              <p className={LABEL} style={{ color: "var(--bj-ink4)", letterSpacing: "0.08em" }}>Standing on</p>
+              {(prayer.scriptures ?? []).map((r, k) => (
+                <VerseCard key={`${refLabel(r)}-${k}`} r={r} onRemove={isAnswered ? undefined : () => user && updatePrayer(user.uid, prayer.id, { scriptures: prayer.scriptures.filter((_, j) => j !== k) })} />
+              ))}
+              {!isAnswered && (addingVerse ? (
+                <div className="bj-well h-[38px] rounded-xl flex items-center gap-2 pl-3 pr-1.5">
+                  <input autoFocus value={verseText} onChange={(e) => setVerseText(e.target.value)} placeholder="Isaiah 41:10" aria-label="Verse to stand on"
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addVerse(); } if (e.key === "Escape") setAddingVerse(false); }}
+                    className="flex-1 min-w-0 bg-transparent outline-none font-sans text-[13px]" style={{ color: "var(--bj-ink)" }} />
+                  <button type="button" onClick={() => void addVerse()} disabled={!parseRef(verseText)} aria-label="Add verse" className="w-7 h-7 rounded-lg flex items-center justify-center disabled:opacity-40" style={{ color: "var(--bj-gold)" }}><Check size={14} /></button>
+                  <button type="button" onClick={() => setAddingVerse(false)} aria-label="Cancel" className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}><X size={14} /></button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setAddingVerse(true)} className="h-[38px] rounded-xl flex items-center justify-center gap-1.5 font-sans text-[12.5px] font-medium"
+                  style={{ border: "1px dashed color-mix(in oklch, var(--bj-ink) 16%, transparent)", color: "var(--bj-ink4)" }}>
+                  <Plus size={13} /> Add a verse
+                </button>
+              ))}
+              {others.length > 0 && (
+                <>
+                  <p className={LABEL + " mt-4"} style={{ color: "var(--bj-ink4)", letterSpacing: "0.08em" }}>Also for {prayer.for?.trim()}</p>
+                  {others.map((o) => (
+                    <button key={o.id} type="button" onClick={() => router.push(`/prayer/${o.id}`)} className="bj-menu-item flex items-center gap-2.5 px-3 py-2.5 rounded-[13px] text-left"
+                      style={{ background: "color-mix(in oklch, var(--bj-ink) 2.5%, transparent)", border: "1px solid color-mix(in oklch, var(--bj-ink) 5%, transparent)" }}>
+                      <span className="flex-1 min-w-0 truncate font-sans text-[13.5px] font-medium" style={{ color: "var(--bj-ink2)" }}>{o.title || "Untitled prayer"}</span>
+                      <span className="font-sans text-[11px] shrink-0" style={{ color: "var(--bj-ink4)" }}>Day {dayNumber(o)}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+            </aside>
+          </div>
         )}
       </div>
 
-      <TestimonyDialog
-        open={testimonyOpen}
-        prayer={prayer}
-        onClose={() => setTestimonyOpen(false)}
-        onConfirm={handleMarkAnswered}
-      />
-    </>
+      <AnimatePresence>
+        {praying && prayer && <PrayNow key="pray" queue={[prayer]} onClose={() => setPraying(false)} />}
+      </AnimatePresence>
+      <AnsweredDialog open={answering} prayer={prayer} onClose={() => setAnswering(false)}
+        onConfirm={async (t) => { if (user) await markAnswered(user.uid, prayerId, t); }} />
+    </div>
+  );
+}
+
+function LogItem({ e, first, font, onRemove }: { e: PrayerLogEntry; first: boolean; font: Parameters<typeof writingFontStyle>[0]; onRemove: () => void }) {
+  return (
+    <motion.div layout="position" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.22, ease: EASE }}
+      className="group flex gap-4">
+      <div className="w-3 flex flex-col items-center pt-[7px] shrink-0" aria-hidden>
+        <i className="block w-[9px] h-[9px] rounded-full" style={{
+          background: first ? "var(--bj-gold)" : "color-mix(in oklch, var(--bj-ink) 22%, transparent)",
+          boxShadow: first ? "0 0 0 4px color-mix(in oklch, var(--bj-gold) 18%, transparent)" : "none",
+        }} />
+        <i className="block flex-1 w-px mt-1.5" style={{ background: "color-mix(in oklch, var(--bj-ink) 8%, transparent)" }} />
+      </div>
+      <div className="flex-1 min-w-0 pb-5">
+        <p className="flex items-center gap-2 font-sans text-[10.5px] font-semibold uppercase mb-1" style={{ color: first ? "var(--bj-gold)" : "var(--bj-ink4)", letterSpacing: "0.06em" }}>
+          {shortDate(e.at)}
+          <span className="font-normal normal-case tracking-normal" style={{ color: "var(--bj-ink4)" }}>{new Date(e.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+          <button type="button" onClick={onRemove} aria-label="Remove this entry" className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center rounded" style={{ color: "var(--bj-ink4)" }}><X size={12} /></button>
+        </p>
+        {e.text
+          ? <p style={{ ...writingFontStyle(font, 18), lineHeight: 1.55, color: first ? "var(--bj-ink)" : "var(--bj-ink2)", whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{e.text}</p>
+          : <p className="font-display italic" style={{ fontSize: 16, color: "var(--bj-ink4)" }}>Prayed</p>}
+      </div>
+    </motion.div>
   );
 }

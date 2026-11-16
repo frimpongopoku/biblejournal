@@ -6,6 +6,8 @@ import {
   ArrowRight, BookOpen, MessageSquare, NotebookPen, HeartHandshake, Mic, Plus, Moon, Sun,
   Maximize2, Keyboard, Search, Quote, Hash,
 } from "lucide-react";
+import { Settings } from "lucide-react";
+import { useSettingsUi } from "@/store/prefs.store";
 import { NAV_ITEMS } from "@/lib/nav";
 import { parseRef, type ParsedRef } from "@/lib/bible-ref-parser";
 import { useJournalStore } from "@/store/journal.store";
@@ -139,6 +141,7 @@ function Palette({ onClose, onShortcuts }: { onClose: () => void; onShortcuts: (
       { id: "bible", group: "Actions", label: "Open floating Bible", hint: "⌘⌥B", icon: <BookOpen size={15} />, haystack: "floating bible open read", run: () => { close(); toggleBible(); } },
       { id: "theme", group: "Actions", label: isDark ? "Switch to light theme" : "Switch to dark theme", icon: isDark ? <Sun size={15} /> : <Moon size={15} />, haystack: "theme dark light mode appearance", run: () => { close(); setTheme(isDark ? "warm" : "dusk"); } },
       { id: "zen", group: "Actions", label: "Zen writing mode", hint: "⌘.", icon: <Maximize2 size={15} />, haystack: "zen focus distraction free mode", run: () => { close(); writing.set({ zen: true }); router.push("/journal"); } },
+      { id: "settings", group: "Actions", label: "Settings", icon: <Settings size={15} />, hint: "⌘,", haystack: "settings preferences options appearance theme font export account", run: () => { close(); if (window.matchMedia("(min-width: 768px)").matches) useSettingsUi.getState().show(); else router.push("/settings"); } },
       { id: "sounds", group: "Actions", label: writing.keySounds ? "Turn off keyboard sounds" : "Turn on keyboard sounds", icon: <Keyboard size={15} />, haystack: "keyboard sounds typing click switch mechanical", run: () => { close(); writing.toggle("keySounds"); } },
       { id: "typewriter", group: "Actions", label: writing.typewriter ? "Turn off typewriter scrolling" : "Turn on typewriter scrolling", icon: <Keyboard size={15} />, haystack: "typewriter scrolling center", run: () => { close(); writing.toggle("typewriter"); } },
       { id: "shortcuts", group: "Actions", label: "Keyboard shortcuts", hint: "⌘/", icon: <Keyboard size={15} />, haystack: "keyboard shortcuts help keys", run: () => { close(); onShortcuts(); } },
@@ -241,10 +244,10 @@ function Palette({ onClose, onShortcuts }: { onClose: () => void; onShortcuts: (
   return (
     <div className="fixed inset-0 z-[90] flex justify-center px-3" style={{ paddingTop: "min(14vh, 120px)" }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) close(); }}>
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "color-mix(in oklch, var(--bj-bg) 45%, transparent)" }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: "var(--m-scrim)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }} />
       <div role="dialog" aria-label="Command palette" aria-modal="true"
         className="relative w-full flex flex-col rounded-2xl overflow-hidden self-start"
-        style={{ maxWidth: 620, maxHeight: "min(70vh, 560px)", background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-lg)" }}>
+        style={{ maxWidth: 620, maxHeight: "min(70vh, 560px)", background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", border: "1px solid var(--m-edge)", boxShadow: "var(--bj-shadow-lg)" }}>
         <div className="flex items-center gap-3 px-4 shrink-0" style={{ height: 54, borderBottom: "1px solid var(--bj-line-soft)" }}>
           <Search size={16} style={{ color: "var(--bj-ink4)" }} aria-hidden="true" />
           <input
@@ -281,10 +284,10 @@ function Palette({ onClose, onShortcuts }: { onClose: () => void; onShortcuts: (
                   data-index={i}
                   onMouseMove={() => { if (index !== i) setIndex(i); }}
                   onClick={(e) => it.run({ alt: e.metaKey || e.ctrlKey })}
-                  className="flex items-center gap-3 px-3 h-10 rounded-lg cursor-pointer"
-                  style={{ background: sel ? "var(--bj-gold-tint)" : "transparent" }}
+                  data-active={sel || undefined}
+                  className="bj-menu-item flex items-center gap-3 px-3 h-10 rounded-[10px] cursor-pointer"
                 >
-                  <span className="shrink-0" style={{ color: sel ? "var(--bj-gold-deep)" : "var(--bj-ink4)" }}>{it.icon}</span>
+                  <span className="shrink-0" style={{ color: sel ? "var(--bj-gold)" : "var(--bj-ink4)" }}>{it.icon}</span>
                   <span className="font-sans text-[13.5px] truncate whitespace-pre" style={{ color: sel ? "var(--bj-ink)" : "var(--bj-ink2)" }}>{it.label}</span>
                   {it.hint && <span className="ml-auto pl-3 font-sans text-[12px] truncate shrink min-w-0 max-w-[55%] text-right" style={{ color: "var(--bj-ink4)" }}>{it.hint}</span>}
                   {sel && !it.hint && <ArrowRight size={13} className="ml-auto shrink-0" style={{ color: "var(--bj-ink4)" }} />}

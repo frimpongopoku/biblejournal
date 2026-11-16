@@ -105,29 +105,15 @@ export default function SermonsPage() {
   const { sermons, loading } = useSermons();
   const router = useRouter();
   const [link, setLink] = useState("");
-  const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
   const [speaker, setSpeaker] = useState<string | null>(null);
 
+  /** Opens the new sermon at once; its title and speaker fill in on the page. */
   async function start(raw?: string) {
-    if (!user || creating) return;
-    setCreating(true);
-    try {
-      const vid = raw ? extractYouTubeId(raw) : null;
-      let seed: Parameters<typeof createSermon>[1] = {};
-      if (vid && raw) {
-        seed = { videoUrl: raw, videoId: vid };
-        try {
-          const info = await fetch(`/api/youtube/info?url=${encodeURIComponent(raw)}`).then((r) => r.json()) as { title?: string; author?: string };
-          seed.title = info.title ?? "";
-          seed.speaker = info.author ?? "";
-        } catch { /* fill in later */ }
-      }
-      const id = await createSermon(user.uid, seed);
-      router.push(`/sermons/${id}`);
-    } finally {
-      setCreating(false);
-    }
+    if (!user) return;
+    const vid = raw ? extractYouTubeId(raw) : null;
+    const id = await createSermon(user.uid, vid && raw ? { videoUrl: raw, videoId: vid } : {});
+    router.push(`/sermons/${id}`);
   }
 
   const continueOne = useMemo(() => sermons.find(inProgress) ?? null, [sermons]);
@@ -183,7 +169,7 @@ export default function SermonsPage() {
       }}
         placeholder="Paste a YouTube link to start notes…" aria-label="YouTube link"
         className="flex-1 min-w-0 bg-transparent outline-none font-sans text-[13.5px]" style={{ color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }} />
-      <button type="submit" disabled={creating} className="bj-gold h-8 px-3 rounded-[10px] flex items-center gap-1.5 font-sans text-[12.5px] font-semibold shrink-0 disabled:opacity-60">
+      <button type="submit" className="bj-gold h-8 px-3 rounded-[10px] flex items-center gap-1.5 font-sans text-[12.5px] font-semibold shrink-0 disabled:opacity-60">
         <Plus size={13} strokeWidth={2.4} />{linkOk ? "Start" : "New"}
       </button>
     </form>

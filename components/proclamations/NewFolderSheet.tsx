@@ -46,7 +46,7 @@ export function NewFolderSheet({ open, folder, onClose, onSave }: Props) {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             className="fixed inset-0 z-40"
-            style={{ background: "rgba(0,0,0,0.3)", cursor: "pointer" }}
+            style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", cursor: "pointer" }}
             onClick={onClose}
             onTouchEnd={(e) => { e.preventDefault(); onClose(); }}
           />
@@ -58,11 +58,11 @@ export function NewFolderSheet({ open, folder, onClose, onSave }: Props) {
           >
             <form onSubmit={handleSubmit} className="w-full" style={{ maxWidth: 560 }}>
               <div className="rounded-t-2xl overflow-hidden" style={{
-                background: "var(--bj-bg-panel)",
-                borderTop: "1px solid var(--bj-line)",
-                borderLeft: "1px solid var(--bj-line)",
-                borderRight: "1px solid var(--bj-line)",
-                boxShadow: "0 -8px 40px color-mix(in oklch, var(--bj-ink) 16%, transparent)",
+                background: "linear-gradient(180deg, var(--m-paper-top), var(--m-paper-bot))",
+                borderTop: "1px solid var(--m-edge)",
+                borderLeft: "1px solid var(--m-edge)",
+                borderRight: "1px solid var(--m-edge)",
+                boxShadow: "var(--bj-shadow-lg)",
               }}>
                 <div className="flex justify-center pt-3 pb-1">
                   <div className="w-8 h-1 rounded-full" style={{ background: "var(--bj-line)" }} />

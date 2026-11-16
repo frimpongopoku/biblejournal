@@ -56,11 +56,22 @@ export interface ScriptureRef {
   text?: string;
 }
 
+/** One time you prayed for a request, with what you said (may be empty). */
+export interface PrayerLogEntry {
+  /** Epoch ms. */
+  at: number;
+  text: string;
+}
+
 export interface Prayer {
   id: string;
   userId: string;
   title: string;
   body: string;
+  /** Who it's for ("Mum", "Grace Chapel"); empty means yourself. */
+  for?: string;
+  /** Each time you prayed it, oldest first. */
+  log?: PrayerLogEntry[];
   status: "active" | "answered" | "archived";
   scriptures: ScriptureRef[];
   testimony: string | null;

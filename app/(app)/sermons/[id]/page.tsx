@@ -84,6 +84,25 @@ export default function SermonDetailPage() {
     setNow(near ? 0 : pos);
   }, [sermon]);
 
+  // A new sermon opens straight away; its title and speaker arrive from YouTube a moment later.
+  const filled = useRef(false);
+  const needsInfo = !!sermon && !!sermon.videoId && !sermon.title.trim() && !sermon.speaker.trim();
+  const infoUrl = sermon?.videoUrl ?? "";
+  useEffect(() => {
+    if (!needsInfo || filled.current || !user) return;
+    filled.current = true;
+    const uid = user.uid;
+    fetch(`/api/youtube/info?url=${encodeURIComponent(infoUrl)}`)
+      .then((r) => r.json() as Promise<{ title?: string; author?: string }>)
+      .then((info) => {
+        const patch: { title?: string; speaker?: string } = {};
+        if (info.title) { setTitle((t) => t || info.title!); patch.title = info.title; }
+        if (info.author) { setSpeaker((t) => t || info.author!); patch.speaker = info.author; }
+        if (Object.keys(patch).length) void updateSermon(uid, id, patch);
+      })
+      .catch(() => { /* stays as typed */ });
+  }, [needsInfo, infoUrl, user, id]);
+
   // One player at a time: if this video is in the floating player, take it back.
   const clearVideo = useVideoStore((s) => s.clearVideo);
   const floatingId = useVideoStore((s) => s.videoId);
@@ -126,6 +145,16 @@ export default function SermonDetailPage() {
     playing.current = p;
     if (!p) savePosition();
   }, [savePosition]);
+
+  // A sermon left completely blank is removed on the way out.
+  const blank = useRef(true);
+  useEffect(() => {
+    blank.current = !title.trim() && !speaker.trim() && !church.trim() && !videoId && moments.length === 0
+      && !hasText(sermon?.content) && !(sermon?.references.length);
+  }, [title, speaker, church, videoId, moments, sermon]);
+  useEffect(() => () => {
+    if (blank.current && initialised.current && user) void deleteSermon(user.uid, id);
+  }, [user, id]);
 
   // Leaving while it plays: keep the sermon going in the floating player.
   const setFloating = useVideoStore((s) => s.setVideo);

@@ -48,7 +48,7 @@ export function VerseActionBar({ h, top, left }: { h: VerseActionHandlers; top: 
       className="absolute z-20 flex items-center gap-0.5 p-1 rounded-xl"
       style={{
         top, left, transformOrigin: "bottom left",
-        background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-lg)",
+        background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", border: "1px solid var(--m-edge)", boxShadow: "var(--bj-shadow-lg)",
       }}
     >
       <span className="font-sans text-[12px] font-semibold px-2 whitespace-nowrap" style={{ color: "var(--bj-gold-deep)" }}>{h.label}</span>
@@ -84,7 +84,7 @@ export function VerseSheet({ h }: { h: VerseActionHandlers }) {
       onDragEnd={(_, info) => { if (info.offset.y > 60 || info.velocity.y > 400) h.onClear(); }}
       className="fixed left-0 right-0 bottom-0 z-[60] md:hidden rounded-t-[20px] px-4 pt-2"
       style={{
-        background: "var(--bj-bg-panel)", borderTop: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-lg)",
+        background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", borderTop: "1px solid var(--m-edge)", boxShadow: "var(--bj-shadow-lg)",
         paddingBottom: "calc(16px + env(safe-area-inset-bottom))", touchAction: "none",
       }}
     >

@@ -94,7 +94,7 @@ export function InsightDrawer({ open, onClose, topics, defaultTopicId }: Props) 
           <motion.div
             key="insight-bd"
             className="fixed inset-0 z-40"
-            style={{ background: "rgba(0,0,0,0.35)" }}
+            style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -108,9 +108,9 @@ export function InsightDrawer({ open, onClose, topics, defaultTopicId }: Props) 
             className="fixed top-0 right-0 bottom-0 z-50 flex flex-col"
             style={{
               width: "min(440px, 100vw)",
-              background: "var(--bj-bg-panel)",
+              background: "linear-gradient(180deg, var(--m-paper-top), var(--m-paper-bot))",
               borderLeft: "1px solid var(--bj-line-soft)",
-              boxShadow: "-8px 0 40px color-mix(in oklch, var(--bj-ink) 12%, transparent)",
+              boxShadow: "var(--bj-shadow-lg)",
             }}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}

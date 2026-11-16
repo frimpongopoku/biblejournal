@@ -27,7 +27,7 @@ export function CommentaryAboutModal({ open, onClose }: Props) {
           <motion.div
             key="cab-bd"
             className="fixed inset-0 z-50"
-            style={{ background: "rgba(0,0,0,0.5)" }}
+            style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             onClick={onClose}
@@ -41,9 +41,9 @@ export function CommentaryAboutModal({ open, onClose }: Props) {
               className="w-full rounded-2xl overflow-hidden"
               style={{
                 maxWidth: 560,
-                background: "var(--bj-bg-panel)",
-                border: "1px solid var(--bj-line)",
-                boxShadow: "0 24px 64px color-mix(in oklch, var(--bj-ink) 24%, transparent)",
+                background: "linear-gradient(180deg, var(--m-paper-top), var(--m-paper-bot))",
+                border: "1px solid var(--m-edge)",
+                boxShadow: "var(--bj-shadow-lg)",
                 pointerEvents: "auto",
               }}
               initial={{ opacity: 0, scale: 0.95, y: 8 }}

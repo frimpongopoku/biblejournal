@@ -17,7 +17,7 @@ interface Group {
 
 // ── Data ───────────────────────────────────────────────────
 
-const GROUPS: Group[] = [
+export const SHORTCUT_GROUPS: Group[] = [
   {
     title: "Anywhere",
     shortcuts: [
@@ -25,6 +25,7 @@ const GROUPS: Group[] = [
       { keys: ["⌘", "⌥", "B"], desc: "Floating Bible" },
       { keys: ["⌘", "⇧", "A"], desc: "Ask about Scripture" },
       { keys: ["⌘", "/"], desc: "This panel" },
+      { keys: ["⌘", ","], desc: "Settings" },
     ],
   },
   {
@@ -111,13 +112,13 @@ export function ShortcutsPanel({ open, onClose }: Props) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose} />
+      <div className="absolute inset-0" style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }} onClick={onClose} />
       <div
         className="relative w-full rounded-2xl overflow-hidden"
         style={{
           maxWidth: 640,
-          background: "var(--bj-bg-panel)",
-          border: "1px solid var(--bj-line)",
+          background: "linear-gradient(180deg, var(--m-paper-top), var(--m-paper-bot))",
+          border: "1px solid var(--m-edge)",
           boxShadow: "var(--bj-shadow-lg)",
         }}
       >
@@ -140,7 +141,7 @@ export function ShortcutsPanel({ open, onClose }: Props) {
 
               {/* Shortcut groups — 2-column grid */}
               <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5 max-h-[70vh] overflow-y-auto">
-                {GROUPS.map((group) => (
+                {SHORTCUT_GROUPS.map((group) => (
                   <div key={group.title}>
                     <p className="font-sans text-[10px] uppercase tracking-widest font-semibold mb-3"
                       style={{ color: "var(--bj-ink4)" }}>

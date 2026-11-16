@@ -12,7 +12,7 @@ export const WIDTHS: Record<WritingWidth, number> = { narrow: 600, normal: 700, 
 type Toggleable = "keySounds" | "smoothCaret" | "typewriter" | "focusParagraph" | "zen";
 
 interface WritingPrefs {
-  /** Mechanical keyboard sounds while writing. Off until the writer opts in. */
+  /** Mechanical keyboard sounds while typing. */
   keySounds: boolean;
   switchId: SwitchId;
   volume: number;
@@ -40,7 +40,7 @@ interface WritingPrefs {
 export const useWritingStore = create<WritingPrefs>()(
   persist(
     (set) => ({
-      keySounds: false,
+      keySounds: true,
       switchId: "mx-brown",
       volume: 0.7,
       smoothCaret: true,
@@ -58,7 +58,7 @@ export const useWritingStore = create<WritingPrefs>()(
     }),
     {
       name: "bj-writing",
-      version: 2,
+      version: 3,
       // v1 had a single face list shared by writing and the Bible.
       migrate: (old, v) => {
         const o = (old ?? {}) as Record<string, unknown>;
@@ -68,6 +68,8 @@ export const useWritingStore = create<WritingPrefs>()(
           o.readFont = o.font === "dyslexic" ? "dyslexic" : "garamond";
           o.readSize = Math.max(18, Math.min(26, Number(o.size) || 20) + 1);
         }
+        // v3: sounds are on by default now (they were opt-in and easy to miss).
+        if (v < 3) o.keySounds = true;
         return o as unknown as WritingPrefs;
       },
       // eslint-disable-next-line @typescript-eslint/no-unused-vars

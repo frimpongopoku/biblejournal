@@ -61,7 +61,7 @@ export function PrayerDialog({ open, prayer, onClose, onSave }: Props) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-40"
-            style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)" }}
+            style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
             onClick={onClose}
           />
 
@@ -82,9 +82,9 @@ export function PrayerDialog({ open, prayer, onClose, onSave }: Props) {
                 maxWidth: 680,
                 height: "92dvh",
                 maxHeight: "92dvh",
-                background: "var(--bj-bg-panel)",
-                border: "1px solid var(--bj-line)",
-                boxShadow: "0 -8px 60px color-mix(in oklch, var(--bj-ink) 18%, transparent), 0 32px 80px color-mix(in oklch, var(--bj-ink) 24%, transparent)",
+                background: "linear-gradient(180deg, var(--m-paper-top), var(--m-paper-bot))",
+                border: "1px solid var(--m-edge)",
+                boxShadow: "var(--bj-shadow-lg)",
                 pointerEvents: "auto",
               }}
             >

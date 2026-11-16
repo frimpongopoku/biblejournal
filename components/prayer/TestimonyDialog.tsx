@@ -45,7 +45,7 @@ export function TestimonyDialog({ open, prayer, onClose, onConfirm }: Props) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             className="fixed inset-0 z-40"
-            style={{ background: "rgba(0,0,0,0.3)" }}
+            style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
             onClick={onClose}
           />
 
@@ -61,11 +61,11 @@ export function TestimonyDialog({ open, prayer, onClose, onConfirm }: Props) {
               <div
                 className="rounded-t-2xl overflow-hidden"
                 style={{
-                  background: "var(--bj-bg-panel)",
-                  borderTop: "1px solid var(--bj-line)",
-                  borderLeft: "1px solid var(--bj-line)",
-                  borderRight: "1px solid var(--bj-line)",
-                  boxShadow: "0 -8px 40px color-mix(in oklch, var(--bj-ink) 18%, transparent)",
+                  background: "linear-gradient(180deg, var(--m-paper-top), var(--m-paper-bot))",
+                  borderTop: "1px solid var(--m-edge)",
+                  borderLeft: "1px solid var(--m-edge)",
+                  borderRight: "1px solid var(--m-edge)",
+                  boxShadow: "var(--bj-shadow-lg)",
                 }}
               >
                 {/* Drag handle */}

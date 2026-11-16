@@ -53,7 +53,7 @@ export function BookPickerSheet({ open, currentBook, currentChapter, onSelect, o
             transition={{ duration: 0.18 }}
             className="fixed inset-0 z-40"
             style={{
-              background: "rgba(0,0,0,0.3)",
+              background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
               cursor: "pointer",
             }}
             onClick={handleClose}

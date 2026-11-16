@@ -179,59 +179,29 @@ const SlashMenu = forwardRef<MenuRef, MenuProps>(function SlashMenu(
   if (!items.length) return null;
 
   return (
-    <div
-      className="slash-menu"
-      style={{
-        background: "var(--bj-bg-panel)",
-        border: "1px solid var(--bj-line)",
-        borderRadius: 12,
-        boxShadow: "0 8px 32px color-mix(in oklch, var(--bj-ink) 16%, transparent)",
-        overflow: "hidden",
-        minWidth: 240,
-        maxHeight: 320,
-        overflowY: "auto",
-      }}
-    >
-      <p
-        className="px-3 pt-2.5 pb-1 font-sans uppercase"
-        style={{ fontSize: 9, letterSpacing: "0.12em", color: "var(--bj-ink4)" }}
-      >
-        Blocks
+    <div className="slash-menu bj-pop rounded-[14px] p-1 overflow-y-auto" style={{ width: 264, maxHeight: 320 }}>
+      <p className="px-2.5 pt-1.5 pb-1 font-sans text-[10.5px] font-semibold uppercase tracking-[0.08em]" style={{ color: "var(--bj-ink4)" }}>
+        Insert
       </p>
       {items.map((item, i) => (
         <button
           key={item.label}
+          type="button"
           data-slash-index={i}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            select(item);
-          }}
-          className="flex items-center gap-3 w-full px-3 py-2 text-left"
-          style={{
-            background: selected === i ? "var(--bj-gold-tint)" : "transparent",
-            color: selected === i ? "var(--bj-gold-deep)" : "var(--bj-ink2)",
-            transition: "background 0.1s ease",
-          }}
-          onMouseEnter={() => setSelected(i)}
+          data-active={selected === i || undefined}
+          onMouseDown={(e) => { e.preventDefault(); select(item); }}
+          onMouseMove={() => { if (selected !== i) setSelected(i); }}
+          className="bj-menu-item flex items-center gap-2.5 w-full h-11 px-2 rounded-[10px] text-left"
         >
-          <span
-            className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-            style={{
-              background: selected === i ? "var(--bj-gold)" : "var(--bj-bg-soft)",
-              color: selected === i ? "white" : "var(--bj-ink3)",
-              transition: "background 0.1s ease, color 0.1s ease",
-            }}
-          >
+          <span className="w-7 h-7 rounded-[8px] bj-well flex items-center justify-center shrink-0"
+            style={{ color: selected === i ? "var(--bj-gold)" : "var(--bj-ink3)" }}>
             {item.icon}
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block font-sans text-sm font-medium leading-none mb-0.5">
-              {item.label}
-            </span>
-            <span className="block font-sans" style={{ fontSize: 11, color: selected === i ? "var(--bj-gold-deep)" : "var(--bj-ink4)" }}>
-              {item.description}
-            </span>
+            <span className="block font-sans text-[13px] font-medium leading-tight truncate" style={{ color: "var(--bj-ink)" }}>{item.label}</span>
+            <span className="block font-sans text-[11.5px] leading-tight truncate mt-0.5" style={{ color: "var(--bj-ink4)" }}>{item.description}</span>
           </span>
+          {selected === i && <span className="bj-kbd shrink-0">↵</span>}
         </button>
       ))}
     </div>
@@ -256,7 +226,7 @@ function makeRenderer(): SuggestionOptions["render"] {
       } else {
         wrapper.style.top = `${rect.top - menuH - 6 + window.scrollY}px`;
       }
-      wrapper.style.left = `${Math.min(rect.left, window.innerWidth - 260)}px`;
+      wrapper.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 272))}px`;
     }
 
     return {

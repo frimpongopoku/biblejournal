@@ -3,17 +3,25 @@
 import { useEffect } from "react";
 import type { Editor } from "@tiptap/core";
 import { useWritingStore } from "@/store/writing.store";
+import { usePrefsStore } from "@/store/prefs.store";
 import { configureKeySounds, keySoundDown, keySoundUp } from "@/lib/typing/keySounds";
 
 // ── Keyboard sounds ─────────────────────────────────────────
 // One document listener for the whole app (however many editors are
-// mounted). It only clicks when typing inside a [data-writing-surface].
+// mounted). It clicks inside a [data-writing-surface], and — unless that's
+// switched off in Settings — in any other place you type text.
 
 let soundUsers = 0;
 let unsubscribeStore: (() => void) | null = null;
 
+const TEXT_INPUT = /^(text|search|email|url|tel|number|)$/;
 function inSurface(t: EventTarget | null) {
-  return t instanceof Element && !!t.closest("[data-writing-surface]");
+  if (!(t instanceof Element)) return false;
+  if (t.closest("[data-writing-surface]")) return true;
+  if (t.closest("[data-no-key-sounds]") || !usePrefsStore.getState().soundsEverywhere) return false;
+  if (t instanceof HTMLTextAreaElement) return !t.readOnly;
+  if (t instanceof HTMLInputElement) return TEXT_INPUT.test(t.type) && !t.readOnly;
+  return t instanceof HTMLElement && t.isContentEditable;
 }
 function onDown(e: KeyboardEvent) { if (inSurface(e.target)) keySoundDown(e); }
 function onUp(e: KeyboardEvent) { if (inSurface(e.target)) keySoundUp(e); }

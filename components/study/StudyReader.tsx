@@ -642,7 +642,7 @@ export function StudyReader({ uid, chapterState, studyNotes }: Props) {
         {mobilePanelOpen && (
           <>
             <motion.div
-              key="study-panel-scrim" className="md:hidden fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.4)" }}
+              key="study-panel-scrim" className="md:hidden fixed inset-0 z-40" style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setMobilePanelOpen(false)}
             />

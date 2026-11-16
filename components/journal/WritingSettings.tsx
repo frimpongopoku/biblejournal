@@ -98,7 +98,7 @@ export function WritingSettingsButton({ showZen = false, role = "write" }: { sho
             style={{
               top: "calc(100% + 8px)", width: 360, maxWidth: "calc(100vw - 24px)",
               transformOrigin: "top right",
-              background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)",
+              background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", border: "1px solid var(--m-edge)",
               boxShadow: "var(--bj-shadow-lg)",
               maxHeight: "min(78vh, 720px)", overflowY: "auto",
             }}

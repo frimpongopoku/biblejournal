@@ -99,7 +99,7 @@ function VersionMenu({ value, onChange, exclude, compact }: { value: string; onC
             exit={{ opacity: 0, transition: { duration: 0.08 } }} transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
             role="listbox" aria-label="Translation"
             className="absolute right-0 top-full mt-1.5 z-50 w-64 p-1 rounded-xl"
-            style={{ transformOrigin: "top right", background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-lg)" }}>
+            style={{ transformOrigin: "top right", background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", border: "1px solid var(--m-edge)", boxShadow: "var(--bj-shadow-lg)" }}>
             {VERSIONS.filter((v) => v !== exclude).map((v) => (
               <button key={v} type="button" role="option" aria-selected={v === value} onClick={() => { onChange(v); setOpen(false); }}
                 className="bj-list-row w-full flex items-center gap-2.5 px-2.5 h-9 rounded-lg text-left font-sans text-[13px]"
@@ -624,12 +624,12 @@ export function Reader() {
       <AnimatePresence>
         {notesFor !== undefined && user && (
           <>
-            <motion.div key="nd-bd" className="fixed inset-0 z-[70]" style={{ background: "rgba(0,0,0,0.35)" }}
+            <motion.div key="nd-bd" className="fixed inset-0 z-[70]" style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
               onClick={() => setNotesFor(undefined)} />
             <motion.div key="nd" role="dialog" aria-modal="true" aria-label={`Notes on ${book} ${chapter}`}
               className="fixed z-[71] flex flex-col right-0 bottom-0 left-0 h-[78dvh] rounded-t-[20px] md:left-auto md:top-0 md:h-auto md:w-[400px] md:rounded-none"
-              style={{ background: "var(--bj-bg-panel)", borderLeft: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-lg)", paddingBottom: "env(safe-area-inset-bottom)" }}
+              style={{ background: "var(--m-pop-bg)", backdropFilter: "blur(24px) saturate(170%)", WebkitBackdropFilter: "blur(24px) saturate(170%)", borderLeft: "1px solid var(--m-edge)", boxShadow: "var(--bj-shadow-lg)", paddingBottom: "env(safe-area-inset-bottom)" }}
               initial={phone ? { y: "100%" } : { x: "100%" }} animate={phone ? { y: 0 } : { x: 0 }} exit={phone ? { y: "100%" } : { x: "100%" }}
               transition={{ ease: [0.32, 0.72, 0, 1], duration: 0.28 }}>
               <AnnotationPanel uid={user.uid} book={book} chapter={chapter} version={version}
@@ -644,12 +644,12 @@ export function Reader() {
       <AnimatePresence>
         {notebook && (
           <>
-            <motion.div key="nb-bd" className="fixed inset-0 z-[70]" style={{ background: "rgba(0,0,0,0.35)" }}
+            <motion.div key="nb-bd" className="fixed inset-0 z-[70]" style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}
               onClick={() => setNotebook(false)} />
             <motion.div key="nb" role="dialog" aria-modal="true" aria-label="Notebook"
               className="fixed z-[71] flex flex-col right-0 bottom-0 left-0 h-[85dvh] rounded-t-[20px] md:left-auto md:top-0 md:h-auto md:w-[480px] md:rounded-none"
-              style={{ background: "var(--bj-bg)", borderLeft: "1px solid var(--bj-line)", boxShadow: "var(--bj-shadow-lg)", paddingBottom: "env(safe-area-inset-bottom)" }}
+              style={{ background: "var(--bj-bg)", borderLeft: "1px solid var(--m-edge)", boxShadow: "var(--bj-shadow-lg)", paddingBottom: "env(safe-area-inset-bottom)" }}
               initial={phone ? { y: "100%" } : { x: "100%" }} animate={phone ? { y: 0 } : { x: 0 }} exit={phone ? { y: "100%" } : { x: "100%" }}
               transition={{ ease: [0.32, 0.72, 0, 1], duration: 0.28 }}>
               <div className="flex items-center px-4 shrink-0 border-b" style={{ height: 52, borderColor: "var(--bj-line-soft)" }}>

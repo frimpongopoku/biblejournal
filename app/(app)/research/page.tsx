@@ -935,7 +935,7 @@ export default function ResearchPage() {
         {mobileNotesOpen && (
           <>
             <motion.div key="notes-scrim" className="md:hidden fixed inset-0 z-40"
-              style={{ background: "rgba(0,0,0,0.4)" }}
+              style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setMobileNotesOpen(false)} />
             <motion.div key="notes-sheet"

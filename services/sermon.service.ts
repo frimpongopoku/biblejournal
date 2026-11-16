@@ -1,5 +1,5 @@
 import {
-  collection, doc, addDoc, updateDoc, deleteDoc,
+  collection, doc, setDoc, updateDoc, deleteDoc,
   onSnapshot, query, orderBy, serverTimestamp, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -47,13 +47,15 @@ export async function createSermon(
   uid: string,
   seed: { title?: string; speaker?: string; videoUrl?: string; videoId?: string } = {},
 ): Promise<string> {
-  const ref = await addDoc(col(uid), {
+  // Local id + background write: the page opens on it immediately.
+  const ref = doc(col(uid));
+  void setDoc(ref, {
     userId: uid, title: seed.title ?? "", speaker: seed.speaker ?? "", church: "",
     videoUrl: seed.videoUrl ?? "", videoId: seed.videoId ?? "", moments: [],
     content: JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] }),
     references: [], sermonDate: today(),
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
-  });
+  }).catch((e) => console.error("createSermon", e));
   return ref.id;
 }
 
