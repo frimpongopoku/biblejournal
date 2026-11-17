@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
   }
 
-  const { question, version = "ESV" } = await req.json();
+  const { question, version = "ESV", passage } = await req.json() as { question?: string; version?: string; passage?: { book: string; chapter: number } };
   if (!question?.trim()) {
     return NextResponse.json({ error: "question is required" }, { status: 400 });
   }
@@ -38,6 +38,11 @@ export async function POST(req: Request) {
       }).join("\n")
     : "(No index available — answer from general biblical knowledge.)";
 
+  // Asked from inside a passage: answer with that chapter in view.
+  const passageText = passage?.book && passage.chapter
+    ? (getChapter(ver, passage.book, Number(passage.chapter)) ?? []).map((v) => `[${v.n}] ${v.text}`).join(" ")
+    : "";
+
   try {
     const message = await client.messages.create({
       model: "claude-haiku-5-5",
@@ -48,7 +53,7 @@ export async function POST(req: Request) {
       ] as Parameters<typeof client.messages.create>[0]["system"],
       messages: [{
         role: "user",
-        content: `Question: ${question}\n\nRelevant passages (${ver}):\n${context}`,
+        content: `${passageText ? `The reader is studying ${passage!.book} ${passage!.chapter} (${ver}):\n${passageText}\n\n` : ""}Question: ${question}\n\nRelevant passages (${ver}):\n${context}`,
       }],
     });
 

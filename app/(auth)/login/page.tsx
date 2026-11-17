@@ -1,5 +1,8 @@
 "use client";
 
+import { Mark } from "@/components/brand/Mark";
+import { Opening } from "@/components/brand/Opening";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -47,33 +50,8 @@ export default function LoginPage() {
   const loading = signing || redirecting;
 
   // Show loading screen while auth state resolves or redirect is in progress
-  if (authLoading || redirecting) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}
-        className="min-h-screen flex flex-col items-center justify-center gap-5"
-        style={{ background: "var(--bj-bg)" }}
-      >
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-          style={{ background: "var(--bj-gold)", boxShadow: "0 4px 24px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}>
-          <svg className="animate-spin" width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" strokeOpacity="0.3" />
-            <path d="M12 2a10 10 0 0110 10" stroke="white" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        </div>
-        <div className="text-center">
-          <p className="font-display text-lg" style={{ color: "var(--bj-ink)", fontWeight: 400 }}>
-            {redirecting ? "Opening your journal…" : "Loading…"}
-          </p>
-          {redirecting && (
-            <p className="font-sans text-sm mt-1" style={{ color: "var(--bj-ink4)" }}>
-              Taking you to your dashboard
-            </p>
-          )}
-        </div>
-      </motion.div>
-    );
-  }
+  if (authLoading || redirecting) return <Opening label={redirecting ? "Opening your journal" : "Loading"} />;
+
 
   return (
     <div
@@ -151,24 +129,7 @@ export default function LoginPage() {
           transition={{ delay: 0.25, duration: 0.7, ease: "easeOut" }}
           className="relative z-10 flex items-center gap-3"
         >
-          {/* Flame / lamp icon */}
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: "var(--bj-gold)", boxShadow: "0 2px 16px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z"
-                fill="white"
-                fillOpacity="0.95"
-              />
-              <path
-                d="M12 10c0 0-2 2.5-2 4a2 2 0 004 0c0-1.5-2-4-2-4z"
-                fill="white"
-                fillOpacity="0.55"
-              />
-            </svg>
-          </div>
+          <Mark size={36} />
           <span
             className="font-display text-xl tracking-wide"
             style={{ color: "var(--bj-ink)", letterSpacing: "0.04em" }}

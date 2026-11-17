@@ -8,6 +8,8 @@ import { useFloatWindowsStore } from "@/store/floatWindows.store";
 import { feelingColor } from "@/lib/feelings";
 import { cachedDocText } from "./JournalParts";
 import type { JournalEntry } from "@/types";
+import { useAuthStore } from "@/store/auth.store";
+import { PhotosPanel } from "./EntryPhotos";
 
 const LABEL = "font-sans text-[10.5px] font-semibold uppercase tracking-[0.08em] mb-2.5";
 
@@ -57,6 +59,7 @@ export function Companion({ entry, entries, onClose }: { entry: JournalEntry; en
       .slice(0, 4);
   }, [entries, entry, passages]);
 
+  const uid = useAuthStore((s) => s.user?.uid);
   const photos = useMemo(() => {
     const pool = entries.filter((e) => e.id !== entry.id && e.cover?.url);
     const same = entry.feeling ? pool.filter((e) => e.feeling === entry.feeling) : [];
@@ -73,6 +76,7 @@ export function Companion({ entry, entries, onClose }: { entry: JournalEntry; en
         </button>
       </div>
       <div className="flex-1 overflow-y-auto px-4 pb-5 pt-3 flex flex-col gap-6 bj-stagger">
+        {uid && <PhotosPanel entry={entry} uid={uid} />}
         <section>
           <p className={LABEL} style={{ color: "var(--bj-ink4)" }}>In this entry</p>
           {passages.length ? (

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { EntriesClient } from "./EntriesClient";
+import { Mark } from "@/components/brand/Mark";
 
 // ── Firestore REST helpers (no auth — public documents) ───
 
@@ -130,11 +131,7 @@ export default async function PublicProclamationPage(
 
       {/* Brand mark */}
       <div className="flex items-center gap-2 mb-12">
-        <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "var(--bj-gold)" }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" />
-          </svg>
-        </div>
+        <Mark size={20} />
         <span className="font-display text-sm" style={{ color: "var(--bj-ink3)", letterSpacing: "0.04em" }}>BibJournal</span>
       </div>
 

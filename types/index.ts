@@ -27,6 +27,14 @@ export interface JournalEntry {
   feeling?: string;
   /** "How I felt" photo — the entry's cover. */
   cover?: EntryPhoto | null;
+  /** Every photo on the entry, oldest first. The cover is one of these. */
+  photos?: EntryPhoto[];
+  /** This page is locked on its own (its folder may also be locked). */
+  locked?: boolean;
+  /** Runtime only: the writing is lock-sealed and the lock code hasn't been entered. */
+  shut?: boolean;
+  /** Runtime only: the stored writing is lock-sealed. */
+  lockSealed?: boolean;
   scriptures: ScriptureRef[];
   createdAt: Date;
   updatedAt: Date;

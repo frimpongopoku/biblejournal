@@ -16,6 +16,8 @@ import { FaceList } from "@/components/TypePicker";
 import { SHORTCUT_GROUPS } from "@/components/ShortcutsPanel";
 import { signOutUser } from "@/services/auth.service";
 import { exportEverything, downloadJson, deleteAccount } from "@/services/account.service";
+import { useVault } from "@/lib/vault";
+import { Privacy } from "./PrivacySection";
 
 // ── Primitives ─────────────────────────────────────────────
 
@@ -103,6 +105,7 @@ export const SECTIONS = [
   { id: "reading", label: "Reading" },
   { id: "sounds", label: "Sounds" },
   { id: "prayer", label: "Prayer" },
+  { id: "privacy", label: "Privacy" },
   { id: "shortcuts", label: "Shortcuts" },
   { id: "account", label: "Account & data" },
 ] as const;
@@ -115,6 +118,7 @@ export function useSectionSummary(): Record<SectionId, string> {
   const perDay = usePrefsStore((s) => s.prayersPerDay);
   const w = useWritingStore();
   const version = useBibleStore((s) => s.version);
+  const vault = useVault((s) => s.status);
   return {
     appearance: mode === "system" ? "Follow system" : themes.find((t) => t.id === themeId)?.label ?? "",
     type: "3 faces",
@@ -122,6 +126,7 @@ export function useSectionSummary(): Record<SectionId, string> {
     reading: version,
     sounds: w.keySounds ? SWITCHES[w.switchId]?.name ?? "On" : "Off",
     prayer: perDay ? `${perDay} a day` : "Auto",
+    privacy: vault === "off" ? "Not encrypted" : vault === "unknown" ? "" : "Encrypted",
     shortcuts: "",
     account: "",
   };
@@ -447,6 +452,7 @@ export function SectionBody({ id }: { id: SectionId }) {
     case "reading": return <Reading />;
     case "sounds": return <Sounds />;
     case "prayer": return <PrayerSection />;
+    case "privacy": return <Privacy />;
     case "shortcuts": return <Shortcuts />;
     case "account": return <Account />;
   }

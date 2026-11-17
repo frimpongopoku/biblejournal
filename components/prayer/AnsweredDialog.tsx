@@ -43,7 +43,8 @@ function Body({ prayer, onClose, onConfirm }: { prayer: Prayer; onClose: () => v
     try { await onConfirm(text); onClose(); } catch (e) { console.error(e); setSaving(false); }
   }
 
-  const asked = docToText(prayer.body) || prayer.title;
+  // One flowing paragraph, so the clamp never leaves "…" alone on a blank line.
+  const asked = (docToText(prayer.body) || prayer.title).replace(/\s*\n+\s*/g, " ");
   const times = logOf(prayer).length;
 
   return (
@@ -67,7 +68,7 @@ function Body({ prayer, onClose, onConfirm }: { prayer: Prayer; onClose: () => v
               <p className="font-sans text-[10.5px] font-semibold uppercase mb-1.5" style={{ color: "var(--bj-ink4)", letterSpacing: "0.07em" }}>
                 You asked · {shortDate(prayer.createdAt, true)}{times > 0 ? ` · prayed ${plural(times, "time")}` : ""} over {plural(dayNumber(prayer), "day")}
               </p>
-              <p className="line-clamp-4" style={{ ...writingFontStyle(font, 17), lineHeight: 1.5, color: "var(--bj-ink3)", whiteSpace: "pre-line" }}>{asked}</p>
+              <p className="line-clamp-4" style={{ ...writingFontStyle(font, 17), lineHeight: 1.5, color: "var(--bj-ink3)" }}>{asked}</p>
             </div>
 
             <label htmlFor="answer-text" className="block font-sans text-[13px] font-medium mb-2" style={{ color: "var(--bj-ink2)" }}>How did he answer?</label>

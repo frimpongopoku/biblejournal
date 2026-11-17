@@ -1,683 +1,200 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import Link from "next/link";
-import { motion, useInView } from "framer-motion";
-import {
-  BookOpen, NotebookPen, HeartHandshake, Mic,
-  Compass, Megaphone, ArrowRight, Sparkles,
-  Check, Languages, FlaskConical, MessageSquare,
-  Globe, Flame,
-} from "lucide-react";
+import { motion, useInView, MotionConfig } from "framer-motion";
+import { ArrowRight, PenLine, CalendarDays, BookOpen, Lock, Camera } from "lucide-react";
+import { Mark } from "@/components/brand/Mark";
+import { useAuth } from "@/hooks/useAuth";
 import pkg from "@/version.json";
 
-// ── Animation helpers ──────────────────────────────────────
+/* The front door. Writing first: one honest look at the journal, three short
+   reasons, privacy said plainly, one way in. */
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
-  show: (i = 0) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.65, ease: [0.22, 1, 0.36, 1] } }),
-};
+const EASE = [0.23, 1, 0.32, 1] as const;
 
 function Reveal({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true, margin: "-80px" });
+  const ref = useRef<HTMLDivElement>(null);
+  const seen = useInView(ref, { once: true, margin: "-80px" });
   return (
-    <motion.div ref={ref} className={className}
-      initial={{ opacity: 0, y: 32 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ delay, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
+    <motion.div ref={ref} className={className} initial={{ opacity: 0, y: 16 }} animate={seen ? { opacity: 1, y: 0 } : undefined}
+      transition={{ duration: 0.5, delay, ease: EASE }}>
       {children}
     </motion.div>
   );
 }
 
-// ── Nav ────────────────────────────────────────────────────
+function Start({ big }: { big?: boolean }) {
+  const { user } = useAuth();
+  return (
+    <Link href={user ? "/journal" : "/login"}
+      className={`bj-gold bj-lift inline-flex items-center justify-center gap-2 rounded-[14px] font-sans font-semibold ${big ? "h-12 px-6 text-[15px]" : "h-12 px-5 text-[14.5px]"}`}>
+      {user ? "Open your journal" : "Start writing — it’s free"} <ArrowRight size={16} strokeWidth={2.2} />
+    </Link>
+  );
+}
 
 function Nav() {
-  const [hov, setHov] = useState(false);
+  const { user } = useAuth();
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-5 md:px-10"
-      style={{ height: 60, background: "color-mix(in oklch, var(--bj-bg) 85%, transparent)", backdropFilter: "blur(16px)", borderBottom: "1px solid var(--bj-line-soft)" }}>
-      {/* Logo */}
-      <Link href="/" className="flex items-center gap-2.5">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-          style={{ background: "var(--bj-gold)", boxShadow: "0 2px 12px color-mix(in oklch, var(--bj-gold) 40%, transparent)" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" />
-            <path d="M12 10c0 0-2 2.5-2 4a2 2 0 004 0c0-1.5-2-4-2-4z" fill="white" fillOpacity="0.55" />
-          </svg>
-        </div>
-        <span className="font-display text-base" style={{ color: "var(--bj-ink)", letterSpacing: "0.04em" }}>BibJournal</span>
+    <header className="relative z-10 h-[76px] px-4 sm:px-8 md:px-14 flex items-center gap-3">
+      <Link href="/" className="flex items-center gap-2.5" aria-label="BibJournal home">
+        <Mark size={30} />
+        <span className="font-display text-[21px]" style={{ color: "var(--bj-ink)", fontWeight: 500 }}>BibJournal</span>
       </Link>
-
-      {/* CTA */}
-      <Link href="/login"
-        onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-        className="flex items-center gap-2 font-sans text-sm px-4 py-2 rounded-xl"
-        style={{
-          background: hov ? "var(--bj-gold)" : "var(--bj-gold-tint)",
-          color: hov ? "white" : "var(--bj-gold-deep)",
-          border: "1px solid var(--bj-gold-soft)",
-          transition: "all 0.15s ease",
-          transform: hov ? "translateY(-1px)" : "none",
-          boxShadow: hov ? "0 4px 16px color-mix(in oklch, var(--bj-gold) 30%, transparent)" : "none",
-        }}>
-        Sign in <ArrowRight size={14} />
+      <nav className="ml-auto hidden sm:flex items-center gap-7 font-sans text-[13.5px]" style={{ color: "var(--bj-ink3)" }}>
+        <a href="#inside" className="hover:text-[var(--bj-ink)] transition-colors">How it works</a>
+        <a href="#privacy" className="hover:text-[var(--bj-ink)] transition-colors">Privacy</a>
+      </nav>
+      <Link href={user ? "/journal" : "/login"} className="bj-raised bj-lift ml-auto sm:ml-6 h-9 px-3.5 rounded-[11px] flex items-center font-sans text-[13px] font-medium" style={{ color: "var(--bj-ink2)" }}>
+        {user ? "Open" : "Sign in"}
       </Link>
     </header>
   );
 }
 
-// ── Hero ───────────────────────────────────────────────────
+// ── A truthful look at the journal ──────────────────────────
 
-function Hero() {
-  return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-5 pt-24 pb-20 overflow-hidden text-center">
-      {/* Background */}
-      <div className="pointer-events-none absolute inset-0" style={{
-        background: `
-          radial-gradient(ellipse 70% 55% at 50% 100%, color-mix(in oklch, var(--bj-gold-soft) 45%, transparent) 0%, transparent 65%),
-          radial-gradient(ellipse 50% 40% at 20% 20%, color-mix(in oklch, var(--bj-gold-tint) 70%, transparent) 0%, transparent 60%),
-          radial-gradient(ellipse 40% 30% at 80% 15%, color-mix(in oklch, var(--bj-gold-soft) 30%, transparent) 0%, transparent 55%),
-          var(--bj-bg)
-        `
-      }} />
-      {/* Grain */}
-      <div className="pointer-events-none absolute inset-0 opacity-[0.035]" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-        backgroundSize: "128px"
-      }} />
-      {/* Decorative rings */}
-      <svg className="pointer-events-none absolute opacity-[0.07]" style={{ bottom: -80, left: -80 }} width="560" height="560" viewBox="0 0 560 560" fill="none">
-        <circle cx="280" cy="280" r="268" stroke="var(--bj-gold)" strokeWidth="1" />
-        <circle cx="280" cy="280" r="210" stroke="var(--bj-gold)" strokeWidth="0.6" />
-      </svg>
-      <svg className="pointer-events-none absolute opacity-[0.06]" style={{ top: -60, right: -60 }} width="380" height="380" viewBox="0 0 380 380" fill="none">
-        <circle cx="190" cy="190" r="178" stroke="var(--bj-gold)" strokeWidth="0.8" />
-      </svg>
-
-      <div className="relative z-10 max-w-4xl mx-auto">
-        {/* Eyebrow */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-8"
-          style={{ background: "var(--bj-gold-tint)", border: "1px solid var(--bj-gold-soft)" }}>
-          <Sparkles size={12} style={{ color: "var(--bj-gold)" }} />
-          <span className="font-sans text-xs font-medium" style={{ color: "var(--bj-gold-deep)", letterSpacing: "0.06em" }}>
-            Your sacred space for Scripture &amp; reflection
-          </span>
-        </motion.div>
-
-        {/* Headline */}
-        <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          className="font-display mb-6" style={{ fontSize: "clamp(3rem, 8vw, 5.5rem)", color: "var(--bj-ink)", fontWeight: 300, lineHeight: 1.06, letterSpacing: "-0.02em" }}>
-          Where faith meets<br />
-          <span style={{ color: "var(--bj-gold)", fontStyle: "italic" }}>reflection</span>
-        </motion.h1>
-
-        {/* Scripture */}
-        <motion.blockquote initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28, duration: 0.7 }}
-          className="mb-10 max-w-xl mx-auto">
-          <p className="font-display italic text-xl md:text-2xl" style={{ color: "var(--bj-ink3)", fontWeight: 300, lineHeight: 1.5 }}>
-            "Your word is a lamp to my feet<br className="hidden md:block" /> and a light to my path."
-          </p>
-          <cite className="block mt-3 font-sans text-xs not-italic tracking-widest uppercase" style={{ color: "var(--bj-gold-deep)", letterSpacing: "0.14em" }}>
-            Psalm 119 · 105
-          </cite>
-        </motion.blockquote>
-
-        {/* CTA */}
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.6 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <HeroButton href="/login" primary>Begin your journey</HeroButton>
-          <HeroButton href="#features">Explore features</HeroButton>
-        </motion.div>
-      </div>
-
-      {/* Hero mockup */}
-      <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55, duration: 1, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 mt-20 w-full max-w-5xl mx-auto">
-        <HeroMockup />
-      </motion.div>
-    </section>
-  );
-}
-
-function HeroButton({ href, primary, children }: { href: string; primary?: boolean; children: React.ReactNode }) {
-  const [hov, setHov] = useState(false);
-  return (
-    <Link href={href}
-      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      className="flex items-center gap-2 font-sans text-sm font-medium px-6 py-3 rounded-2xl"
-      style={{
-        background: primary ? (hov ? "color-mix(in oklch, var(--bj-gold) 88%, black)" : "var(--bj-gold)") : (hov ? "var(--bj-line-soft)" : "var(--bj-bg-soft)"),
-        color: primary ? "white" : (hov ? "var(--bj-ink)" : "var(--bj-ink2)"),
-        border: primary ? "none" : "1px solid var(--bj-line-soft)",
-        transform: hov ? "translateY(-2px)" : "none",
-        boxShadow: hov && primary ? "0 8px 24px color-mix(in oklch, var(--bj-gold) 35%, transparent)" : "none",
-        transition: "all 0.16s ease",
-      }}>
-      {children} {primary && <ArrowRight size={15} />}
-    </Link>
-  );
-}
-
-// ── Hero Mockup ────────────────────────────────────────────
-
-function HeroMockup() {
-  return (
-    <div className="relative mx-auto" style={{ maxWidth: 900 }}>
-      {/* Main window */}
-      <div className="rounded-2xl overflow-hidden shadow-2xl" style={{ background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)", boxShadow: "0 32px 80px color-mix(in oklch, var(--bj-ink) 18%, transparent)" }}>
-        {/* Window chrome */}
-        <div className="flex items-center gap-1.5 px-4 py-3 border-b" style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-soft)" }}>
-          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#FF5F57" }} />
-          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#FEBC2E" }} />
-          <div className="w-2.5 h-2.5 rounded-full" style={{ background: "#28C840" }} />
-          <div className="flex-1 mx-4">
-            <div className="mx-auto rounded-md px-3 py-1 text-center font-sans" style={{ fontSize: 11, maxWidth: 240, background: "var(--bj-bg)", color: "var(--bj-ink4)", border: "1px solid var(--bj-line-soft)" }}>
-              bibjournal.app
-            </div>
-          </div>
-        </div>
-
-        {/* App layout */}
-        <div className="flex" style={{ height: 420 }}>
-          {/* Sidebar */}
-          <div className="hidden md:flex flex-col border-r shrink-0" style={{ width: 200, borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}>
-            <div className="px-3 pt-4 pb-3 border-b flex items-center gap-2" style={{ borderColor: "var(--bj-line-soft)" }}>
-              <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: "var(--bj-gold)" }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" /></svg>
-              </div>
-              <span className="font-display text-xs font-medium" style={{ color: "var(--bj-ink)" }}>BibJournal</span>
-            </div>
-            <nav className="px-2 py-2 flex-1">
-              {[
-                { icon: NotebookPen, label: "Journal", active: true },
-                { icon: BookOpen, label: "Bible" },
-                { icon: HeartHandshake, label: "Prayer" },
-                { icon: Mic, label: "Sermons" },
-                { icon: Megaphone, label: "Proclamations" },
-                { icon: Compass, label: "Research" },
-              ].map(({ icon: Icon, label, active }) => (
-                <div key={label} className="flex items-center gap-2 px-3 py-1.5 rounded-lg mb-0.5"
-                  style={{ background: active ? "var(--bj-gold-tint)" : "transparent", color: active ? "var(--bj-gold-deep)" : "var(--bj-ink3)" }}>
-                  <Icon size={12} />
-                  <span className="font-sans" style={{ fontSize: 11 }}>{label}</span>
-                </div>
-              ))}
-            </nav>
-          </div>
-
-          {/* Journal list */}
-          <div className="hidden sm:flex flex-col border-r shrink-0" style={{ width: 220, borderColor: "var(--bj-line-soft)" }}>
-            <div className="px-4 pt-4 pb-3 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-display text-sm" style={{ color: "var(--bj-ink)" }}>Journal</span>
-                <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: "var(--bj-gold)" }}>
-                  <span style={{ fontSize: 10, color: "white", fontWeight: 600 }}>+</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              {[
-                { title: "Morning devotion", tag: "faith", feeling: "😊", date: "Today" },
-                { title: "Romans 8 study", tag: "study", feeling: "✨", date: "Yesterday" },
-                { title: "Prayer answered!", tag: "testimony", feeling: "🙏", date: "3 days ago" },
-              ].map((e, i) => (
-                <div key={i} className="px-4 py-3 border-b"
-                  style={{ borderColor: "var(--bj-line-soft)", background: i === 0 ? "var(--bj-gold-tint)" : "transparent", borderLeft: i === 0 ? "2px solid var(--bj-gold)" : "2px solid transparent" }}>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="font-sans font-medium truncate" style={{ fontSize: 11, color: "var(--bj-ink)" }}>{e.title}</span>
-                    <span style={{ fontSize: 11 }}>{e.feeling}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-sans px-1.5 py-0.5 rounded" style={{ fontSize: 9, background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)" }}>#{e.tag}</span>
-                    <span className="font-sans ml-auto" style={{ fontSize: 9, color: "var(--bj-ink4)" }}>{e.date}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Editor */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="px-6 pt-5 pb-4 border-b shrink-0" style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-panel)" }}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="font-sans text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}>Today</span>
-                <span className="font-sans text-xs px-2 py-0.5 rounded-lg flex items-center gap-1" style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}>😊 Grateful</span>
-              </div>
-              <p className="font-display" style={{ fontSize: "clamp(1.1rem, 2vw, 1.5rem)", color: "var(--bj-ink)", fontWeight: 400 }}>Morning devotion</p>
-            </div>
-            <div className="flex-1 px-6 py-5 overflow-hidden" style={{ background: "var(--bj-bg)" }}>
-              <p className="font-display italic mb-3" style={{ fontSize: 15, color: "var(--bj-ink2)", lineHeight: 1.85, fontWeight: 300 }}>
-                This morning I was reading Romans 8 and was struck by the promise...
-              </p>
-              <div className="px-4 py-3 rounded-xl mb-3" style={{ background: "var(--bj-gold-tint)", border: "1px solid var(--bj-gold-soft)" }}>
-                <p className="font-sans" style={{ fontSize: 10, color: "var(--bj-gold-deep)", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>Romans 8:28 · ESV</p>
-                <p className="font-display italic" style={{ fontSize: 13, color: "var(--bj-ink)", lineHeight: 1.6, fontWeight: 300 }}>"And we know that for those who love God all things work together for good..."</p>
-              </div>
-              <p className="font-display italic" style={{ fontSize: 15, color: "var(--bj-ink3)", lineHeight: 1.85, fontWeight: 300 }}>
-                I&apos;m reminded that even in difficult seasons, there is purpose...
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Floating label */}
-      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-full"
-        style={{ background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line)", boxShadow: "0 4px 20px color-mix(in oklch, var(--bj-ink) 10%, transparent)" }}>
-        <div className="w-2 h-2 rounded-full" style={{ background: "var(--bj-gold)" }} />
-        <span className="font-sans text-xs" style={{ color: "var(--bj-ink3)" }}>Auto-saving your words</span>
-      </div>
-    </div>
-  );
-}
-
-// ── Features Grid ──────────────────────────────────────────
-
-const FEATURES = [
-  { icon: NotebookPen, label: "Journal", color: "var(--bj-gold)", desc: "Rich text writing with mood tracking, floating Bible panels, and AI assistance as you reflect." },
-  { icon: BookOpen, label: "Bible Reader", color: "var(--bj-sage)", desc: "8 translations, live verse predictions, tap-to-highlight, and seamless chapter navigation." },
-  { icon: HeartHandshake, label: "Prayer", color: "var(--bj-ember)", desc: "Log prayers, track streaks, and mark answered prayers with a testimony of God's faithfulness." },
-  { icon: Mic, label: "Sermons", color: "var(--bj-gold)", desc: "Embed YouTube sermons with live notes and a verse reference panel that knows the Bible." },
-  { icon: Compass, label: "Research", color: "var(--bj-sage)", desc: "AI commentary, semantic search, Greek/Hebrew word studies, and translation comparisons." },
-  { icon: Megaphone, label: "Proclamations", color: "var(--bj-ember)", desc: "Declare scripture over your life. Organise into folders and share publicly with a link." },
+const ROWS = [
+  { d: "17", w: "TUE", t: "Morning light", f: "var(--bj-gold)", x: "The kettle, the window, Psalm 5 before the emails.", photo: true },
+  { d: "16", w: "MON", t: "Kofi and the visa", f: "", x: "", locked: true },
+  { d: "14", w: "SAT", t: "The valley isn’t the end", f: "var(--bj-sky, #7FA7D9)", x: "Drove home the long way. Psalm 23:4 kept coming back." },
+  { d: "12", w: "THU", t: "Slow to speak", f: "var(--bj-sage)", x: "I said less than I wanted to, and it was right." },
 ];
+const PHOTO = "linear-gradient(135deg,#C99A62 0%,#8A5E3A 55%,#3E2A1C 100%)";
 
-function FeaturesGrid() {
+function JournalPeek() {
   return (
-    <section id="features" className="px-5 md:px-10 py-24 md:py-32">
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <Reveal className="text-center mb-16">
-          <p className="font-sans text-xs uppercase tracking-widest font-semibold mb-3" style={{ color: "var(--bj-gold-deep)" }}>Everything you need</p>
-          <h2 className="font-display" style={{ fontSize: "clamp(2.2rem, 5vw, 3.5rem)", color: "var(--bj-ink)", fontWeight: 300, lineHeight: 1.1 }}>
-            A complete spiritual companion
-          </h2>
-          <p className="font-sans text-base mt-4 max-w-xl mx-auto" style={{ color: "var(--bj-ink3)", lineHeight: 1.7 }}>
-            Every tool you need to go deeper in Scripture, prayer, and reflection — beautifully designed and always in reach.
-          </p>
-        </Reveal>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map((f, i) => (
-            <Reveal key={f.label} delay={i * 0.07}>
-              <FeatureCard {...f} />
-            </Reveal>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FeatureCard({ icon: Icon, label, color, desc }: typeof FEATURES[0]) {
-  const [hov, setHov] = useState(false);
-  return (
-    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      className="rounded-2xl p-6"
-      style={{
-        background: hov ? "var(--bj-bg-panel)" : "var(--bj-bg-soft)",
-        border: `1px solid ${hov ? "var(--bj-line)" : "var(--bj-line-soft)"}`,
-        transform: hov ? "translateY(-4px)" : "none",
-        boxShadow: hov ? "0 12px 36px color-mix(in oklch, var(--bj-ink) 8%, transparent)" : "none",
-        transition: "all 0.18s ease",
-        cursor: "default",
-      }}>
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
-        style={{ background: `color-mix(in oklch, ${color} 14%, var(--bj-bg))` }}>
-        <Icon size={18} style={{ color }} />
-      </div>
-      <h3 className="font-display text-xl mb-2" style={{ color: "var(--bj-ink)", fontWeight: 400 }}>{label}</h3>
-      <p className="font-sans text-sm" style={{ color: "var(--bj-ink3)", lineHeight: 1.7 }}>{desc}</p>
-    </div>
-  );
-}
-
-// ── Spotlight Sections ─────────────────────────────────────
-
-function SpotlightSection({ reverse, eyebrow, title, desc, bullets, children }: {
-  reverse?: boolean; eyebrow: string; title: string; desc: string;
-  bullets: string[]; children: React.ReactNode;
-}) {
-  return (
-    <section className="px-5 md:px-10 py-20 md:py-28">
-      <div className={`flex flex-col ${reverse ? "md:flex-row-reverse" : "md:flex-row"} items-center gap-12 md:gap-20`}
-        style={{ maxWidth: 1100, margin: "0 auto" }}>
-        {/* Text */}
-        <Reveal className="flex-1 min-w-0">
-          <p className="font-sans text-xs uppercase tracking-widest font-semibold mb-3" style={{ color: "var(--bj-gold-deep)" }}>{eyebrow}</p>
-          <h2 className="font-display mb-4" style={{ fontSize: "clamp(2rem, 4.5vw, 3rem)", color: "var(--bj-ink)", fontWeight: 300, lineHeight: 1.15 }}>{title}</h2>
-          <p className="font-sans text-base mb-6" style={{ color: "var(--bj-ink3)", lineHeight: 1.75 }}>{desc}</p>
-          <ul className="flex flex-col gap-2.5">
-            {bullets.map((b) => (
-              <li key={b} className="flex items-start gap-2.5">
-                <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: "var(--bj-gold-tint)", border: "1px solid var(--bj-gold-soft)" }}>
-                  <Check size={10} style={{ color: "var(--bj-gold-deep)" }} />
-                </div>
-                <span className="font-sans text-sm" style={{ color: "var(--bj-ink2)", lineHeight: 1.6 }}>{b}</span>
-              </li>
-            ))}
-          </ul>
-        </Reveal>
-
-        {/* Mockup */}
-        <Reveal delay={0.15} className="flex-1 min-w-0 w-full">
-          <div className="rounded-2xl overflow-hidden" style={{ background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line-soft)", boxShadow: "0 20px 60px color-mix(in oklch, var(--bj-ink) 12%, transparent)" }}>
-            {children}
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-// ── Bible mockup ───────────────────────────────────────────
-
-function BibleMockup() {
-  return (
-    <div>
-      {/* Nav bar */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: "var(--bj-line-soft)", background: "var(--bj-bg-soft)" }}>
-        <span className="font-display text-sm" style={{ color: "var(--bj-ink)" }}>John</span>
-        <span style={{ color: "var(--bj-ink4)" }}>·</span>
-        <span className="font-display text-sm" style={{ color: "var(--bj-ink3)" }}>Ch. 3</span>
-        <div className="flex-1" />
-        {["ESV", "KJV", "NIV", "AMP"].map((v, i) => (
-          <span key={v} className="font-sans px-2 py-0.5 rounded-md" style={{ fontSize: 10, background: i === 0 ? "var(--bj-gold)" : "transparent", color: i === 0 ? "white" : "var(--bj-ink4)", fontWeight: i === 0 ? 500 : 400 }}>{v}</span>
-        ))}
-      </div>
-
-      {/* Verse input */}
-      <div className="px-4 py-2 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
-          <span className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>Go to verse…</span>
-          <div className="ml-auto flex gap-1">
-            {["John 3", "John 4", "John 5"].map((s, i) => (
-              <span key={s} className="font-sans px-2 py-0.5 rounded-md" style={{ fontSize: 9, background: i === 0 ? "var(--bj-gold-tint)" : "transparent", color: i === 0 ? "var(--bj-gold-deep)" : "var(--bj-ink4)", border: i === 0 ? "1px solid var(--bj-gold-soft)" : "none" }}>{s}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Verses */}
-      <div className="px-6 py-5">
-        {[
-          { n: 14, text: "And as Moses lifted up the serpent in the wilderness, so must the Son of Man be lifted up,", highlight: true },
-          { n: 15, text: "that whoever believes in him may have eternal life." },
-          { n: 16, text: "For God so loved the world, that he gave his only Son, that whoever believes in him should not perish but have eternal life.", highlight: true },
-          { n: 17, text: "For God did not send his Son into the world to condemn the world, but in order that the world might be saved through him." },
-        ].map((v) => (
-          <div key={v.n} className="flex gap-3 py-2 px-2 rounded-xl mb-1"
-            style={{ background: v.highlight ? "var(--bj-gold-tint)" : "transparent", border: `1px solid ${v.highlight ? "var(--bj-gold-soft)" : "transparent"}` }}>
-            <span className="font-sans shrink-0 w-5 text-right pt-0.5" style={{ fontSize: 10, color: v.highlight ? "var(--bj-gold-deep)" : "var(--bj-ink4)", fontWeight: 600 }}>{v.n}</span>
-            <p className="font-sans text-sm" style={{ color: v.highlight ? "var(--bj-ink)" : "var(--bj-ink2)", lineHeight: 1.75 }}>{v.text}</p>
+    <div className="bj-window rounded-[22px] flex overflow-hidden text-left mx-auto max-w-[1080px]"
+      style={{ height: "clamp(380px, 46vw, 560px)", boxShadow: "0 0 0 1px var(--bj-line-soft), 0 60px 120px -40px rgba(0,0,0,.75)" }}>
+      <div className="hidden md:flex w-[290px] shrink-0 flex-col gap-1 px-3 py-[18px]" style={{ borderRight: "1px solid var(--bj-line-soft)" }}>
+        <p className="font-display text-[24px] px-2 mb-2.5" style={{ color: "var(--bj-ink)" }}>Journal</p>
+        {ROWS.map((r, i) => (
+          <div key={r.t} className={`flex gap-2.5 p-2.5 rounded-xl ${i === 0 ? "bj-raised" : ""}`} style={i ? { border: "1px solid transparent" } : undefined}>
+            {r.photo
+              ? <span className="w-10 h-10 rounded-[9px] shrink-0" style={{ background: PHOTO }} />
+              : <span className="bj-well w-10 h-10 rounded-[9px] shrink-0 flex flex-col items-center justify-center font-display text-[14px] leading-none" style={{ color: "var(--bj-ink2)" }}>
+                  {r.d}<span className="font-sans text-[7.5px] font-semibold mt-0.5" style={{ color: "var(--bj-ink4)" }}>{r.w}</span>
+                </span>}
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-1.5 font-sans text-[12.5px] font-medium" style={{ color: "var(--bj-ink)" }}>
+                {r.locked ? <Lock size={10} style={{ color: "var(--bj-gold)" }} /> : <i className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: r.f }} />}
+                <span className="truncate">{r.t}</span>
+              </p>
+              {r.locked
+                ? <span className="block mt-2 h-[7px] w-[70%] rounded" style={{ background: "color-mix(in oklch, var(--bj-ink) 7%, transparent)" }} />
+                : <p className="mt-1 font-display text-[12.5px] truncate" style={{ color: "var(--bj-ink3)" }}>{r.x}</p>}
+            </div>
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-// ── Research mockup ────────────────────────────────────────
-
-function ResearchMockup() {
-  return (
-    <div>
-      {/* Tabs */}
-      <div className="flex gap-1 px-4 pt-4 pb-3 border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
-        {[
-          { icon: Languages, label: "Compare", active: false },
-          { icon: MessageSquare, label: "Ask", active: true },
-          { icon: FlaskConical, label: "Word Study", active: false },
-        ].map(({ icon: Icon, label, active }) => (
-          <div key={label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
-            style={{ background: active ? "var(--bj-gold)" : "var(--bj-bg-soft)", color: active ? "white" : "var(--bj-ink3)", fontSize: 11 }}>
-            <Icon size={10} /> {label}
-          </div>
-        ))}
-      </div>
-
-      {/* Ask interface */}
-      <div className="p-4">
-        <div className="px-3 py-2.5 rounded-xl mb-3 font-sans text-xs" style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)", color: "var(--bj-ink3)" }}>
-          What does the Bible say about forgiveness?
-        </div>
-        <div className="rounded-xl p-4 mb-3" style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
-          <p className="font-sans text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: "var(--bj-ink4)" }}>Answer</p>
-          <p className="font-sans text-xs" style={{ color: "var(--bj-ink2)", lineHeight: 1.75 }}>
-            Forgiveness is central to the biblical narrative. Jesus teaches in Matthew 6:14 that forgiving others is directly linked to receiving God&apos;s forgiveness...
-          </p>
-        </div>
-        <div className="rounded-xl px-3 py-2.5" style={{ background: "var(--bj-gold-tint)", border: "1px solid var(--bj-gold-soft)" }}>
-          <p className="font-sans" style={{ fontSize: 10, color: "var(--bj-gold-deep)", fontWeight: 600, marginBottom: 4 }}>Matthew 6:14 · ESV</p>
-          <p className="font-display italic text-xs" style={{ color: "var(--bj-ink)", lineHeight: 1.6, fontWeight: 300 }}>"For if you forgive others their trespasses, your heavenly Father will also forgive you..."</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Prayer mockup ──────────────────────────────────────────
-
-function PrayerMockup() {
-  return (
-    <div className="p-5">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <p className="font-display text-lg" style={{ color: "var(--bj-ink)", fontWeight: 400 }}>Prayer Journal</p>
-          <p className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>3 active · 2 answered</p>
-        </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl" style={{ background: "var(--bj-gold-tint)", border: "1px solid var(--bj-gold-soft)" }}>
-          <Flame size={11} style={{ color: "var(--bj-gold)" }} />
-          <span className="font-sans text-xs font-semibold" style={{ color: "var(--bj-gold-deep)" }}>7d streak</span>
-        </div>
-      </div>
-      {[
-        { title: "Healing for my father", days: "14d", answered: false },
-        { title: "Provision for this month", days: "5d", answered: false },
-        { title: "Career direction — answered!", days: "", answered: true },
-      ].map((p, i) => (
-        <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-2xl mb-2"
-          style={{ background: "var(--bj-bg-soft)", border: `1px solid ${p.answered ? "color-mix(in oklch, var(--bj-sage) 30%, transparent)" : "var(--bj-line-soft)"}` }}>
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: p.answered ? "color-mix(in oklch, var(--bj-sage) 15%, transparent)" : "color-mix(in oklch, var(--bj-ember) 12%, transparent)" }}>
-            {p.answered
-              ? <Check size={13} style={{ color: "var(--bj-sage)" }} />
-              : <HeartHandshake size={13} style={{ color: "var(--bj-ember)" }} />}
-          </div>
-          <span className="font-sans text-sm flex-1" style={{ color: "var(--bj-ink)", fontWeight: 500, textDecoration: p.answered ? "line-through" : "none", opacity: p.answered ? 0.6 : 1 }}>{p.title}</span>
-          {!p.answered && (
-            <span className="font-sans text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "color-mix(in oklch, var(--bj-ember) 12%, transparent)", color: "var(--bj-ember)" }}>{p.days}</span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Proclamations mockup ───────────────────────────────────
-
-function ProclamationsMockup() {
-  return (
-    <div className="p-5">
-      <div className="flex items-center justify-between mb-5">
-        <p className="font-display text-lg" style={{ color: "var(--bj-ink)", fontWeight: 400 }}>Declarations</p>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
-          <Globe size={10} style={{ color: "var(--bj-ink4)" }} />
-          <span className="font-sans" style={{ fontSize: 10, color: "var(--bj-ink4)" }}>Public link</span>
-        </div>
-      </div>
-      {[
-        { num: 1, title: "I am more than a conqueror", body: "Romans 8:37 — through Him who loved us." },
-        { num: 2, title: "I walk in divine health", body: "By His stripes I am healed. — Isaiah 53:5" },
-        { num: 3, title: "My steps are ordered by the Lord", body: "Psalm 37:23 — He delights in my way." },
-      ].map((d) => (
-        <div key={d.num} className="flex gap-3 px-4 py-3.5 rounded-2xl mb-2"
-          style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
-          <span className="font-sans font-bold w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-            style={{ fontSize: 10, background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)" }}>{d.num}</span>
-          <div>
-            <p className="font-sans font-semibold text-sm mb-0.5" style={{ color: "var(--bj-ink)", fontSize: 12 }}>{d.title}</p>
-            <p className="font-display italic" style={{ fontSize: 11, color: "var(--bj-ink3)", fontWeight: 300 }}>{d.body}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── CTA ────────────────────────────────────────────────────
-
-function CTA() {
-  const [hov, setHov] = useState(false);
-  return (
-    <section className="px-5 md:px-10 py-24 md:py-36 relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0" style={{
-        background: `radial-gradient(ellipse 80% 60% at 50% 50%, color-mix(in oklch, var(--bj-gold-soft) 50%, transparent) 0%, transparent 70%), var(--bj-bg-soft)`
-      }} />
-      <Reveal className="relative z-10 text-center max-w-2xl mx-auto">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <div className="h-px w-12" style={{ background: "var(--bj-gold-soft)" }} />
-          <div className="w-2 h-2 rounded-full" style={{ background: "var(--bj-gold)" }} />
-          <div className="h-px w-12" style={{ background: "var(--bj-gold-soft)" }} />
-        </div>
-        <h2 className="font-display mb-4" style={{ fontSize: "clamp(2.4rem, 6vw, 4rem)", color: "var(--bj-ink)", fontWeight: 300, lineHeight: 1.1 }}>
-          Begin your<br />
-          <span style={{ color: "var(--bj-gold)", fontStyle: "italic" }}>spiritual journey</span>
-        </h2>
-        <p className="font-sans text-base mb-10" style={{ color: "var(--bj-ink3)", lineHeight: 1.7 }}>
-          Everything you need to go deeper in Scripture, prayer, and reflection.<br className="hidden md:block" />
-          Free to start. Always with you.
-        </p>
-        <Link href="/login"
-          onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-          className="inline-flex items-center gap-2.5 font-sans text-base font-medium px-8 py-4 rounded-2xl"
-          style={{
-            background: hov ? "color-mix(in oklch, var(--bj-gold) 88%, black)" : "var(--bj-gold)",
-            color: "white",
-            transform: hov ? "translateY(-3px)" : "none",
-            boxShadow: hov ? "0 12px 36px color-mix(in oklch, var(--bj-gold) 40%, transparent)" : "0 4px 20px color-mix(in oklch, var(--bj-gold) 25%, transparent)",
-            transition: "all 0.18s ease",
-          }}>
-          Get started with Google <ArrowRight size={16} />
-        </Link>
-        <p className="font-sans text-xs mt-5" style={{ color: "var(--bj-ink4)" }}>Free · No credit card · Works on all devices</p>
-      </Reveal>
-    </section>
-  );
-}
-
-// ── Footer ─────────────────────────────────────────────────
-
-function Footer() {
-  return (
-    <footer className="px-5 md:px-10 py-8 border-t" style={{ borderColor: "var(--bj-line-soft)" }}>
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4" style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "var(--bj-gold)" }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" /></svg>
-          </div>
-          <span className="font-display text-sm" style={{ color: "var(--bj-ink3)" }}>BibJournal</span>
-          <span style={{ color: "var(--bj-line)" }}>·</span>
-          <span className="font-sans" style={{ fontSize: 11, color: "var(--bj-ink4)" }}>© {new Date().getFullYear()}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="font-sans text-xs px-2.5 py-1 rounded-full font-semibold"
-            style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)", letterSpacing: "0.04em" }}>
-            v{pkg.version}
+      <div className="relative flex-1 min-w-0 px-6 sm:px-11 py-8 sm:py-9">
+        <p className="font-sans text-[12px] font-medium mb-2.5" style={{ color: "var(--bj-ink3)" }}>Tuesday, Nov 17 · 7:12 AM</p>
+        <div className="flex gap-1.5 mb-5">
+          <span className="h-6 px-2.5 rounded-full flex items-center gap-1.5 font-sans text-[12px]" style={{ background: "var(--m-hover)", color: "var(--bj-ink2)" }}>
+            <i className="w-[7px] h-[7px] rounded-full" style={{ background: "var(--bj-gold)" }} />Grateful
           </span>
-          <span className="font-sans text-xs italic" style={{ color: "var(--bj-ink4)" }}>{pkg.codename}</span>
+          <span className="h-6 pl-[3px] pr-2.5 rounded-full flex items-center gap-1.5 font-sans text-[12px]" style={{ background: "var(--m-hover)", color: "var(--bj-ink2)" }}>
+            <i className="w-[18px] h-[18px] rounded-md" style={{ background: PHOTO }} />1 photo
+          </span>
+        </div>
+        <p className="font-display mb-4" style={{ fontSize: "clamp(28px, 3.4vw, 40px)", lineHeight: 1.1, color: "var(--bj-ink)", fontWeight: 500 }}>Morning light</p>
+        <p className="max-w-[560px]" style={{ fontFamily: "var(--font-newsreader), serif", fontSize: "clamp(16px, 1.6vw, 19px)", lineHeight: 1.75, color: "var(--bj-ink2)" }}>
+          The kettle, the window, and Psalm 5 before the emails.{" "}
+          <span style={{ color: "var(--bj-gold)", borderBottom: "1px dashed color-mix(in oklch, var(--bj-gold) 55%, transparent)" }}>Psalm 5:3</span>
+          {" "}— in the morning you hear my voice. I want the first words of the day to be to you, not about the day.
+        </p>
+        <div className="bj-glass absolute left-6 sm:left-11 bottom-5 h-[38px] rounded-xl hidden sm:flex items-center gap-3.5 px-3.5 font-sans text-[12.5px]" style={{ color: "var(--bj-ink3)" }}>
+          112 words
+          <span className="flex items-center gap-1.5" style={{ color: "var(--bj-gold)" }}><Camera size={13} />Photo</span>
+          <span className="flex items-center gap-1.5"><BookOpen size={13} />Verse</span>
         </div>
       </div>
-    </footer>
+    </div>
   );
 }
 
-// ── Page ───────────────────────────────────────────────────
+const REASONS = [
+  { Icon: PenLine, title: "Write the day", body: "A page that gets out of the way: how you felt, a photo of the moment, and verses that turn into links as you type." },
+  { Icon: CalendarDays, title: "See the seasons", body: "Month and year views show what you wrote, how you felt and which prayers were answered — any stretch, read back in order." },
+  { Icon: BookOpen, title: "Read beside it", body: "The Bible, word studies and your sermon notes open next to the page, so a verse goes straight into what you’re writing." },
+];
 
 export default function LandingPage() {
   return (
-    <div style={{ background: "var(--bj-bg)", minHeight: "100vh" }}>
-      <Nav />
-      <Hero />
+    <MotionConfig reducedMotion="user">
+      <div className="bj-opening min-h-screen overflow-x-hidden" style={{ color: "var(--bj-ink)" }}>
+        <Nav />
 
-      <FeaturesGrid />
+        <section className="text-center px-4 pt-14 sm:pt-20">
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: EASE }}>
+            <p className="font-sans text-[10.5px] sm:text-[11px] font-semibold uppercase mb-5" style={{ letterSpacing: "0.14em", color: "var(--bj-gold)" }}>A journal for life with God</p>
+            <h1 className="font-display mx-auto" style={{ fontSize: "clamp(2.9rem, 7vw, 4.9rem)", lineHeight: 1.02, letterSpacing: "-0.015em", fontWeight: 500, maxWidth: 760 }}>
+              A quiet place <br className="hidden sm:block" />to write with God.
+            </h1>
+            <p className="font-sans mx-auto mt-6 max-w-[560px] text-[15px] sm:text-[17px]" style={{ lineHeight: 1.6, color: "var(--bj-ink3)" }}>
+              Write what you’re carrying, keep the verse that met you, and look back over months to see where He was. The Bible, your prayers and your notes sit beside the page.
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row gap-2.5 justify-center items-stretch sm:items-center max-w-[340px] sm:max-w-none mx-auto">
+              <Start />
+              <a href="#inside" className="bj-raised bj-lift h-12 px-5 rounded-[14px] inline-flex items-center justify-center font-sans text-[14.5px] font-medium" style={{ color: "var(--bj-ink2)" }}>See inside</a>
+            </div>
+            <p className="font-sans text-[12px] mt-4" style={{ color: "var(--bj-ink4)" }}>Sign in with Google · Works on phone and desktop</p>
+          </motion.div>
+        </section>
 
-      <SpotlightSection
-        eyebrow="Journal"
-        title={"Write freely.\nProcess the Word."}
-        desc="A distraction-free writing space that stays out of your way. Rich formatting, mood tracking, floating Bible and AI panels — everything you need flows naturally as you reflect."
-        bullets={[
-          "10 mood indicators to capture how you feel each day",
-          "Floating Bible reader while you write — no tab switching",
-          "Ask AI any biblical question without leaving your entry",
-          "5 beautiful writing fonts to match your tone",
-          "Table view to see all entries at a glance",
-        ]}
-      >
-        <HeroMockup />
-      </SpotlightSection>
+        <motion.div id="inside" className="px-4 sm:px-8 mt-14 sm:mt-[70px] scroll-mt-6" style={{ perspective: 1600 }}
+          initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.15, ease: EASE }}>
+          <div style={{ transform: "rotateX(6deg)", transformOrigin: "top center" }}>
+            <JournalPeek />
+          </div>
+        </motion.div>
 
-      <SpotlightSection
-        reverse
-        eyebrow="Bible"
-        title="The Word, across\nevery translation."
-        desc="Read, compare, and highlight scripture across 8 translations. As you type a reference, intelligent predictions guide you to the exact verse — then navigate the whole Bible without friction."
-        bullets={[
-          "ESV, KJV, NIV, AMP, MSG, ASV, NKJV and NLT built-in",
-          "Live suggestions as you type — John 3, Ps 23, 1 Cor 13",
-          "Tap any verse to highlight it in gold",
-          "Compare the same passage across all translations at once",
-        ]}
-      >
-        <BibleMockup />
-      </SpotlightSection>
+        <section className="px-4 sm:px-8 md:px-[120px] pt-24 sm:pt-28 max-w-[1240px] mx-auto">
+          <Reveal className="text-center">
+            <p className="font-sans text-[10.5px] font-semibold uppercase mb-3" style={{ letterSpacing: "0.08em", color: "var(--bj-ink4)" }}>What it’s for</p>
+            <h2 className="font-display mb-10" style={{ fontSize: "clamp(2rem, 4.4vw, 2.75rem)", lineHeight: 1.1, fontWeight: 500 }}>Writing first. Everything else beside it.</h2>
+          </Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {REASONS.map(({ Icon, title, body }, i) => (
+              <Reveal key={title} delay={i * 0.06}>
+                <div className="bj-raised rounded-[20px] p-6 h-full">
+                  <span className="bj-glass w-[38px] h-[38px] rounded-xl flex items-center justify-center mb-4"><Icon size={17} style={{ color: "var(--bj-gold)" }} /></span>
+                  <h3 className="font-display text-[22px] mb-2" style={{ lineHeight: 1.2, fontWeight: 500 }}>{title}</h3>
+                  <p className="font-sans text-[13.5px]" style={{ lineHeight: 1.6, color: "var(--bj-ink3)" }}>{body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
 
-      <SpotlightSection
-        eyebrow="Research · AI"
-        title="Scripture study,\npowered by AI."
-        desc="Ask any biblical question and receive a cited, scripture-backed answer drawn from semantic search across all 31,000 ESV verses. Generate chapter commentary, study Greek and Hebrew roots, and compare translations side by side."
-        bullets={[
-          "Semantic vector search — finds passages by meaning, not just keywords",
-          "AI chapter commentary: themes, context, cross-references",
-          "Greek & Hebrew word studies with Strongs numbers",
-          "Research journaling mode — save findings, add reflections, finalise",
-        ]}
-      >
-        <ResearchMockup />
-      </SpotlightSection>
+          <Reveal className="mt-4">
+            <div id="privacy" className="bj-glass rounded-[24px] p-6 sm:p-9 flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-9 scroll-mt-6">
+              <span className="bj-raised w-16 h-16 rounded-[20px] flex items-center justify-center shrink-0"><Lock size={26} style={{ color: "var(--bj-gold)" }} /></span>
+              <div>
+                <h2 className="font-display mb-2" style={{ fontSize: "clamp(1.6rem, 3vw, 1.9rem)", lineHeight: 1.15, fontWeight: 500 }}>Some pages are only for you and God.</h2>
+                <p className="font-sans text-[14px] max-w-[640px]" style={{ lineHeight: 1.6, color: "var(--bj-ink3)" }}>
+                  Turn on encryption and your journal and prayers are sealed with a passphrase only you know — not even we can read them. Lock single pages or whole folders with a code.
+                </p>
+              </div>
+            </div>
+          </Reveal>
+        </section>
 
-      <SpotlightSection
-        reverse
-        eyebrow="Prayer"
-        title="Never forget what\nGod has answered."
-        desc="Log every prayer, watch your streak grow, and mark answered prayers with a testimony. A faithful record of God's faithfulness over your life."
-        bullets={[
-          "Prayer streaks — stay consistent with daily logging",
-          "Mark as answered and record the testimony",
-          "Day-counter badges show how long you've been praying",
-          "Separate views for active and answered prayers",
-        ]}
-      >
-        <PrayerMockup />
-      </SpotlightSection>
+        <section className="text-center px-4 pt-28 sm:pt-32">
+          <Reveal>
+            <Mark size={56} className="mx-auto" />
+            <h2 className="font-display mt-6 mb-3" style={{ fontSize: "clamp(2.3rem, 5vw, 3.1rem)", lineHeight: 1.1, fontWeight: 500 }}>Start tonight’s page.</h2>
+            <p className="font-display italic text-[18px] mb-8" style={{ color: "var(--bj-ink3)" }}>“In the morning you hear my voice.” — Psalm 5:3</p>
+            <Start big />
+          </Reveal>
+        </section>
 
-      <SpotlightSection
-        eyebrow="Proclamations"
-        title="Declare what\nGod says."
-        desc="Write declarations of scripture over your life. Organise them into folders, share them publicly with a link, and speak them as living words — not just text."
-        bullets={[
-          "Organise declarations into themed folders",
-          "Share any folder publicly with a single link",
-          "Beautiful typography designed for proclamation",
-          "In-place editing — always easy to update",
-        ]}
-      >
-        <ProclamationsMockup />
-      </SpotlightSection>
-
-      <CTA />
-      <Footer />
-    </div>
+        <footer className="mt-28 px-4 sm:px-14 py-6 flex items-center gap-2.5 font-sans text-[12.5px]" style={{ borderTop: "1px solid var(--bj-line-soft)", color: "var(--bj-ink4)" }}>
+          <Mark size={20} />
+          <span className="font-display text-[15px]" style={{ color: "var(--bj-ink3)" }}>BibJournal</span>
+          <span className="ml-auto" style={{ fontVariantNumeric: "tabular-nums" }}>v{pkg.version} · © {new Date().getFullYear()}</span>
+        </footer>
+      </div>
+    </MotionConfig>
   );
 }

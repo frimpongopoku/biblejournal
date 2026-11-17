@@ -4,15 +4,18 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Pin, Star, Search, Plus, Trash2, ChevronLeft, List, X, Table2, Check, Maximize2, Minimize2, Loader2, CloudOff,
+  Pin, Star, Search, Plus, Trash2, ChevronLeft, List, X, Table2, Check, CalendarDays, Lock, LockOpen, Maximize2, Minimize2, Loader2, CloudOff,
 } from "lucide-react";
 import { useJournalEntries } from "@/hooks/useJournalEntries";
 import { useAutosave, saveStatusLabel, type SaveStatus } from "@/hooks/useAutosave";
-import { createEntry, updateEntry, deleteEntry } from "@/services/journal.service";
+import { createEntry, updateEntry, deleteEntry, setEntryLocked, addEntryPhoto } from "@/services/journal.service";
+import { FolderSwitcher, FolderChip, LockedPanel, LockCodeWindow, ensureLockKey } from "@/components/journal/Folders";
+import { useLocks, lockNow } from "@/lib/locks";
+import { folderLocked } from "@/services/folder.service";
 import { useAuthStore } from "@/store/auth.store";
-import { EntryCover, AddCoverChip, CoverWash, PhotoDropOverlay, useCoverSrc } from "@/components/journal/EntryCover";
-import { attachCover } from "@/lib/photos";
-import { getActiveEditor } from "@/lib/editor/quote";
+import { PhotoDropOverlay } from "@/components/journal/EntryCover";
+import { PhotoStack, PhotoViewer, PhotoPile, PhotoGallery, useEntryPhotos, addEntryPhotos } from "@/components/journal/EntryPhotos";
+import { attachPhotos } from "@/lib/photos";
 import { feelingColor } from "@/lib/feelings";
 import { lastInputWasKeyboard } from "@/lib/inputMode";
 import { Companion } from "@/components/journal/Companion";
@@ -21,7 +24,8 @@ import { useWritingStore } from "@/store/writing.store";
 import { TipTapEditor } from "@/components/journal/TipTapEditor";
 import { WritingSettingsButton } from "@/components/journal/WritingSettings";
 import { TagEditor, FeelingPicker, TableView, cachedDocText } from "@/components/journal/JournalParts";
-import type { JournalEntry } from "@/types";
+import type { EntryPhoto, JournalEntry } from "@/types";
+import { MonthView, YearView, type TimeMode } from "@/components/journal/TimeViews";
 
 type Patch = Partial<Omit<JournalEntry, "id" | "userId" | "createdAt" | "updatedAt">>;
 const FILTERS = ["All", "Pinned", "Starred"] as const;
@@ -125,11 +129,17 @@ function JournalView() {
 
   const [filter, setFilter] = useState<Filter>("All");
   const [search, setSearch] = useState("");
+  const [folder, setFolder] = useState<string | null>(null);
+  const lockOpenNow = useLocks((s) => !!s.key);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [localTitle, setLocalTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [showSheet, setShowSheet] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "table">("list");
+  const [viewMode, setViewMode] = useState<"list" | "table" | "month" | "year">(() => {
+    const v = searchParams.get("view");
+    return v === "month" || v === "year" ? v : "list";
+  });
+  const timeView = viewMode === "month" || viewMode === "year";
   const [undo, setUndo] = useState<JournalEntry | null>(null);
   const [chromeVisible, setChromeVisible] = useState(true);
   const pendingDelete = useRef<{ entry: JournalEntry; timer: ReturnType<typeof setTimeout> } | null>(null);
@@ -145,7 +155,7 @@ function JournalView() {
   // A just-created entry is shown at once from a local draft until Firestore reports it.
   const [draft, setDraft] = useState<JournalEntry | null>(null);
   const selected = entries.find((e) => e.id === selectedId) ?? (draft && draft.id === selectedId ? draft : null);
-  const { src: coverSrc } = useCoverSrc(selected);
+  const hasPhotos = useEntryPhotos(selected).length > 0;
   const [dropping, setDropping] = useState(false);
   const [companionOpen, setCompanionOpen] = useState(() => {
     try { return localStorage.getItem("bj-companion") !== "0"; } catch { return true; }
@@ -229,6 +239,7 @@ function JournalView() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return entries.filter((e) => {
+      if (folder && e.folderId !== folder) return false;
       if (filter === "Pinned" && !e.isPinned) return false;
       if (filter === "Starred" && !e.isFavorite) return false;
       if (!q) return true;
@@ -239,7 +250,7 @@ function JournalView() {
         e.tags.some((t) => t.toLowerCase().includes(q.replace(/^#/, "")))
       );
     });
-  }, [entries, filter, search, derived]);
+  }, [entries, filter, search, derived, folder]);
 
   const groups = useMemo(() => {
     const out: { label: string; items: JournalEntry[] }[] = [];
@@ -259,16 +270,22 @@ function JournalView() {
 
   // ── Actions ──
 
-  const handleNew = useCallback(async () => {
+  const handleNew = useCallback(async (forDay?: unknown) => {
     if (!user || creating) return;
     setCreating(true);
     autosave.flush();
     try {
-      const id = await createEntry(user.uid);
-      const now = new Date();
+      // From the calendar: an entry that belongs to an earlier day (at noon, so time zones don't shift it).
+      const day = forDay instanceof Date && forDay.toDateString() !== new Date().toDateString()
+        ? new Date(forDay.getFullYear(), forDay.getMonth(), forDay.getDate(), 12) : undefined;
+      // New pages go into the folder you're looking at (a locked one asks for the code first).
+      const into = folder && (!folderLocked(folder) || (await ensureLockKey("Enter your lock code to write here"))) ? folder : null;
+      const id = await createEntry(user.uid, { ...(day ? { createdAt: day } : {}), folderId: into });
+      setViewMode("list");
+      const now = day ?? new Date();
       setDraft({
         id, userId: user.uid, title: "", content: JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] }),
-        tags: [], folderId: null, isPinned: false, isFavorite: false, scriptures: [], createdAt: now, updatedAt: now,
+        tags: [], folderId: into, isPinned: false, isFavorite: false, scriptures: [], createdAt: now, updatedAt: now,
       } as JournalEntry);
       setSelectedId(id);
       setLocalTitle("");
@@ -278,7 +295,7 @@ function JournalView() {
     } finally {
       setCreating(false);
     }
-  }, [user, creating, autosave]);
+  }, [user, creating, autosave, folder]);
 
   const commitDelete = useCallback(() => {
     const p = pendingDelete.current;
@@ -316,6 +333,53 @@ function JournalView() {
     return () => { window.removeEventListener("pagehide", commitDelete); commitDelete(); };
   }, [commitDelete]);
 
+  // ⌘L — lock or unlock this page (asks for the lock code, or to choose one the first time).
+  const toggleLockPage = useCallback(async () => {
+    if (!user || !selected || selected.shut) return;
+    autosave.flush();
+    if (!(await ensureLockKey(selected.locked ? "Enter your lock code to remove the lock" : "Enter your lock code"))) return;
+    try { await setEntryLocked(user.uid, selected, !selected.locked); } catch (e) { console.error("lock page", e); }
+  }, [user, selected, autosave]);
+
+  const lockEverything = useCallback(() => {
+    autosave.flush();
+    // Let the last save land sealed before the key goes.
+    setTimeout(lockNow, 500);
+  }, [autosave]);
+
+  // Photos live in the stack at the top-right, never in the writing: the toolbar / ⌘⇧P
+  // add to it, and a photo found in the text (older pages) is moved up into it.
+  useEffect(() => {
+    if (!user || !selected) return;
+    const uid = user.uid, entry = selected;
+    let hasCover = !!entry.cover || !!entry.photos?.length;
+    const add = () => { if (!entry.shut) void addEntryPhotos(uid, entry); };
+    const out = (e: Event) => {
+      const d = (e as CustomEvent<{ photo: EntryPhoto; handled: boolean }>).detail;
+      if (entry.shut) return;
+      d.handled = true;
+      const already = entry.photos?.some((p) => p.url === d.photo.url) || entry.cover?.url === d.photo.url;
+      if (!already) void addEntryPhoto(uid, entry.id, d.photo, !hasCover);
+      hasCover = true;
+    };
+    // Pasted, dropped or /photo pictures: into the photo set, not the writing.
+    const files = (e: Event) => {
+      const d = (e as CustomEvent<{ files: File[]; handled: boolean }>).detail;
+      if (entry.shut || !d.files.length) return;
+      d.handled = true;
+      attachPhotos(uid, entry.id, d.files, !hasCover);
+      hasCover = true;
+    };
+    window.addEventListener("bj:entry-photos", add);
+    window.addEventListener("bj:photo-out", out);
+    window.addEventListener("bj:entry-photo-files", files);
+    return () => {
+      window.removeEventListener("bj:entry-photos", add);
+      window.removeEventListener("bj:photo-out", out);
+      window.removeEventListener("bj:entry-photo-files", files);
+    };
+  }, [user, selected]);
+
   const patchSelected = (patch: Patch) => {
     if (!user || !selected) return;
     void updateEntry(user.uid, selected.id, patch);
@@ -328,12 +392,9 @@ function JournalView() {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.shiftKey && e.code === "KeyN") { e.preventDefault(); void handleNew(); return; }
       if (mod && !e.shiftKey && e.code === "KeyJ") { e.preventDefault(); setCompanionOpen((o) => !o); return; }
-      // ⌘⇧P — a photo into the page, where the cursor is.
-      if (mod && e.shiftKey && e.code === "KeyP") {
-        const ed = getActiveEditor();
-        if (ed) { e.preventDefault(); ed.view.dom.dispatchEvent(new CustomEvent("bj:photo-picker")); }
-        return;
-      }
+      if (mod && !e.shiftKey && e.code === "KeyL") { e.preventDefault(); void toggleLockPage(); return; }
+      // ⌘⇧P — add photos to this page (kept beside the writing).
+      if (mod && e.shiftKey && e.code === "KeyP") { e.preventDefault(); window.dispatchEvent(new CustomEvent("bj:entry-photos")); return; }
       if (mod && e.code === "Period") { e.preventDefault(); setWriting({ zen: !useWritingStore.getState().zen }); return; }
       if (e.key === "Escape" && useWritingStore.getState().zen && !document.querySelector('[role="dialog"]')) { setWriting({ zen: false }); return; }
       if (mod && !e.shiftKey && e.code === "KeyZ" && pendingDelete.current) {
@@ -356,7 +417,7 @@ function JournalView() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [handleNew, handleUndo, setWriting, flatOrder, selectedId, select]);
+  }, [handleNew, handleUndo, setWriting, flatOrder, selectedId, select, toggleLockPage]);
 
   // Zen: chrome fades while typing, returns when the mouse moves.
   useEffect(() => {
@@ -416,12 +477,20 @@ function JournalView() {
             {fc && <span className="w-[7px] h-[7px] rounded-full shrink-0" style={{ background: fc, boxShadow: `0 0 6px ${fc}` }} title={entry.feeling} />}
             {entry.isPinned && filter !== "All" && <Pin size={10} className="shrink-0" style={{ color: "var(--bj-gold)" }} />}
             {entry.isFavorite && <Star size={10} className="shrink-0" fill="var(--bj-gold)" style={{ color: "var(--bj-gold)" }} />}
+            {entry.lockSealed && (entry.shut
+              ? <Lock size={10} className="shrink-0" style={{ color: "var(--bj-gold)" }} aria-label="Locked" />
+              : <LockOpen size={10} className="shrink-0" style={{ color: "var(--bj-gold)" }} aria-label="Locked, open now" />)}
             <span className="font-sans text-[13.5px] font-medium truncate flex-1" style={{ color: isSel ? "var(--bj-ink)" : "var(--bj-ink2)" }}>
               {entry.title || <span style={{ color: "var(--bj-ink4)", fontWeight: 400 }}>Untitled</span>}
             </span>
             <span className="shrink-0 font-sans text-[10.5px]" style={{ color: "var(--bj-ink4)", fontVariantNumeric: "tabular-nums" }}>{rowTime(entry.updatedAt)}</span>
           </span>
-          {d?.excerpt ? (
+          {entry.shut ? (
+            <span className="flex flex-col gap-1.5 mt-2" aria-label="Locked writing">
+              <i className="block h-[7px] w-[88%] rounded" style={{ background: "color-mix(in oklch, var(--bj-ink) 7%, transparent)" }} />
+              <i className="block h-[7px] w-[62%] rounded" style={{ background: "color-mix(in oklch, var(--bj-ink) 7%, transparent)" }} />
+            </span>
+          ) : d?.excerpt ? (
             <span className="bj-preview block font-write text-[14px] mt-1"
               style={{ color: "var(--bj-ink3)", lineHeight: 1.35, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
               {d.excerpt}
@@ -475,12 +544,22 @@ function JournalView() {
         {!zen && (
           <aside
             aria-label="Journal entries"
-            className={`${viewMode === "table" ? "hidden" : selectedId ? "hidden md:flex" : "flex"} w-full md:w-[316px] flex-col h-full overflow-hidden shrink-0`}
+            className={`${viewMode === "table" || timeView ? "hidden" : selectedId ? "hidden md:flex" : "flex"} w-full md:w-[316px] flex-col h-full overflow-hidden shrink-0`}
           >
             <div className="px-4 pt-5 pb-2 flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <h1 className="font-display text-[28px]" style={{ color: "var(--bj-ink)", fontWeight: 500 }}>Journal</h1>
                 <div className="flex items-center gap-1">
+                  {lockOpenNow && (
+                    <button type="button" onClick={lockEverything} title="Lock locked pages again" aria-label="Lock now"
+                      className="bj-btn-icon w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-gold)" }}>
+                      <LockOpen size={14} />
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setViewMode("month")} title="Month and year" aria-label="Calendar view"
+                    className="bj-btn-icon w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
+                    <CalendarDays size={14} />
+                  </button>
                   <button type="button" onClick={() => setViewMode("table")} title="Table view" aria-label="Table view"
                     className="bj-btn-icon w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}>
                     <Table2 size={14} />
@@ -508,6 +587,7 @@ function JournalView() {
                   <button type="button" onClick={() => setSearch("")} aria-label="Clear search" style={{ color: "var(--bj-ink4)" }}><X size={12} /></button>
                 ) : <kbd className="bj-kbd hidden md:inline-flex">/</kbd>}
               </label>
+              {user && <FolderSwitcher uid={user.uid} current={folder} onPick={(id) => { setFolder(id); setSearch(""); }} entries={entries} />}
               <div className="bj-well flex gap-0.5 p-[3px] rounded-xl" role="tablist">
                 {FILTERS.map((f) => (
                   <button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}
@@ -547,11 +627,20 @@ function JournalView() {
           </div>
         )}
 
+        {/* ── Month / Year ── */}
+        {timeView && !zen && (
+          <div className="flex-1 min-w-0 h-full overflow-hidden">
+            {viewMode === "month"
+              ? <MonthView entries={entries} onOpen={(id) => { select(id); setViewMode("list"); }} onNewFor={(d) => void handleNew(d)} onMode={(m: TimeMode) => setViewMode(m)} />
+              : <YearView entries={entries} onOpen={(id) => { select(id); setViewMode("list"); }} onMode={(m: TimeMode) => setViewMode(m)} />}
+          </div>
+        )}
+
         {/* ── Writing pane ── */}
         <section
           aria-label="Entry"
           data-writing-surface
-          className={`${viewMode === "table" && !zen ? "hidden" : selectedId ? "flex" : "hidden md:flex"} flex-1 min-w-0 h-full overflow-hidden ${zen ? "" : "md:p-3 md:pl-1 gap-3"}`}
+          className={`${(viewMode === "table" || timeView) && !zen ? "hidden" : selectedId ? "flex" : "hidden md:flex"} flex-1 min-w-0 h-full overflow-hidden ${zen ? "" : "md:p-3 md:pl-1 gap-3"}`}
         >
           <div ref={sheetRef} className={`relative flex-1 flex flex-col min-w-0 h-full overflow-hidden ${zen ? "" : "bj-sheet"}`}>
           {selected ? (
@@ -573,6 +662,14 @@ function JournalView() {
 
                 <div className="hidden md:block"><SaveIndicator status={autosave.status} /></div>
                 <div className="flex-1" />
+                {!selected.shut && (
+                  <button type="button" onClick={() => void toggleLockPage()}
+                    aria-label={selected.locked ? "Unlock this page" : "Lock this page"} aria-pressed={!!selected.locked} title={selected.locked ? "Remove the lock (⌘L)" : "Lock this page (⌘L)"}
+                    className="bj-btn-action w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ color: selected.locked ? "var(--bj-gold)" : "var(--bj-ink4)" }}>
+                    {selected.locked ? <Lock size={14} /> : <LockOpen size={14} />}
+                  </button>
+                )}
                 <button type="button" onClick={() => patchSelected({ isPinned: !selected.isPinned })}
                   aria-label={selected.isPinned ? "Unpin" : "Pin"} aria-pressed={selected.isPinned} title={selected.isPinned ? "Unpin" : "Pin"}
                   className="bj-btn-action w-8 h-8 rounded-lg flex items-center justify-center"
@@ -603,15 +700,14 @@ function JournalView() {
 
               <div className="relative flex-1 min-h-0"
                 onDragEnter={(e) => { if (user && Array.from(e.dataTransfer.types).includes("Files")) setDropping(true); }}>
-                <CoverWash src={coverSrc} tint={selected.cover?.tint} />
                 {dropping && user && (
                   <PhotoDropOverlay
                     onLeave={() => setDropping(false)}
-                    onCover={([f]) => attachCover(user.uid, selected.id, f)}
-                    onPage={(files) => getActiveEditor()?.commands.insertPhotos(files)}
+                    onCover={(files) => attachPhotos(user.uid, selected.id, files, true)}
+                    onPage={(files) => attachPhotos(user.uid, selected.id, files, false)}
                   />
                 )}
-                <TipTapEditor
+                {selected.shut ? <LockedPanel entry={selected} /> : <TipTapEditor
                   entryId={selected.id}
                   content={selected.content}
                   onChange={(json) => autosave.schedule(selected.id, { content: json })}
@@ -621,15 +717,16 @@ function JournalView() {
                   statsExtra={<span className="md:hidden"><SaveIndicator status={autosave.status} /></span>}
                   header={
                     <div className="relative mb-6">
-                      <div className="flex flex-wrap items-end gap-x-5 gap-y-4 mb-5">
-                        {user && <EntryCover entry={selected} uid={user.uid} />}
+                      {hasPhotos && <div className="absolute right-0 top-0 z-10"><PhotoPile entry={selected} /></div>}
+                      <div className={`flex flex-wrap items-end gap-x-5 gap-y-4 mb-5 ${hasPhotos ? "pr-[100px] md:pr-[136px] min-h-[92px] md:min-h-[120px] items-start" : ""}`}>
                         <div className="min-w-0 pb-1">
                           <p className="font-sans text-[12.5px] font-medium mb-2.5" style={{ color: "var(--bj-ink3)" }}>
                             {selected.createdAt.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })} · {selected.createdAt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                           </p>
                           <div className="flex items-center gap-1.5 flex-wrap font-sans text-[12px]" style={{ color: "var(--bj-ink4)" }}>
                             <FeelingPicker value={selected.feeling} onChange={(feeling) => patchSelected({ feeling: feeling ?? "" })} />
-                            {user && <AddCoverChip entry={selected} uid={user.uid} />}
+                            {user && <PhotoStack entry={selected} uid={user.uid} />}
+                            {user && <FolderChip uid={user.uid} entry={selected} />}
                             <TagEditor tags={selected.tags} onChange={(tags) => patchSelected({ tags })} />
                           </div>
                         </div>
@@ -655,7 +752,7 @@ function JournalView() {
                       />
                     </div>
                   }
-                />
+                />}
               </div>
             </>
           ) : !loading ? (
@@ -675,6 +772,9 @@ function JournalView() {
               <Companion entry={selected} entries={entries} onClose={() => setCompanionOpen(false)} />
             </aside>
           )}
+          {selected && user && <PhotoGallery entry={selected} uid={user.uid} />}
+          {selected && user && <PhotoViewer entry={selected} uid={user.uid} />}
+          <LockCodeWindow />
         </section>
       </div>
 

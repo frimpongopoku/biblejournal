@@ -34,7 +34,7 @@ export default function SettingsPage() {
               <h1 className="font-display flex-1" style={{ fontSize: 34, color: "var(--bj-ink)", fontWeight: 500 }}>Settings</h1>
               <button type="button" onClick={() => router.back()} className="font-sans text-[14px] font-medium h-9 px-2" style={{ color: "var(--bj-gold)" }}>Done</button>
             </div>
-            <button type="button" onClick={() => setOpen("account")} className="bj-raised w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl mb-5 text-left">
+            <button type="button" onClick={() => setOpen("account")} className="bj-raised bj-lift w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl mb-5 text-left">
               {user?.photoURL
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={user.photoURL} alt="" referrerPolicy="no-referrer" className="w-10 h-10 rounded-full object-cover shrink-0" />
@@ -50,7 +50,7 @@ export default function SettingsPage() {
                 {g.map((id) => {
                   const Icon = SECTION_ICONS[id];
                   return (
-                    <button key={id} type="button" onClick={() => setOpen(id)} className="w-full flex items-center gap-3 h-12 text-left border-b last:border-b-0" style={{ borderColor: "var(--bj-line-soft)" }}>
+                    <button key={id} type="button" onClick={() => setOpen(id)} className="w-full flex items-center gap-3 h-12 text-left border-b last:border-b-0 transition-opacity duration-100 active:opacity-60" style={{ borderColor: "var(--bj-line-soft)" }}>
                       <span className="bj-well w-7 h-7 rounded-lg flex items-center justify-center shrink-0"><Icon size={14} style={{ color: "var(--bj-gold)" }} /></span>
                       <span className="flex-1 font-sans text-[15px] font-medium" style={{ color: "var(--bj-ink)" }}>{label(id)}</span>
                       <span className="font-sans text-[13px] truncate max-w-[40%]" style={{ color: "var(--bj-ink4)" }}>{summary[id]}</span>

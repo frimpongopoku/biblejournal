@@ -12,7 +12,7 @@ import { useReadingStore } from "@/store/reading.store";
 import { useBibleStore } from "@/store/bible.store";
 import { fetchPassage } from "@/lib/bible-client";
 import { startEntry } from "@/lib/startEntry";
-import { attachCover, pickPhotos, imageFiles } from "@/lib/photos";
+import { attachPhotos, getPhotos, imageFiles } from "@/lib/photos";
 import { FEELING_COLORS, feelingColor } from "@/lib/feelings";
 import { cachedDocText, feelingByLabel, plural, FEELINGS } from "@/components/journal/JournalParts";
 import type { JournalEntry } from "@/types";
@@ -132,11 +132,10 @@ export default function TodayPage() {
 
   async function withPhoto(files?: File[]) {
     if (!user) return;
-    const picked = files ?? await pickPhotos({ camera: window.matchMedia("(pointer: coarse)").matches });
-    const [file] = picked;
-    if (!file) return;
+    const picked = files ?? await getPhotos({ multiple: true });
+    if (!picked.length) return;
     const id = await begin({ ...(feeling ? { feeling } : {}), ...(draft.trim() ? { content: JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: draft.trim() }] }] }) } : {}) }, "title");
-    if (id) attachCover(user.uid, id, file);
+    if (id) attachPhotos(user.uid, id, picked, true);
   }
 
   // ── Rail data ──

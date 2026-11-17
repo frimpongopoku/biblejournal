@@ -27,7 +27,16 @@ export function dayNumber(p: Prayer, now = Date.now()): number {
 /** How many to pray each day so everything comes round about once a week. */
 export function perDayFor(activeCount: number, setting: number): number {
   if (setting > 0) return Math.min(setting, activeCount);
-  return Math.min(activeCount, Math.max(4, Math.ceil(activeCount / 7)));
+  // Enough to come round weekly, but never a wall: past 7 a day the cycle just takes longer.
+  return Math.min(activeCount, 7, Math.max(4, Math.ceil(activeCount / 7)));
+}
+
+/** How long it takes for everything to come round once, in words. */
+export function cycleLabel(activeCount: number, perDay: number): string {
+  const days = perDay ? Math.ceil(activeCount / perDay) : 0;
+  if (days <= 7) return "Everything you carry comes round about once a week";
+  const weeks = Math.round(days / 7);
+  return `Everything you carry comes round about every ${weeks} weeks`;
 }
 
 /**
@@ -73,15 +82,20 @@ export function shortDate(t: number | Date, withYear = false): string {
   });
 }
 
+export function num(n: number): string {
+  return n.toLocaleString();
+}
+
 export function plural(n: number, one: string, many = `${one}s`) {
-  return `${n} ${n === 1 ? one : many}`;
+  return `${num(n)} ${n === 1 ? one : many}`;
 }
 
 export function initialOf(name: string): string {
   const seg = typeof Intl !== "undefined" && "Segmenter" in Intl
     ? Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(name.trim()), (s) => s.segment)
     : Array.from(name.trim());
-  return (seg[0] ?? "").toUpperCase();
+  // First letter or digit, so "🙏 Grandma" is G, not the emoji.
+  return (seg.find((g) => /[\p{L}\p{N}]/u.test(g)) ?? seg[0] ?? "").toUpperCase();
 }
 
 const HUES = ["var(--bj-sage)", "oklch(70% 0.09 240)", "oklch(70% 0.09 295)", "var(--bj-gold)", "oklch(68% 0.1 15)", "oklch(70% 0.09 190)"];

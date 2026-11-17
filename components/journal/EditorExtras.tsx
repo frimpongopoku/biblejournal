@@ -103,7 +103,7 @@ export function WritingStats({ editor, docKey, whisper = false, extra }: {
       </span>
       <span className="w-px h-4 mx-0.5" style={{ background: "var(--bj-line)" }} />
       <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => fire("bj:photo-picker")}
-        title="Add a photo (⌘⇧P) — or paste / drop one" style={{ color: "var(--bj-gold-deep)" }}>
+        title="Add photos to this page (⌘⇧P) — kept beside your writing" style={{ color: "var(--bj-gold-deep)" }}>
         <Camera size={14} /><span className="hidden sm:inline">Photo</span>
       </button>
       <button type="button" className={tool} onMouseDown={(e) => e.preventDefault()} onClick={() => fire("bj:verse-picker")} title="Quote a verse (/verse)">

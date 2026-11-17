@@ -10,6 +10,8 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, BookOpen, PenLine, Wrench, Settings,
 } from "lucide-react";
 import { SettingsModal } from "@/components/settings/SettingsModal";
+import { CameraWindow } from "@/components/journal/CameraWindow";
+import { Mark } from "@/components/brand/Mark";
 import { usePrefsStore, useSettingsUi } from "@/store/prefs.store";
 import { useKeySounds } from "@/hooks/useWritingSurface";
 import { ShortcutsPanel } from "@/components/ShortcutsPanel";
@@ -65,14 +67,7 @@ function isEditable(t: EventTarget | null) {
 }
 
 function Logo({ size = 24 }: { size?: number }) {
-  return (
-    <div className="bj-gold rounded-lg flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <svg width={size / 2} height={size / 2} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" />
-        <path d="M12 10c0 0-2 2.5-2 4a2 2 0 004 0c0-1.5-2-4-2-4z" fill="white" fillOpacity="0.5" />
-      </svg>
-    </div>
-  );
+  return <Mark size={size} />;
 }
 
 function Avatar({ size, photo, initial }: { size: number; photo?: string | null; initial: string }) {
@@ -643,6 +638,7 @@ export function AppShell({ children, rightRail }: AppShellProps) {
 
       <ShortcutsPanel open={showShortcuts} onClose={() => setShowShortcuts(false)} />
       <SettingsModal />
+      <CameraWindow />
       <CommandPalette open={showPalette} onClose={() => setShowPalette(false)} onShortcuts={() => setShowShortcuts(true)} />
 
       <AnimatePresence>

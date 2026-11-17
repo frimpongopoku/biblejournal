@@ -12,9 +12,11 @@ import { useBibleStore } from "@/store/bible.store";
 import { useWritingStore, writingFontStyle } from "@/store/writing.store";
 import { parseRef } from "@/lib/bible-ref-parser";
 import { fetchPassage } from "@/lib/bible-client";
-import { dayNumber, docToText, textToDoc, lastWords, plural, prayedToday, shortDate, todaysPrayers, waitedDays } from "@/lib/prayer";
+import { useAutoGrow } from "@/hooks/useAutoGrow";
+import { cycleLabel, num, perDayFor, dayNumber, docToText, textToDoc, lastWords, plural, prayedToday, shortDate, todaysPrayers, waitedDays } from "@/lib/prayer";
 import { PersonDot, VerseCard, forLabel, STAND_ON } from "@/components/prayer/parts";
 import { PrayNow } from "@/components/prayer/PrayNow";
+import { DataToggle } from "@/components/dev/DataToggle";
 import type { Prayer, ScriptureRef } from "@/types";
 
 const EASE: [number, number, number, number] = [0.23, 1, 0.32, 1];
@@ -37,12 +39,7 @@ function Composer({ people, onAdded }: { people: string[]; onAdded: (id: string,
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const parsed = verse.trim() ? parseRef(verse) : null;
 
-  useEffect(() => {
-    const el = areaRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [text]);
+  useAutoGrow(areaRef, text);
 
   function add() {
     const t = text.trim();
@@ -119,7 +116,7 @@ function TodayRow({ p, onOpen, onPray }: { p: Prayer; onOpen: () => void; onPray
       <button type="button" onClick={onOpen} className="flex gap-3.5 items-start flex-1 min-w-0 text-left" data-row>
         <PersonDot name={p.for} size={30} />
         <span className="flex-1 min-w-0">
-          <span className="block font-sans text-[10.5px] font-semibold uppercase mb-1 truncate" style={{ color: "var(--bj-ink4)", letterSpacing: "0.06em" }}>{forLabel(p.for)} · day {dayNumber(p)}</span>
+          <span className="block font-sans text-[10.5px] font-semibold uppercase mb-1 truncate" style={{ color: "var(--bj-ink4)", letterSpacing: "0.06em" }}>{forLabel(p.for)} · day {num(dayNumber(p))}</span>
           <span className="block font-display mb-1" style={{ fontSize: 21, fontWeight: 500, lineHeight: 1.2, color: "var(--bj-ink)", overflowWrap: "anywhere" }}>{p.title || "Untitled prayer"}</span>
           {said && <span className="bj-preview line-clamp-2" style={{ ...writingFontStyle(font, 15), lineHeight: 1.45, color: "var(--bj-ink3)" }}>{said}</span>}
         </span>
@@ -127,11 +124,11 @@ function TodayRow({ p, onOpen, onPray }: { p: Prayer; onOpen: () => void; onPray
       {done ? (
         <span className="h-8 px-3 rounded-[10px] flex items-center gap-1.5 font-sans text-[12px] font-semibold shrink-0"
           style={{ background: "color-mix(in oklch, var(--bj-sage) 14%, transparent)", color: "var(--bj-sage)", border: "1px solid color-mix(in oklch, var(--bj-sage) 28%, transparent)" }}>
-          <Check size={13} strokeWidth={2.4} /> Prayed
+          <Check size={13} strokeWidth={2.4} /> <span className="max-[400px]:hidden">Prayed</span>
         </span>
       ) : (
         <button type="button" onClick={onPray} className="bj-raised bj-lift h-8 px-3 rounded-[10px] flex items-center gap-1.5 font-sans text-[12px] font-semibold shrink-0" style={{ color: "var(--bj-ink2)" }}>
-          <HandHeart size={13} style={{ color: "var(--bj-gold)" }} /> Pray
+          <HandHeart size={13} style={{ color: "var(--bj-gold)" }} /> <span className="max-[400px]:hidden">Pray</span>
         </button>
       )}
     </motion.div>
@@ -147,7 +144,7 @@ function SmallRow({ p, onOpen }: { p: Prayer; onOpen: () => void }) {
       <span className="flex-1 min-w-0 font-sans text-[14px] font-medium truncate" style={{ color: "var(--bj-ink2)" }}>
         {p.for?.trim() && <span style={{ color: "var(--bj-ink4)", fontWeight: 400 }}>{p.for.trim()} — </span>}{p.title || "Untitled prayer"}
       </span>
-      <span className="font-sans text-[11px] shrink-0" style={{ color: "var(--bj-ink4)", fontVariantNumeric: "tabular-nums" }}>Day {dayNumber(p)}</span>
+      <span className="font-sans text-[11px] shrink-0" style={{ color: "var(--bj-ink4)", fontVariantNumeric: "tabular-nums" }}>Day {num(dayNumber(p))}</span>
     </button>
   );
 }
@@ -252,13 +249,13 @@ export default function PrayerPage() {
                   <div className="flex-1 min-w-0">
                     <h1 className="font-display" style={{ fontSize: "clamp(32px, 5vw, 40px)", fontWeight: 500, lineHeight: 1, color: "var(--bj-ink)" }}>Prayer</h1>
                     <p className="font-sans text-[13px] mt-1.5" style={{ color: "var(--bj-ink3)" }}>
-                      {loading ? " " : `${active.length} you’re carrying · ${answeredThisYear.length} answered this year`}
+                      {loading ? " " : `${num(active.length)} you’re carrying · ${num(answeredThisYear.length)} answered this year`}
                     </p>
                   </div>
                   {today.length > 0 && (
                     <button type="button" onClick={startPraying} className="bj-gold h-[38px] px-4 rounded-xl flex items-center gap-2 font-sans text-[13px] font-semibold shrink-0">
                       <HandHeart size={15} /> Pray now
-                      <span className="hidden sm:inline" style={{ opacity: 0.6, fontWeight: 500 }}>· {left.length ? `${left.length} left` : "again"}</span>
+                      <span className="hidden sm:inline" style={{ opacity: 0.6, fontWeight: 500 }}>· {left.length ? `${num(left.length)} left` : "again"}</span>
                     </button>
                   )}
                 </div>
@@ -286,10 +283,14 @@ export default function PrayerPage() {
                   <>
                     <div className="flex items-center gap-2.5 mt-3 flex-wrap">
                       <Tag>{today.length === 4 ? "Today’s four" : "Today"}</Tag>
-                      <span className="font-sans text-[12px] flex-1 min-w-0 truncate" style={{ color: "var(--bj-ink4)" }}>Everything you carry comes round about once a week</span>
-                      <span className="flex gap-1" aria-label={`${today.length - left.length} of ${today.length} prayed`}>
-                        {today.map((p) => <i key={p.id} className="block w-[18px] h-[6px] rounded-full" style={{ background: prayedToday(p) ? "var(--bj-gold)" : "color-mix(in oklch, var(--bj-ink) 10%, transparent)", transition: "background-color 0.3s ease" }} />)}
-                      </span>
+                      <span className="font-sans text-[12px] flex-1 min-w-0 truncate" style={{ color: "var(--bj-ink4)" }}>{cycleLabel(active.length, perDayFor(active.length, perDay))}</span>
+                      {today.length > 7 ? (
+                        <span className="font-sans text-[12px] font-medium shrink-0" style={{ color: "var(--bj-ink3)", fontVariantNumeric: "tabular-nums" }}>{today.length - left.length} of {today.length}</span>
+                      ) : (
+                        <span className="flex gap-1 shrink-0" aria-label={`${today.length - left.length} of ${today.length} prayed`}>
+                          {today.map((p) => <i key={p.id} className="block w-[18px] h-[6px] rounded-full" style={{ background: prayedToday(p) ? "var(--bj-gold)" : "color-mix(in oklch, var(--bj-ink) 10%, transparent)", transition: "background-color 0.3s ease" }} />)}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col gap-2.5">
                       {today.map((p) => <TodayRow key={p.id} p={p} onOpen={() => router.push(`/prayer/${p.id}`)} onPray={() => pray(p)} />)}
@@ -319,8 +320,8 @@ export default function PrayerPage() {
               <aside className="lg:w-[340px] shrink-0 flex flex-col gap-3.5 lg:pt-[74px]">
                 <div className="bj-glass rounded-[20px] p-[18px]">
                   <Tag color="var(--bj-sage)">Answered</Tag>
-                  <p className="font-display mt-2.5" style={{ fontSize: 46, fontWeight: 500, lineHeight: 1, color: "var(--bj-ink)" }}>
-                    {answeredThisYear.length}<span className="font-display" style={{ fontSize: 20, color: "var(--bj-ink3)" }}> this year</span>
+                  <p className="font-display mt-2.5" style={{ fontSize: 46, fontWeight: 500, lineHeight: 1, color: "var(--bj-ink)", fontVariantNumeric: "lining-nums tabular-nums" }}>
+                    {num(answeredThisYear.length)}<span className="font-display" style={{ fontSize: 20, color: "var(--bj-ink3)" }}> this year</span>
                   </p>
                   <p className="font-sans text-[12px] mt-1 mb-4" style={{ color: "var(--bj-ink4)" }}>
                     {answered.length ? `Longest you waited: ${plural(longest, "day")}` : "When God answers, write it down here."}
@@ -343,6 +344,7 @@ export default function PrayerPage() {
       <AnimatePresence>
         {praying && <PrayNow key="pray" queue={praying} onClose={() => setPraying(null)} />}
       </AnimatePresence>
+    <DataToggle />
     </div>
   );
 }

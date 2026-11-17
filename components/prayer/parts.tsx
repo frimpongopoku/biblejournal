@@ -52,7 +52,10 @@ export function VerseCard({ r, size = 17.5, onRemove }: { r: ScriptureRef; size?
       <button type="button" onClick={() => openBibleAt({ book: r.book, chapter: r.chapter, verse: r.verse })} className="block text-left w-full">
         <span className="block font-sans text-[10.5px] font-semibold uppercase mb-1.5" style={{ color: "var(--bj-gold)", letterSpacing: "0.07em" }}>{refLabel(r)}{r.version ? ` · ${r.version}` : ""}</span>
         {r.text
-          ? <span className="block leading-[1.45]" style={{ ...readingFontStyle(readFont, size), color: "var(--bj-ink)" }}>“{r.text}”</span>
+          ? <>
+              <span className="line-clamp-6 leading-[1.45]" style={{ ...readingFontStyle(readFont, size), color: "var(--bj-ink)" }}>“{r.text}”</span>
+              {r.text.length > 260 && <span className="block mt-1.5 font-sans text-[11.5px] font-medium" style={{ color: "var(--bj-ink4)" }}>Read it all in the Bible →</span>}
+            </>
           : <span className="block font-sans text-[12.5px]" style={{ color: "var(--bj-ink4)" }}>Open in the Bible</span>}
       </button>
       {onRemove && (

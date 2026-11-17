@@ -7,5 +7,8 @@ export async function signInWithGoogle() {
 }
 
 export async function signOutUser() {
+  // Don't leave the journal's key on this device after signing out.
+  const uid = auth.currentUser?.uid;
+  if (uid) await import("@/lib/vault").then((v) => v.forgetVaultHere(uid));
   await signOut(auth);
 }

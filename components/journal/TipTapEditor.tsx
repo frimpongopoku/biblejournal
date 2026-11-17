@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { ScriptureBlock } from "@/extensions/ScriptureBlock";
 import { PhotoBlock } from "@/extensions/PhotoBlock";
-import { pickPhotos } from "@/lib/photos";
 import { CalloutBlock } from "@/extensions/CalloutBlock";
 import { SlashCommands } from "@/extensions/SlashCommands";
 import { CurrentBlock, ScriptureRefs } from "@/extensions/WritingAids";
@@ -227,7 +226,8 @@ export function TipTapEditor({
       } catch { /* ignore */ }
     };
     const typing = () => setHover(null);
-    const photos = () => { void pickPhotos({ multiple: true }).then((files) => { if (files.length && !editor.isDestroyed) editor.commands.insertPhotos(files); }); };
+    // Photos go to the page's photo set (beside the writing), not into the text.
+    const photos = () => window.dispatchEvent(new CustomEvent("bj:entry-photos"));
     dom.addEventListener("bj:photo-picker", photos);
     dom.addEventListener("mouseover", over);
     dom.addEventListener("mouseout", out);

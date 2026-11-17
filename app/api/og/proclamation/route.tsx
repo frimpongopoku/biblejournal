@@ -24,9 +24,10 @@ export async function GET(request: Request) {
       >
         {/* Top: brand */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 8, background: "#C9A96E", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C12 2 6 8.5 6 13a6 6 0 0012 0C18 8.5 12 2 12 2z" fill="white" />
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: "linear-gradient(180deg,#E9C783,#B48A47)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="20" height="20" viewBox="0 0 64 64">
+              <path d="M17 7h30a3 3 0 013 3v47l-18-11-18 11V10a3 3 0 013-3z" fill="#1A140A" />
+              <path d="M32 12c0 0-11 11-11 19.5a11 11 0 0022 0C43 23 32 12 32 12z" fill="#D9B26C" />
             </svg>
           </div>
           <span style={{ fontSize: 18, color: "#8B7355", fontFamily: "Georgia, serif", letterSpacing: "0.04em" }}>

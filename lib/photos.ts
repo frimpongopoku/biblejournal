@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { app } from "@/lib/firebase";
-import { updateEntry } from "@/services/journal.service";
+import { addEntryPhoto } from "@/services/journal.service";
 import type { EntryPhoto } from "@/types";
 
 /**
@@ -21,29 +21,44 @@ export interface Upload {
   status: "uploading" | "done" | "error";
   result?: EntryPhoto;
   error?: string;
+  /** Kept in memory so a failed upload can be tried again. */
+  file?: File;
+  asCover?: boolean;
 }
 
 interface UploadState {
   uploads: Record<string, Upload>;
-  /** entryId → upload id of a cover still uploading. */
-  covers: Record<string, string>;
+  /** entryId → upload ids still on their way to that entry, in order. */
+  pending: Record<string, string[]>;
   set: (u: Upload) => void;
   patch: (id: string, p: Partial<Upload>) => void;
-  setCover: (entryId: string, uploadId: string | null) => void;
+  addPending: (entryId: string, uploadId: string) => void;
+  dropPending: (entryId: string, uploadId: string) => void;
 }
 
 export const useUploads = create<UploadState>((set) => ({
   uploads: {},
-  covers: {},
+  pending: {},
   set: (u) => set((s) => ({ uploads: { ...s.uploads, [u.id]: u } })),
   patch: (id, p) => set((s) => (s.uploads[id] ? { uploads: { ...s.uploads, [id]: { ...s.uploads[id], ...p } } } : s)),
-  setCover: (entryId, uploadId) =>
-    set((s) => {
-      const covers = { ...s.covers };
-      if (uploadId) covers[entryId] = uploadId; else delete covers[entryId];
-      return { covers };
-    }),
+  addPending: (entryId, uploadId) => set((s) => ({ pending: { ...s.pending, [entryId]: [...(s.pending[entryId] ?? []), uploadId] } })),
+  dropPending: (entryId, uploadId) => set((s) => {
+    const left = (s.pending[entryId] ?? []).filter((x) => x !== uploadId);
+    const pending = { ...s.pending };
+    if (left.length) pending[entryId] = left; else delete pending[entryId];
+    return { pending };
+  }),
 }));
+
+/** Plain words for an upload that failed. */
+export function uploadErrorText(code?: string): string {
+  if (!code) return "Couldn’t save";
+  if (code.includes("unauthorized") || code.includes("unauthenticated")) return "Storage said no — check the Storage rules";
+  if (code.includes("bucket-not-found") || code.includes("project-not-found") || code.includes("unknown")) return "Photo storage isn’t set up yet";
+  if (code.includes("quota")) return "Storage is full";
+  if (code.includes("retry-limit") || code.includes("canceled")) return "Couldn’t reach storage — try again";
+  return "Couldn’t save";
+}
 
 export const isImageFile = (f: File) => f.type.startsWith("image/");
 
@@ -83,6 +98,9 @@ async function send(uid: string, id: string, blob: Blob): Promise<{ url: string;
   const ext = blob.type === "image/webp" ? "webp" : blob.type === "image/png" ? "png" : "jpg";
   const path = `users/${uid}/photos/${id}.${ext}`;
   const storage = getStorage(app);
+  // Give up in seconds, not the SDK's default ten minutes — and say why.
+  storage.maxUploadRetryTime = 20_000;
+  storage.maxOperationRetryTime = 20_000;
   for (let attempt = 0; ; attempt++) {
     await online();
     try {
@@ -93,7 +111,7 @@ async function send(uid: string, id: string, blob: Blob): Promise<{ url: string;
     } catch (err) {
       const code = (err as { code?: string }).code ?? "";
       // Permission problems won't fix themselves; network ones usually do.
-      if (code.includes("unauthorized") || code.includes("unauthenticated") || attempt >= 4) throw err;
+      if (code.includes("unauthorized") || code.includes("unauthenticated") || code.includes("not-found") || code.includes("retry-limit") || code.includes("quota") || attempt >= 2) throw err;
       await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
     }
   }
@@ -104,7 +122,7 @@ export function startUpload(uid: string, file: File): { id: string; localUrl: st
   const id = crypto.randomUUID();
   const localUrl = URL.createObjectURL(file);
   const store = useUploads.getState();
-  store.set({ id, localUrl, progress: 0, status: "uploading" });
+  store.set({ id, localUrl, progress: 0, status: "uploading", file });
   const done = (async () => {
     try {
       const { blob, w, h, tint } = await shrink(file);
@@ -122,15 +140,42 @@ export function startUpload(uid: string, file: File): { id: string; localUrl: st
   return { id, localUrl, done };
 }
 
-/** Make a photo the entry's cover ("how I felt"). Saved to the entry when the upload lands. */
+/**
+ * Add photos to an entry. Each shows at once from a local preview and is
+ * saved to the entry when its upload lands. The first one becomes the
+ * cover ("how I felt") when `firstIsCover`.
+ */
+export function attachPhotos(uid: string, entryId: string, files: File[], firstIsCover: boolean) {
+  const store = useUploads.getState();
+  files.forEach((file, i) => {
+    const up = startUpload(uid, file);
+    store.patch(up.id, { asCover: firstIsCover && i === 0 });
+    store.addPending(entryId, up.id);
+    up.done
+      .then((photo) => addEntryPhoto(uid, entryId, photo, firstIsCover && i === 0))
+      .then(() => useUploads.getState().dropPending(entryId, up.id))
+      .catch(() => { /* the failure shows on the photo, with a way to dismiss it */ });
+  });
+}
+
+/** Forget a failed upload. */
+export function discardUpload(entryId: string, uploadId: string) {
+  const u = useUploads.getState().uploads[uploadId];
+  if (u) URL.revokeObjectURL(u.localUrl);
+  useUploads.getState().dropPending(entryId, uploadId);
+}
+
+/** Try a failed upload again. */
+export function retryUpload(uid: string, entryId: string, uploadId: string) {
+  const u = useUploads.getState().uploads[uploadId];
+  if (!u?.file) return;
+  useUploads.getState().dropPending(entryId, uploadId);
+  attachPhotos(uid, entryId, [u.file], !!u.asCover);
+}
+
+/** One photo as the entry's cover (dashboard, drop-on-cover). */
 export function attachCover(uid: string, entryId: string, file: File) {
-  const up = startUpload(uid, file);
-  useUploads.getState().setCover(entryId, up.id);
-  up.done
-    .then((cover) => updateEntry(uid, entryId, { cover }))
-    .then(() => useUploads.getState().setCover(entryId, null))
-    .catch(() => { /* status shows on the cover */ });
-  return up;
+  attachPhotos(uid, entryId, [file], true);
 }
 
 /** Open the system picker (camera on phones when `camera`). */
@@ -146,5 +191,36 @@ export function pickPhotos(opts: { multiple?: boolean; camera?: boolean } = {}):
     input.addEventListener("cancel", () => { resolve([]); input.remove(); });
     document.body.appendChild(input);
     input.click();
+  });
+}
+
+// ── Camera window (desktop): take a selfie, or choose a file from there ──
+
+interface CameraState {
+  open: boolean;
+  multiple: boolean;
+  resolve: ((files: File[]) => void) | null;
+  finish: (files: File[]) => void;
+}
+
+export const useCamera = create<CameraState>((set, get) => ({
+  open: false,
+  multiple: false,
+  resolve: null,
+  finish: (files) => { get().resolve?.(files); set({ open: false, resolve: null }); },
+}));
+
+/**
+ * Get a photo the right way for this device: phones get the system sheet
+ * (camera or library); computers get the camera window, with "Choose a file"
+ * inside it. Resolves with [] if you close it.
+ */
+export function getPhotos(opts: { multiple?: boolean } = {}): Promise<File[]> {
+  const coarse = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+  const hasCamera = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+  if (coarse || !hasCamera) return pickPhotos({ multiple: opts.multiple, camera: coarse && !opts.multiple });
+  return new Promise((resolve) => {
+    useCamera.getState().resolve?.([]);
+    useCamera.setState({ open: true, multiple: !!opts.multiple, resolve });
   });
 }

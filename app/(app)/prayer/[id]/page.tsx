@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Check, HandHeart, MoreHorizontal, Plus, Trash2, Undo2, X } from "lucide-react";
 import { useAutosave } from "@/hooks/useAutosave";
+import { useAutoGrow } from "@/hooks/useAutoGrow";
 import { usePrayers } from "@/hooks/usePrayers";
 import { deletePrayer, logPrayer, markAnswered, removePrayerLog, reopenPrayer, updatePrayer } from "@/services/prayer.service";
 import { useAuthStore } from "@/store/auth.store";
@@ -12,22 +13,15 @@ import { useBibleStore } from "@/store/bible.store";
 import { useWritingStore, writingFontStyle } from "@/store/writing.store";
 import { parseRef } from "@/lib/bible-ref-parser";
 import { fetchPassage } from "@/lib/bible-client";
-import { dayNumber, docToText, logOf, plural, prayedDays, shortDate, textToDoc } from "@/lib/prayer";
+import { num, dayNumber, docToText, logOf, plural, prayedDays, shortDate, textToDoc } from "@/lib/prayer";
 import { DayStrip, PersonDot, VerseCard, forLabel, refLabel } from "@/components/prayer/parts";
 import { PrayNow } from "@/components/prayer/PrayNow";
 import { AnsweredDialog } from "@/components/prayer/AnsweredDialog";
+import { DataToggle } from "@/components/dev/DataToggle";
 import type { PrayerLogEntry, ScriptureRef } from "@/types";
 
 const EASE: [number, number, number, number] = [0.23, 1, 0.32, 1];
 
-function useAutoGrow(ref: React.RefObject<HTMLTextAreaElement | null>, value: string) {
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [ref, value]);
-}
 
 const LABEL = "font-sans text-[10.5px] font-semibold uppercase";
 
@@ -50,6 +44,7 @@ export default function PrayerPage() {
   const [addingVerse, setAddingVerse] = useState(false);
   const [verseText, setVerseText] = useState("");
   const [menu, setMenu] = useState(false);
+  const [showAllLog, setShowAllLog] = useState(false);
   const [praying, setPraying] = useState(false);
   const [answering, setAnswering] = useState(false);
   const initialised = useRef(false);
@@ -198,8 +193,9 @@ export default function PrayerPage() {
                     {forLabel(who)}
                   </button>
                 )}
-                <span className="font-sans text-[12px]" style={{ color: "var(--bj-ink4)" }}>
-                  · since {shortDate(prayer.createdAt, true).replace(/^(Today|Yesterday)$/, (m) => m.toLowerCase())} · day {dayNumber(prayer)}{log.length ? ` · prayed ${plural(log.length, "time")}` : ""}
+                <span className="hidden sm:inline font-sans text-[12px]" style={{ color: "var(--bj-ink4)" }} aria-hidden>·</span>
+                <span className="basis-full sm:basis-auto font-sans text-[12px]" style={{ color: "var(--bj-ink4)" }}>
+                  {[`since ${shortDate(prayer.createdAt, true).replace(/^(Today|Yesterday)$/, (m) => m.toLowerCase())}`, `day ${num(dayNumber(prayer))}`, ...(log.length ? [`prayed ${plural(log.length, "time")}`] : [])].join(" · ")}
                 </span>
               </div>
 
@@ -234,8 +230,13 @@ export default function PrayerPage() {
               )}
               <div>
                 <AnimatePresence initial={false}>
-                  {log.map((e, k) => <LogItem key={e.at} e={e} first={k === 0} font={font} onRemove={() => user && removePrayerLog(user.uid, prayer.id, e)} />)}
+                  {(showAllLog ? log : log.slice(0, 30)).map((e, k) => <LogItem key={e.at} e={e} first={k === 0} font={font} onRemove={() => user && removePrayerLog(user.uid, prayer.id, e)} />)}
                 </AnimatePresence>
+                {!showAllLog && log.length > 30 && (
+                  <button type="button" onClick={() => setShowAllLog(true)} className="bj-raised bj-lift ml-7 mb-4 h-8 px-3.5 rounded-[10px] font-sans text-[12.5px] font-medium" style={{ color: "var(--bj-ink3)" }}>
+                    Show {plural(log.length - 30, "earlier time")}
+                  </button>
+                )}
               </div>
 
               {!isAnswered && (
@@ -296,6 +297,7 @@ export default function PrayerPage() {
       </AnimatePresence>
       <AnsweredDialog open={answering} prayer={prayer} onClose={() => setAnswering(false)}
         onConfirm={async (t) => { if (user) await markAnswered(user.uid, prayerId, t); }} />
+    <DataToggle />
     </div>
   );
 }

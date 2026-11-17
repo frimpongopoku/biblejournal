@@ -8,7 +8,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useWritingStore, readingFontStyle, writingFontStyle } from "@/store/writing.store";
 import { logPrayer } from "@/services/prayer.service";
 import { useMounted } from "@/hooks/useMounted";
-import { dayNumber, docToText, lastWords } from "@/lib/prayer";
+import { num, dayNumber, docToText, lastWords } from "@/lib/prayer";
 import type { Prayer } from "@/types";
 import { PersonDot, forLabel, refLabel } from "./parts";
 
@@ -113,7 +113,7 @@ export function PrayNow({ queue, onClose }: { queue: Prayer[]; onClose: () => vo
               transition={{ duration: 0.26, ease: EASE }} style={{ touchAction: "pan-y" }}>
               <div className="flex items-center justify-center gap-2.5 mb-5">
                 <PersonDot name={p.for} size={30} />
-                <span className="font-sans text-[13px] font-medium" style={{ color: "var(--bj-ink3)" }}>{forLabel(p.for)} · day {dayNumber(p)}</span>
+                <span className="font-sans text-[13px] font-medium" style={{ color: "var(--bj-ink3)" }}>{forLabel(p.for)} · day {num(dayNumber(p))}</span>
               </div>
               <h2 className="font-display mx-auto" style={{ fontSize: "clamp(34px, 6vw, 54px)", fontWeight: 500, lineHeight: 1.08, overflowWrap: "anywhere" }}>
                 {p.title || "Untitled prayer"}
@@ -142,8 +142,8 @@ export function PrayNow({ queue, onClose }: { queue: Prayer[]; onClose: () => vo
             style={{ ...writingFontStyle(font, 18), color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }} />
           <div className="flex gap-2.5">
             <button type="button" onClick={() => next(false)}
-              className="bj-raised bj-lift flex-1 md:flex-none h-12 px-5 rounded-[14px] flex items-center justify-center gap-2 font-sans text-[14px] font-medium" style={{ color: "var(--bj-ink3)" }}>
-              <SkipForward size={14} /> Not today
+              className="bj-raised bj-lift flex-1 md:flex-none h-12 px-5 rounded-[14px] flex items-center justify-center gap-2 font-sans text-[14px] font-medium whitespace-nowrap" style={{ color: "var(--bj-ink3)" }}>
+              <SkipForward size={14} className="max-[360px]:hidden" /> Not today
             </button>
             <button type="button" onClick={() => next(true)}
               className="bj-gold flex-[2] h-12 px-6 rounded-[14px] flex items-center justify-center gap-2 font-sans text-[14.5px] font-semibold">

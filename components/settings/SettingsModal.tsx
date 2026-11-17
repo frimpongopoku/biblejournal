@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Palette, Type, PenLine, BookOpen, Volume2, HandHeart, Keyboard, UserRound, Search, X } from "lucide-react";
+import { Palette, Type, PenLine, BookOpen, Volume2, HandHeart, Keyboard, UserRound, Search, X, ShieldCheck } from "lucide-react";
 import { useSettingsUi } from "@/store/prefs.store";
 import { useMounted } from "@/hooks/useMounted";
 import { SECTIONS, SectionBody, type SectionId } from "./SettingsSections";
 
 export const SECTION_ICONS: Record<SectionId, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
-  appearance: Palette, type: Type, writing: PenLine, reading: BookOpen, sounds: Volume2, prayer: HandHeart, shortcuts: Keyboard, account: UserRound,
+  appearance: Palette, type: Type, writing: PenLine, reading: BookOpen, sounds: Volume2, prayer: HandHeart, privacy: ShieldCheck, shortcuts: Keyboard, account: UserRound,
 };
 
 /** Words people search for, so "dark" finds Appearance and "click" finds Sounds. */
@@ -20,6 +20,7 @@ const KEYWORDS: Record<SectionId, string> = {
   reading: "bible translation version esv kjv niv font size commentary henry gill",
   sounds: "keyboard sound click typing switch volume mechanical audio",
   prayer: "prayer today rotation day week",
+  privacy: "encrypt encryption lock passphrase password recovery code secure private e2e vault",
   shortcuts: "keys keyboard shortcuts hotkeys",
   account: "export backup download privacy hide previews delete sign out logout account data",
 };
@@ -75,8 +76,8 @@ export function SettingsModal() {
                 const Icon = SECTION_ICONS[s.id];
                 const on = s.id === section;
                 return (
-                  <button key={s.id} type="button" onClick={() => show(s.id)} aria-current={on ? "page" : undefined}
-                    className={`flex items-center gap-2.5 h-[34px] px-2.5 rounded-[10px] font-sans text-[13px] text-left ${on ? "bj-raised" : "bj-menu-item"}`}
+                  <button key={s.id} type="button" onClick={() => show(s.id)} aria-current={on ? "page" : undefined} data-active={on ? "" : undefined}
+                    className={`bj-nav-item flex items-center gap-2.5 h-[34px] px-2.5 rounded-[10px] font-sans text-[13px] text-left ${on ? "bj-raised" : ""}`}
                     style={{ color: on ? "var(--bj-ink)" : "var(--bj-ink3)", fontWeight: on ? 500 : 400, border: on ? undefined : "1px solid transparent" }}>
                     <Icon size={14} style={{ color: on ? "var(--bj-gold)" : "currentColor" }} />
                     {s.label}

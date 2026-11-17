@@ -1,964 +1,534 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  BookOpen, MessageSquare, Search, FlaskConical, Languages,
-  Loader2, AlertCircle, BookmarkPlus, Check, X, Pencil,
-  FileText, Copy, Trash2, ChevronDown, ChevronUp,
-} from "lucide-react";
-import { parseRef } from "@/lib/bible-ref-parser";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Search, Star, X, Send, NotebookPen, BookOpen, Sparkles, ArrowUpRight, Loader2 } from "lucide-react";
+import { parseRef, type ParsedRef } from "@/lib/bible-ref-parser";
 import { useBibleStore } from "@/store/bible.store";
+import { useAuthStore } from "@/store/auth.store";
+import { useWritingStore, readingFontStyle, writingFontStyle } from "@/store/writing.store";
+import { subscribeToResearch, keepResearch, forgetResearch, type ResearchNote } from "@/services/research.service";
+import { createEntry } from "@/services/journal.service";
+import { textToDoc } from "@/lib/prayer";
 
-// ── Types ──────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────────────────
+   Research: one box for a passage, a word or a question. A passage
+   opens in the middle and you look at it through lenses — Read,
+   Compare, Context, Cross-refs. Click any word to study it. Ask about
+   the passage beside it. Anything you keep lands in a notebook that
+   lives with your account.
+   ────────────────────────────────────────────────────────────── */
 
-type Tab = "compare" | "commentary" | "ask" | "word";
-
-const VERSIONS = ["ESV", "KJV", "NIV", "AMP", "MSG", "ASV", "NKJV", "NLT"];
-
-interface NoteItem {
-  id: string;
-  type: Tab;
-  source: string;
-  content: string;
-  personalNote: string;
-  savedAt: number;
-}
-type SavePayload = Omit<NoteItem, "id" | "personalNote" | "savedAt">;
-
-interface CommentaryResult {
-  summary: string; themes: string[];
-  context: string; crossRefs: { ref: string; note: string }[]; application: string;
-}
-interface AskResult {
-  answer: string; keyVerses: { ref: string; text: string }[]; furtherReading: string[];
-}
+interface Verse { n: number; text: string }
+interface CommentaryResult { summary: string; themes: string[]; context: string; crossRefs: { ref: string; note: string }[]; application: string }
+interface AskResult { answer: string; keyVerses: { ref: string; text: string }[]; furtherReading: string[] }
 interface WordResult {
   word: string;
   original: { language: string; term: string; transliteration: string; strongsNumber: string };
   definition: string; usageCount: number; nuances: string[];
   keyOccurrences: { ref: string; note: string }[]; insight: string;
 }
+type Lens = "read" | "compare" | "context" | "refs";
+type WordAsk = { word: string; book?: string; chapter?: number; verse?: number };
 
-const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
-  { id: "compare",    label: "Compare",    icon: Languages,     desc: "Same passage side-by-side across all 8 translations" },
-  { id: "commentary", label: "Commentary", icon: BookOpen,      desc: "AI themes, context & cross-references for any chapter" },
-  { id: "ask",        label: "Ask",        icon: MessageSquare, desc: "Ask a biblical question — get a cited, scripture-backed answer" },
-  { id: "word",       label: "Word Study", icon: FlaskConical,  desc: "Greek & Hebrew root, Strongs number, nuances & usage" },
+const LENSES: { id: Lens; label: string }[] = [
+  { id: "read", label: "Read" }, { id: "compare", label: "Compare" }, { id: "context", label: "Context" }, { id: "refs", label: "Cross-refs" },
 ];
+const COMPARE = ["ESV", "NIV", "AMP", "MSG", "KJV", "NLT", "NKJV", "ASV"];
+const LABEL = "font-sans text-[10.5px] font-semibold uppercase tracking-[0.08em]";
+const SUGGEST = ["John 15", "What is grace, really?", "shalom", "Psalm 23", "Who was Melchizedek?"];
 
-// ── Shared UI ──────────────────────────────────────────────
+const refLabel = (p: ParsedRef) => `${p.book} ${p.chapter}${p.verse ? `:${p.verse}${p.verseEnd && p.verseEnd !== p.verse ? `–${p.verseEnd}` : ""}` : ""}`;
+const isWord = (s: string) => /^[\p{L}'’-]{2,24}$/u.test(s.trim());
+const clean = (w: string) => w.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="font-sans text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: "var(--bj-ink4)" }}>
-      {children}
-    </p>
-  );
+/** Fetch JSON for a key; null key = idle. Loading is "the key changed and nothing came back yet". */
+function useJson<T>(key: string | null, run: () => Promise<Response>) {
+  const [got, setGot] = useState<{ key: string; data?: T; error?: string } | null>(null);
+  const runRef = useRef(run);
+  useEffect(() => { runRef.current = run; });
+  useEffect(() => {
+    if (!key) return;
+    let live = true;
+    runRef.current()
+      .then(async (r) => { const d = await r.json(); if (!r.ok || d.error) throw new Error(d.error || "Something went wrong"); return d as T; })
+      .then((data) => { if (live) setGot({ key, data }); })
+      .catch((e: Error) => { if (live) setGot({ key, error: e.message.includes("not configured") ? "Research needs the AI key set up on the server." : e.message }); });
+    return () => { live = false; };
+  }, [key]);
+  const mine = got && got.key === key ? got : null;
+  return { data: mine?.data, error: mine?.error, loading: !!key && !mine };
 }
 
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+const post = (url: string, body: unknown) => () => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+export default function ResearchPage() {
+  return <Suspense fallback={null}><Research /></Suspense>;
+}
+
+function Research() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const user = useAuthStore((s) => s.user);
+  const version = useBibleStore((s) => s.version);
+  const readFont = useWritingStore((s) => s.readFont);
+  const writeFont = useWritingStore((s) => s.font);
+
+  // What's on the desk comes from the URL, so back/forward and links work.
+  const q = params.get("q") ?? "";
+  const [draft, setDraft] = useState(q);
+  const [draftFor, setDraftFor] = useState(q);
+  if (draftFor !== q) { setDraftFor(q); setDraft(q); }
+
+  const passage = useMemo(() => parseRef(q), [q]);
+  const mode: "passage" | "word" | "answer" | null = !q.trim() ? null : passage ? "passage" : isWord(q) ? "word" : "answer";
+  const topic = passage ? refLabel(passage) : q.trim();
+
+  const [lens, setLens] = useState<Lens>("read");
+  const [lensFor, setLensFor] = useState(q);
+  const [wordAsk, setWordAsk] = useState<WordAsk | null>(null);
+  if (lensFor !== q) { setLensFor(q); setLens("read"); setWordAsk(null); }
+
+  function look(text: string) {
+    const t = text.trim();
+    if (!t) return;
+    router.push(`/research?q=${encodeURIComponent(t)}`);
+  }
+
+  // ── Data ──
+  const chapterKey = passage ? `${version}/${passage.book}/${passage.chapter}` : null;
+  const chapter = useJson<{ verses: Verse[] }>(chapterKey, () => fetch(`/api/bible/${version}/${encodeURIComponent(passage!.book)}/${passage!.chapter}`));
+  const [compareOn, setCompareOn] = useState<string[]>(["ESV", "NIV", "AMP", "MSG"]);
+  const compareKey = passage && lens === "compare" ? `${passage.book}/${passage.chapter}/${compareOn.join(",")}` : null;
+  const compare = useJson<Record<string, Verse[]>>(compareKey, async () => {
+    const pairs = await Promise.all(compareOn.map((v) => fetch(`/api/bible/${v}/${encodeURIComponent(passage!.book)}/${passage!.chapter}`).then((r) => r.json()).then((d) => [v, d.verses ?? []] as const)));
+    return new Response(JSON.stringify(Object.fromEntries(pairs)));
+  });
+  const commKey = passage && (lens === "context" || lens === "refs") ? `${passage.book}/${passage.chapter}/${version}` : null;
+  const commentary = useJson<CommentaryResult>(commKey, post("/api/research/commentary", { book: passage?.book, chapter: passage?.chapter, version }));
+  const wordTarget: WordAsk | null = mode === "word" ? { word: q.trim() } : wordAsk;
+  const wordKey = wordTarget ? JSON.stringify(wordTarget) : null;
+  const word = useJson<WordResult>(wordKey, post("/api/research/word-study", wordTarget ?? {}));
+  const answerKey = mode === "answer" ? `${version}/${q}` : null;
+  const answer = useJson<AskResult>(answerKey, post("/api/research/ask", { question: q, version }));
+
+  // ── Notebook ──
+  const [notes, setNotes] = useState<ResearchNote[]>([]);
+  useEffect(() => (user ? subscribeToResearch(user.uid, setNotes) : undefined), [user]);
+  const keptKeys = useMemo(() => new Set(notes.map((n) => `${n.topic}|${n.title}`)), [notes]);
+  const keep = (kind: ResearchNote["kind"], title: string, body: string, ref?: string) => {
+    if (!user || keptKeys.has(`${topic}|${title}`)) return;
+    keepResearch(user.uid, { topic, kind, title, body, ...(ref ? { ref } : {}) });
+  };
+  const isKept = (title: string) => keptKeys.has(`${topic}|${title}`);
+
+  const versesShown = useMemo(() => {
+    const vs = chapter.data?.verses ?? [];
+    return vs;
+  }, [chapter.data]);
+  const inRange = (n: number) => !!passage?.verse && n >= passage.verse && n <= (passage.verseEnd ?? passage.verse);
+  const readRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!passage?.verse || !versesShown.length) return;
+    readRef.current?.querySelector("[data-target]")?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [passage?.verse, versesShown.length]);
+
+  const studyWord = (w: string, verse: number) => {
+    const c = clean(w);
+    if (c.length < 2 || !passage) return;
+    setWordAsk({ word: c.toLowerCase(), book: passage.book, chapter: passage.chapter, verse });
+  };
+
   return (
-    <div className={`rounded-2xl p-5 ${className}`} style={{ background: "var(--bj-bg-panel)", border: "1px solid var(--bj-line-soft)" }}>
-      {children}
+    <div className="flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden">
+      <main className="flex-1 min-w-0 lg:overflow-y-auto px-4 md:px-8 lg:px-10 pt-6 md:pt-8 pb-10">
+        <div className="max-w-[760px] mx-auto">
+          <div className="flex items-end gap-3 mb-5">
+            <h1 className="font-display" style={{ fontSize: "clamp(2rem, 4vw, 2.5rem)", color: "var(--bj-ink)", fontWeight: 500, lineHeight: 1 }}>Research</h1>
+            {notes.length > 0 && <span className="font-sans text-[12.5px] pb-1" style={{ color: "var(--bj-ink4)" }}>{notes.length} kept</span>}
+          </div>
+
+          <form onSubmit={(e) => { e.preventDefault(); look(draft); }} className="bj-well flex items-center gap-3 h-14 pl-4 pr-2 rounded-[18px] mb-3">
+            <Search size={16} style={{ color: "var(--bj-ink4)" }} />
+            <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="A passage, a word, or a question" aria-label="Look something up"
+              className="flex-1 min-w-0 bg-transparent outline-none" style={{ ...writingFontStyle(writeFont, 19), color: "var(--bj-ink)" }} />
+            <span className="hidden md:inline font-sans text-[11.5px] shrink-0" style={{ color: "var(--bj-ink4)" }}>John 15 · grace · Who was…?</span>
+            <button type="submit" className="bj-gold h-10 px-4 rounded-[12px] font-sans text-[13px] font-semibold shrink-0">Look</button>
+          </form>
+
+          {mode === null && (
+            <div className="flex flex-wrap gap-2 mt-4">
+              {SUGGEST.map((s) => (
+                <button key={s} type="button" onClick={() => look(s)} className="bj-chip h-8 px-3 rounded-full font-sans text-[12.5px]" style={{ color: "var(--bj-ink3)", border: "1px solid var(--bj-line)" }}>{s}</button>
+              ))}
+              <p className="w-full mt-8 font-display italic text-[19px]" style={{ color: "var(--bj-ink4)" }}>
+                Start from a passage and look at it through lenses — or ask anything.
+              </p>
+            </div>
+          )}
+
+          {/* ── A passage ── */}
+          {mode === "passage" && passage && (
+            <section className="mt-5">
+              <div className="flex flex-wrap items-center gap-3 mb-5">
+                <h2 className="font-display flex-1 min-w-0" style={{ fontSize: 34, color: "var(--bj-ink)", fontWeight: 500, lineHeight: 1.05 }}>{refLabel(passage)}</h2>
+                <div role="tablist" aria-label="Lenses" className="bj-well inline-flex gap-0.5 p-0.5 rounded-[11px]">
+                  {LENSES.map((l) => (
+                    <button key={l.id} role="tab" type="button" aria-selected={lens === l.id} onClick={() => setLens(l.id)}
+                      className={`bj-nav-item h-8 px-3 rounded-[9px] font-sans text-[12.5px] ${lens === l.id ? "bj-raised" : ""}`}
+                      data-active={lens === l.id ? "" : undefined}
+                      style={{ color: lens === l.id ? "var(--bj-ink)" : "var(--bj-ink3)", fontWeight: lens === l.id ? 500 : 400, border: lens === l.id ? undefined : "1px solid transparent" }}>
+                      {l.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {lens === "read" && (
+                <>
+                  <p className="font-sans text-[11.5px] mb-3" style={{ color: "var(--bj-ink4)" }}>{version} · click any word to study it</p>
+                  {chapter.loading && <Wait label="Opening the passage…" />}
+                  {chapter.error && <Problem text={chapter.error} />}
+                  <div ref={readRef} className="rs-read" style={{ ...readingFontStyle(readFont, 20.5), lineHeight: 1.8, color: "var(--bj-ink2)" }}>
+                    {versesShown.map((v) => (
+                      <span key={v.n} data-target={inRange(v.n) ? "" : undefined} className="rs-verse">
+                        <sup className="font-sans text-[11px] mr-1 select-none" style={{ color: "var(--bj-ink4)" }}>{v.n}</sup>
+                        {v.text.split(/(\s+)/).map((w, i) => (/\s/.test(w) || !clean(w)
+                          ? w
+                          : <span key={i} className="rs-w" data-on={wordAsk?.verse === v.n && wordAsk.word === clean(w).toLowerCase() ? "" : undefined}
+                              role="button" tabIndex={-1} onClick={() => studyWord(w, v.n)}>{w}</span>))}
+                        {" "}
+                      </span>
+                    ))}
+                  </div>
+                  {wordAsk && (
+                    // Pinned to the bottom of the reading column, so it opens where you are — not under the chapter.
+                    <div className="sticky bottom-3 mt-6 z-10">
+                      <div className="max-h-[46vh] overflow-y-auto rounded-[18px]" style={{ boxShadow: "0 24px 60px -18px var(--m-shade)" }}>
+                        <WordCard ask={wordAsk} res={word} onClose={() => setWordAsk(null)} isKept={isKept} keep={keep} />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {lens === "compare" && (
+                <>
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {COMPARE.map((v) => {
+                      const on = compareOn.includes(v);
+                      return (
+                        <button key={v} type="button" aria-pressed={on}
+                          onClick={() => setCompareOn((c) => (on ? (c.length > 1 ? c.filter((x) => x !== v) : c) : [...c, v]))}
+                          className="bj-chip h-7 px-2.5 rounded-full font-sans text-[11.5px] font-medium" data-active={on ? "" : undefined}
+                          style={{ color: on ? "var(--bj-ink)" : "var(--bj-ink4)", background: on ? "var(--m-hover)" : undefined, border: `1px solid ${on ? "color-mix(in oklch, var(--bj-gold) 40%, transparent)" : "var(--bj-line)"}` }}>
+                          {v}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {compare.loading && <Wait label="Laying the translations side by side…" />}
+                  {compare.error && <Problem text={compare.error} />}
+                  {compare.data && (
+                    <div className="flex flex-col gap-3">
+                      {(compare.data[compareOn[0]] ?? [])
+                        .filter((v) => !passage.verse || inRange(v.n))
+                        .map((v) => (
+                          <div key={v.n} className="bj-raised rounded-[16px] px-4 py-3.5">
+                            <p className={LABEL} style={{ color: "var(--bj-gold)" }}>Verse {v.n}</p>
+                            <div className="mt-2 flex flex-col gap-1.5">
+                              {compareOn.map((ver) => {
+                                const t = compare.data![ver]?.find((x) => x.n === v.n)?.text;
+                                return t ? (
+                                  <p key={ver} style={{ ...readingFontStyle(readFont, 17), lineHeight: 1.5, color: "var(--bj-ink2)" }}>
+                                    <b className="font-sans text-[10.5px] font-semibold mr-2 tracking-[0.06em]" style={{ color: "var(--bj-ink4)" }}>{ver}</b>{t}
+                                  </p>
+                                ) : null;
+                              })}
+                            </div>
+                            <KeepBtn kept={isKept(`${passage.book} ${passage.chapter}:${v.n} · ${compareOn.join("/")}`)}
+                              onKeep={() => keep("verse", `${passage.book} ${passage.chapter}:${v.n} · ${compareOn.join("/")}`,
+                                compareOn.map((ver) => `${ver}: ${compare.data![ver]?.find((x) => x.n === v.n)?.text ?? ""}`).join("\n"), `${passage.book} ${passage.chapter}:${v.n}`)} />
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {(lens === "context" || lens === "refs") && (
+                <>
+                  {commentary.loading && <Wait label="Reading around the passage…" />}
+                  {commentary.error && <Problem text={commentary.error} />}
+                  {commentary.data && lens === "context" && (
+                    <div className="flex flex-col gap-3">
+                      <Card tag="In short">
+                        <p style={{ ...writingFontStyle(writeFont, 18.5), lineHeight: 1.6, color: "var(--bj-ink2)" }}>{commentary.data.summary}</p>
+                        {commentary.data.themes?.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-3">{commentary.data.themes.map((t) => <span key={t} className="h-6 px-2.5 rounded-full flex items-center font-sans text-[11.5px]" style={{ background: "var(--m-hover)", color: "var(--bj-ink3)" }}>{t}</span>)}</div>
+                        )}
+                        <KeepBtn kept={isKept("In short")} onKeep={() => keep("context", "In short", `${commentary.data!.summary}\nThemes: ${commentary.data!.themes.join(", ")}`)} />
+                      </Card>
+                      <Card tag="Setting">
+                        <p style={{ ...writingFontStyle(writeFont, 18), lineHeight: 1.6, color: "var(--bj-ink2)" }}>{commentary.data.context}</p>
+                        <KeepBtn kept={isKept("Setting")} onKeep={() => keep("context", "Setting", commentary.data!.context)} />
+                      </Card>
+                      <Card tag="Living it">
+                        <p style={{ ...writingFontStyle(writeFont, 18), lineHeight: 1.6, color: "var(--bj-ink2)" }}>{commentary.data.application}</p>
+                        <KeepBtn kept={isKept("Living it")} onKeep={() => keep("context", "Living it", commentary.data!.application)} />
+                      </Card>
+                    </div>
+                  )}
+                  {commentary.data && lens === "refs" && (
+                    <div className="flex flex-col gap-2">
+                      {commentary.data.crossRefs.map((r) => (
+                        <div key={r.ref} className="bj-raised rounded-[16px] px-4 py-3.5 flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <button type="button" onClick={() => look(r.ref)} className="font-sans text-[13.5px] font-semibold inline-flex items-center gap-1 hover:underline" style={{ color: "var(--bj-gold)" }}>
+                              {r.ref} <ArrowUpRight size={12} />
+                            </button>
+                            <p className="mt-1" style={{ ...writingFontStyle(writeFont, 17), lineHeight: 1.5, color: "var(--bj-ink2)" }}>{r.note}</p>
+                          </div>
+                          <KeepBtn small kept={isKept(r.ref)} onKeep={() => keep("verse", r.ref, r.note, r.ref)} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          )}
+
+          {/* ── A word ── */}
+          {mode === "word" && wordTarget && (
+            <section className="mt-6"><WordCard ask={wordTarget} res={word} isKept={isKept} keep={keep} /></section>
+          )}
+
+          {/* ── A question ── */}
+          {mode === "answer" && (
+            <section className="mt-6 flex flex-col gap-3">
+              {answer.loading && <Wait label="Searching the Scriptures…" />}
+              {answer.error && <Problem text={answer.error} />}
+              {answer.data && (
+                <>
+                  <Card tag="Answer · with the verses">
+                    <p style={{ ...writingFontStyle(writeFont, 19), lineHeight: 1.65, color: "var(--bj-ink2)", whiteSpace: "pre-line" }}>{answer.data.answer}</p>
+                    <KeepBtn kept={isKept("Answer")} onKeep={() => keep("answer", "Answer", answer.data!.answer)} />
+                  </Card>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {answer.data.keyVerses.map((v) => (
+                      <div key={v.ref} className="bj-raised rounded-[16px] px-4 py-3.5">
+                        <button type="button" onClick={() => look(v.ref)} className={`${LABEL} inline-flex items-center gap-1 hover:underline`} style={{ color: "var(--bj-gold)" }}>{v.ref} <ArrowUpRight size={11} /></button>
+                        <p className="mt-2" style={{ ...readingFontStyle(readFont, 17), lineHeight: 1.5, color: "var(--bj-ink)" }}>“{v.text}”</p>
+                        <KeepBtn kept={isKept(v.ref)} onKeep={() => keep("verse", v.ref, v.text, v.ref)} />
+                      </div>
+                    ))}
+                  </div>
+                  {answer.data.furtherReading?.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span className={LABEL} style={{ color: "var(--bj-ink4)" }}>Read on</span>
+                      {answer.data.furtherReading.map((r) => (
+                        <button key={r} type="button" onClick={() => look(r)} className="bj-chip h-7 px-2.5 rounded-full font-sans text-[12px]" style={{ color: "var(--bj-ink3)", border: "1px solid var(--bj-line)" }}>{r}</button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          )}
+        </div>
+      </main>
+
+      <aside className="w-full lg:w-[340px] shrink-0 p-4 lg:pl-0 lg:h-full">
+        <div className="bj-glass rounded-[20px] h-full flex flex-col overflow-hidden min-h-[420px]">
+          {mode === "passage" && passage && <AskPassage key={`${passage.book}/${passage.chapter}`} passage={passage} version={version} keep={keep} isKept={isKept} />}
+          <Notebook notes={notes} topic={topic} uid={user?.uid} onOpen={look}
+            onJournal={async (t) => {
+              if (!user) return;
+              const mine = notes.filter((n) => n.topic === t).reverse();
+              const text = mine.map((n) => `${n.title}${n.ref && n.ref !== n.title ? ` (${n.ref})` : ""}\n${n.body}`).join("\n\n");
+              const id = await createEntry(user.uid, { title: `Studying ${t}`, content: textToDoc(text) });
+              router.push(`/journal?entry=${id}`);
+            }} />
+        </div>
+      </aside>
     </div>
   );
 }
 
-function ErrorBox({ message }: { message: string }) {
-  const noKey = message.includes("not configured");
+/* ── Pieces ─────────────────────────────────────────────────── */
+
+function Wait({ label }: { label: string }) {
+  return <p className="flex items-center gap-2 font-sans text-[13px] py-6" style={{ color: "var(--bj-ink4)" }}><Loader2 size={14} className="animate-spin" />{label}</p>;
+}
+function Problem({ text }: { text: string }) {
+  return <p className="font-sans text-[13px] py-4" style={{ color: "var(--bj-ember)" }}>{text}</p>;
+}
+function Card({ tag, children }: { tag: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3 rounded-xl px-4 py-3" style={{
-      background: noKey ? "var(--bj-gold-tint)" : "color-mix(in oklch, var(--bj-ember) 10%, transparent)",
-      border: `1px solid ${noKey ? "var(--bj-gold-soft)" : "color-mix(in oklch, var(--bj-ember) 30%, transparent)"}`,
-    }}>
-      <AlertCircle size={14} style={{ color: noKey ? "var(--bj-gold-deep)" : "var(--bj-ember)", flexShrink: 0, marginTop: 1 }} />
-      <div>
-        <p className="font-sans text-xs font-medium" style={{ color: noKey ? "var(--bj-gold-deep)" : "var(--bj-ember)" }}>
-          {noKey ? "API key required" : "Something went wrong"}
-        </p>
-        <p className="font-sans text-xs mt-0.5" style={{ color: "var(--bj-ink3)" }}>
-          {noKey ? "Add ANTHROPIC_API_KEY to your .env.local to enable AI features." : message}
-        </p>
-      </div>
+    <div className="bj-raised rounded-[18px] px-5 py-4">
+      <p className={`${LABEL} mb-2.5`} style={{ color: "var(--bj-gold)" }}>{tag}</p>
+      {children}
     </div>
   );
 }
-
-function RefBadge({ children }: { children: React.ReactNode }) {
+function KeepBtn({ kept, onKeep, small }: { kept: boolean; onKeep: () => void; small?: boolean }) {
   return (
-    <span className="font-sans text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 h-fit"
-      style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}>
-      {children}
-    </span>
-  );
-}
-
-function SaveBtn({ onSave, saved }: { onSave: () => void; saved: boolean }) {
-  return (
-    <button
-      onClick={onSave}
-      title={saved ? "Saved to notes" : "Save to notes"}
-      className="flex items-center gap-1 font-sans text-xs px-2 py-1 rounded-lg shrink-0 transition-all duration-150"
-      style={{
-        color: saved ? "var(--bj-gold-deep)" : "var(--bj-ink4)",
-        background: saved ? "var(--bj-gold-tint)" : "var(--bj-bg-soft)",
-        border: `1px solid ${saved ? "var(--bj-gold-soft)" : "var(--bj-line-soft)"}`,
-      }}
-    >
-      {saved ? <Check size={10} /> : <BookmarkPlus size={10} />}
-      {saved ? "Saved" : "Save"}
+    <button type="button" onClick={onKeep} disabled={kept} aria-label={kept ? "Kept in your notebook" : "Keep in your notebook"}
+      className={`bj-chip ${small ? "shrink-0" : "mt-3"} h-7 px-2.5 rounded-[9px] inline-flex items-center gap-1.5 font-sans text-[11.5px] font-medium`}
+      style={{ color: kept ? "var(--bj-gold)" : "var(--bj-ink3)", border: "1px solid var(--bj-line)" }}>
+      <Star size={12} fill={kept ? "currentColor" : "none"} /> {kept ? "Kept" : "Keep"}
     </button>
   );
 }
 
-// ── Compare Tab ────────────────────────────────────────────
-
-function CompareTab({ onSave }: { onSave: (p: SavePayload) => void }) {
-  const [ref, setRef] = useState("");
-  const [results, setResults] = useState<Record<string, { n: number; text: string }[]> | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set(VERSIONS));
-  const [saved, setSaved] = useState<Set<string>>(new Set());
-
-  async function handleCompare() {
-    const parsed = parseRef(ref);
-    if (!parsed) { setError('Enter a valid reference like "John 3" or "Ps 23:1"'); return; }
-    setError(""); setLoading(true); setResults(null); setSaved(new Set());
-    try {
-      const vers = VERSIONS.filter((v) => selected.has(v));
-      const entries = await Promise.all(
-        vers.map((v) =>
-          fetch(`/api/bible/${v}/${encodeURIComponent(parsed.book)}/${parsed.chapter}`)
-            .then((r) => r.json())
-            .then((d) => [v, d.verses ?? []] as [string, { n: number; text: string }[]])
-        )
-      );
-      setResults(Object.fromEntries(entries));
-    } catch { setError("Failed to load translations."); }
-    finally { setLoading(false); }
-  }
-
-  function toggleVersion(v: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(v) && next.size > 1) next.delete(v); else next.add(v);
-      return next;
-    });
-  }
-
-  const parsed = parseRef(ref);
-  const targetVerse = parsed?.verse;
-
+function WordCard({ ask, res, onClose, isKept, keep }: {
+  ask: WordAsk; res: { data?: WordResult; error?: string; loading: boolean }; onClose?: () => void;
+  isKept: (t: string) => boolean; keep: (k: ResearchNote["kind"], t: string, b: string, r?: string) => void;
+}) {
+  const readFont = useWritingStore((s) => s.readFont);
+  const writeFont = useWritingStore((s) => s.font);
+  const d = res.data;
+  const title = d ? `${d.word} · ${d.original.transliteration}` : ask.word;
   return (
-    <div className="flex flex-col gap-5">
-      <Card>
-        <SectionLabel>Reference</SectionLabel>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
-            <Languages size={13} style={{ color: "var(--bj-ink4)" }} />
-            <input value={ref} onChange={(e) => setRef(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleCompare(); }}
-              placeholder="John 3, Ps 23:1, Romans 8…"
-              className="flex-1 bg-transparent outline-none font-sans text-sm"
-              style={{ color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }}
-              autoComplete="off" spellCheck={false} />
-          </div>
-          <div>
-            <SectionLabel>Translations</SectionLabel>
-            <div className="flex flex-wrap gap-1.5">
-              {VERSIONS.map((v) => (
-                <button key={v} onClick={() => toggleVersion(v)}
-                  className="font-sans text-xs px-2.5 py-1 rounded-lg transition-all duration-150"
-                  style={{
-                    background: selected.has(v) ? "var(--bj-gold)" : "var(--bj-bg-soft)",
-                    color: selected.has(v) ? "white" : "var(--bj-ink3)",
-                    fontWeight: selected.has(v) ? 500 : 400,
-                    border: `1px solid ${selected.has(v) ? "transparent" : "var(--bj-line-soft)"}`,
-                  }}>{v}</button>
+    <div className="bj-raised rounded-[18px] px-5 py-4 relative">
+      {onClose && (
+        <button type="button" onClick={onClose} aria-label="Close word study" className="bj-btn-icon absolute top-3 right-3 w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: "var(--bj-ink4)" }}><X size={14} /></button>
+      )}
+      <p className={LABEL} style={{ color: "var(--bj-gold)" }}>
+        {ask.word}{d ? ` · ${d.original.term} · ${d.original.transliteration} · ${d.original.strongsNumber}` : ""}{ask.book ? ` · ${ask.book} ${ask.chapter}:${ask.verse}` : ""}
+      </p>
+      {res.loading && <Wait label={`Finding the ${ask.book ? "original word" : "word"}…`} />}
+      {res.error && <Problem text={res.error} />}
+      {d && (
+        <>
+          <p className="font-display mt-2" style={{ fontSize: d.definition.length > 70 ? 21 : 28, lineHeight: 1.15, color: "var(--bj-ink)", fontWeight: 500 }}>{d.definition}</p>
+          <p className="mt-3" style={{ ...writingFontStyle(writeFont, 17.5), lineHeight: 1.6, color: "var(--bj-ink2)" }}>{d.insight}</p>
+          {d.nuances?.length > 0 && <ul className="mt-3 flex flex-col gap-1">{d.nuances.map((n) => <li key={n} className="font-sans text-[13px] flex gap-2" style={{ color: "var(--bj-ink3)" }}><span style={{ color: "var(--bj-gold)" }}>·</span>{n}</li>)}</ul>}
+          {d.keyOccurrences?.length > 0 && (
+            <div className="mt-4 flex flex-col gap-1.5">
+              <p className={LABEL} style={{ color: "var(--bj-ink4)" }}>Where else · {d.usageCount}×</p>
+              {d.keyOccurrences.map((o) => (
+                <p key={o.ref} style={{ ...readingFontStyle(readFont, 15.5), lineHeight: 1.45, color: "var(--bj-ink3)" }}>
+                  <b className="font-sans text-[12px] font-semibold mr-1.5" style={{ color: "var(--bj-ink2)" }}>{o.ref}</b>{o.note}
+                </p>
               ))}
             </div>
-          </div>
-          <button onClick={handleCompare} disabled={loading || !ref.trim()}
-            className="font-sans text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 transition-opacity"
-            style={{ background: "var(--bj-gold)", color: "white" }}>
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Languages size={14} />}
-            {loading ? "Loading…" : "Compare"}
-          </button>
-          {error && <ErrorBox message={error} />}
-        </div>
-      </Card>
-
-      <AnimatePresence>
-        {results && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex flex-col gap-4">
-            {parsed && (
-              <p className="font-display italic text-base" style={{ color: "var(--bj-ink3)", fontWeight: 300 }}>
-                {parsed.book} {parsed.chapter}{parsed.verse ? `:${parsed.verse}` : ""} — {selected.size} translations
-              </p>
-            )}
-            {Object.entries(results).map(([version, verses]) => {
-              const display = targetVerse ? verses.filter((v) => v.n === targetVerse) : verses;
-              const key = `${version}-${ref}`;
-              return (
-                <Card key={version}>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <RefBadge>{version}</RefBadge>
-                    <SaveBtn saved={saved.has(key)} onSave={() => {
-                      setSaved((p) => new Set([...p, key]));
-                      onSave({
-                        type: "compare",
-                        source: `${parsed?.book} ${parsed?.chapter}${parsed?.verse ? `:${parsed.verse}` : ""} — ${version}`,
-                        content: display.map((v) => `[${v.n}] ${v.text}`).join(" "),
-                      });
-                    }} />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {display.map((v) => (
-                      <div key={v.n} className="flex gap-3">
-                        <span className="font-sans shrink-0 w-5 text-right pt-0.5 select-none" style={{ color: "var(--bj-ink4)", fontWeight: 600, fontSize: 11 }}>{v.n}</span>
-                        <p className="font-sans text-sm flex-1" style={{ color: "var(--bj-ink2)", lineHeight: 1.75 }}>{v.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              );
-            })}
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+          <KeepBtn kept={isKept(title)} onKeep={() => keep("word", title, `${d.definition}. ${d.insight}`, ask.book ? `${ask.book} ${ask.chapter}:${ask.verse}` : undefined)} />
+        </>
+      )}
     </div>
   );
 }
 
-// ── Commentary Tab ─────────────────────────────────────────
-
-function CommentaryTab({ onSave, version }: { onSave: (p: SavePayload) => void; version: string }) {
-  const [ref, setRef] = useState("");
-  const [result, setResult] = useState<CommentaryResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
-  const [currentRef, setCurrentRef] = useState("");
-
-  async function handleGenerate() {
-    const parsed = parseRef(ref);
-    if (!parsed) { setError('Enter a chapter like "Romans 8"'); return; }
-    setError(""); setLoading(true); setResult(null); setSaved(false);
-    setCurrentRef(`${parsed.book} ${parsed.chapter}`);
-    try {
-      const res = await fetch("/api/research/commentary", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ book: parsed.book, chapter: parsed.chapter, version }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Failed"); return; }
-      setResult(data);
-    } catch { setError("Network error. Please try again."); }
-    finally { setLoading(false); }
-  }
-
-  function saveResult() {
-    if (!result) return;
-    setSaved(true);
-    onSave({
-      type: "commentary",
-      source: `${currentRef} — Commentary`,
-      content: [
-        `Summary: ${result.summary}`,
-        `Themes: ${result.themes.join(", ")}`,
-        `Context: ${result.context}`,
-        `Application: ${result.application}`,
-      ].join("\n\n"),
-    });
-  }
-
-  return (
-    <div className="flex flex-col gap-5">
-      <Card>
-        <SectionLabel>Chapter</SectionLabel>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
-            <BookOpen size={13} style={{ color: "var(--bj-ink4)" }} />
-            <input value={ref} onChange={(e) => setRef(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleGenerate(); }}
-              placeholder="Romans 8, John 15, Ps 91…"
-              className="flex-1 bg-transparent outline-none font-sans text-sm"
-              style={{ color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }}
-              autoComplete="off" spellCheck={false} />
-          </div>
-          <button onClick={handleGenerate} disabled={loading || !ref.trim()}
-            className="font-sans text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 transition-opacity"
-            style={{ background: "var(--bj-gold)", color: "white" }}>
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <BookOpen size={14} />}
-            {loading ? "Generating…" : "Generate Commentary"}
-          </button>
-          {error && <ErrorBox message={error} />}
-        </div>
-      </Card>
-
-      <AnimatePresence>
-        {result && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <p className="font-display italic text-base" style={{ color: "var(--bj-ink3)", fontWeight: 300 }}>{currentRef}</p>
-              <SaveBtn saved={saved} onSave={saveResult} />
-            </div>
-            <Card>
-              <SectionLabel>Summary</SectionLabel>
-              <p className="font-sans text-sm" style={{ color: "var(--bj-ink2)", lineHeight: 1.75 }}>{result.summary}</p>
-            </Card>
-            <Card>
-              <SectionLabel>Key Themes</SectionLabel>
-              <div className="flex flex-wrap gap-1.5">
-                {result.themes.map((t) => (
-                  <span key={t} className="font-sans text-xs px-2.5 py-1 rounded-full"
-                    style={{ background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}>{t}</span>
-                ))}
-              </div>
-            </Card>
-            <Card>
-              <SectionLabel>Historical & Literary Context</SectionLabel>
-              <p className="font-sans text-sm" style={{ color: "var(--bj-ink2)", lineHeight: 1.75 }}>{result.context}</p>
-            </Card>
-            <Card>
-              <SectionLabel>Cross-References</SectionLabel>
-              <div className="flex flex-col gap-3">
-                {result.crossRefs.map((cr) => (
-                  <div key={cr.ref} className="flex gap-3">
-                    <RefBadge>{cr.ref}</RefBadge>
-                    <p className="font-sans text-sm" style={{ color: "var(--bj-ink2)", lineHeight: 1.65 }}>{cr.note}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
-            <Card>
-              <SectionLabel>Application</SectionLabel>
-              <p className="font-sans text-sm" style={{ color: "var(--bj-ink2)", lineHeight: 1.75 }}>{result.application}</p>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ── Ask Tab ────────────────────────────────────────────────
-
-function AskTab({ onSave, version }: { onSave: (p: SavePayload) => void; version: string }) {
-  const [question, setQuestion] = useState("");
-  const [result, setResult] = useState<AskResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [saved, setSaved] = useState<Set<string>>(new Set());
-
-  async function handleAsk() {
-    if (!question.trim()) return;
-    setError(""); setLoading(true); setResult(null); setSaved(new Set());
-    try {
-      const res = await fetch("/api/research/ask", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, version }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Failed"); return; }
-      setResult(data);
-    } catch { setError("Network error. Please try again."); }
-    finally { setLoading(false); }
-  }
-
-  return (
-    <div className="flex flex-col gap-5">
-      <Card>
-        <SectionLabel>Ask a Biblical Question</SectionLabel>
-        <div className="flex flex-col gap-3">
-          <textarea value={question} onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAsk(); } }}
-            placeholder="What does the Bible say about forgiveness? Who was Melchizedek? What is the meaning of grace?"
-            rows={3} className="w-full bg-transparent outline-none resize-none font-sans text-sm px-3 py-2.5 rounded-xl"
-            style={{ color: "var(--bj-ink)", background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)", caretColor: "var(--bj-gold)", lineHeight: 1.65 }} />
-          <button onClick={handleAsk} disabled={loading || !question.trim()}
-            className="font-sans text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 transition-opacity"
-            style={{ background: "var(--bj-gold)", color: "white" }}>
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <MessageSquare size={14} />}
-            {loading ? "Searching Scripture…" : "Ask"}
-          </button>
-          {error && <ErrorBox message={error} />}
-        </div>
-      </Card>
-
-      <AnimatePresence>
-        {result && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex flex-col gap-4">
-            <Card>
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <SectionLabel>Answer</SectionLabel>
-                <SaveBtn saved={saved.has("answer")} onSave={() => {
-                  setSaved((p) => new Set([...p, "answer"]));
-                  onSave({ type: "ask", source: `Q: ${question.slice(0, 60)}${question.length > 60 ? "…" : ""}`, content: result.answer });
-                }} />
-              </div>
-              <p className="font-sans text-sm whitespace-pre-wrap" style={{ color: "var(--bj-ink2)", lineHeight: 1.8 }}>{result.answer}</p>
-            </Card>
-
-            {result.keyVerses?.length > 0 && (
-              <Card>
-                <SectionLabel>Key Verses</SectionLabel>
-                <div className="flex flex-col gap-3">
-                  {result.keyVerses.map((v) => (
-                    <div key={v.ref} className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <RefBadge>{v.ref}</RefBadge>
-                        <SaveBtn saved={saved.has(`verse-${v.ref}`)} onSave={() => {
-                          setSaved((p) => new Set([...p, `verse-${v.ref}`]));
-                          onSave({ type: "ask", source: v.ref, content: `"${v.text}"` });
-                        }} />
-                      </div>
-                      <p className="font-display italic text-sm mt-1" style={{ color: "var(--bj-ink2)", fontWeight: 400, lineHeight: 1.65 }}>"{v.text}"</p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {result.furtherReading?.length > 0 && (
-              <Card>
-                <SectionLabel>Further Reading</SectionLabel>
-                <div className="flex flex-wrap gap-1.5">
-                  {result.furtherReading.map((r) => (
-                    <span key={r} className="font-sans text-xs px-2.5 py-1 rounded-full"
-                      style={{ background: "var(--bj-bg-soft)", color: "var(--bj-ink3)", border: "1px solid var(--bj-line)" }}>{r}</span>
-                  ))}
-                </div>
-              </Card>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ── Word Study Tab ─────────────────────────────────────────
-
-function WordStudyTab({ onSave }: { onSave: (p: SavePayload) => void }) {
-  const [word, setWord] = useState("");
-  const [context, setContext] = useState("");
-  const [result, setResult] = useState<WordResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
-
-  async function handleStudy() {
-    if (!word.trim()) return;
-    const parsed = context.trim() ? parseRef(context) : null;
-    setError(""); setLoading(true); setResult(null); setSaved(false);
-    try {
-      const res = await fetch("/api/research/word-study", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word: word.trim(), book: parsed?.book, chapter: parsed?.chapter, verse: parsed?.verse }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Failed"); return; }
-      setResult(data);
-    } catch { setError("Network error. Please try again."); }
-    finally { setLoading(false); }
-  }
-
-  function saveResult() {
-    if (!result) return;
-    setSaved(true);
-    onSave({
-      type: "word",
-      source: `Word Study: ${result.word} (${result.original.term})`,
-      content: [
-        `${result.original.language} · ${result.original.term} · ${result.original.transliteration} · ${result.original.strongsNumber}`,
-        result.definition,
-        `Shades of meaning: ${result.nuances.join("; ")}`,
-        `Insight: ${result.insight}`,
-      ].join("\n\n"),
-    });
-  }
-
-  return (
-    <div className="flex flex-col gap-5">
-      <Card>
-        <div className="flex flex-col gap-3">
-          <div>
-            <SectionLabel>Word</SectionLabel>
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
-              <FlaskConical size={13} style={{ color: "var(--bj-ink4)" }} />
-              <input value={word} onChange={(e) => setWord(e.target.value)}
-                placeholder="grace, shalom, logos, agape…"
-                className="flex-1 bg-transparent outline-none font-sans text-sm"
-                style={{ color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }}
-                autoComplete="off" spellCheck={false} />
-            </div>
-          </div>
-          <div>
-            <SectionLabel>Context verse (optional)</SectionLabel>
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}>
-              <BookOpen size={13} style={{ color: "var(--bj-ink4)" }} />
-              <input value={context} onChange={(e) => setContext(e.target.value)}
-                placeholder="John 1:1, Eph 2:8…"
-                className="flex-1 bg-transparent outline-none font-sans text-sm"
-                style={{ color: "var(--bj-ink)", caretColor: "var(--bj-gold)" }}
-                autoComplete="off" spellCheck={false} />
-            </div>
-          </div>
-          <button onClick={handleStudy} disabled={loading || !word.trim()}
-            className="font-sans text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-40 transition-opacity"
-            style={{ background: "var(--bj-gold)", color: "white" }}>
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <FlaskConical size={14} />}
-            {loading ? "Studying…" : "Study Word"}
-          </button>
-          {error && <ErrorBox message={error} />}
-        </div>
-      </Card>
-
-      <AnimatePresence>
-        {result && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="flex flex-col gap-4">
-            <Card>
-              <div className="flex items-start justify-between gap-4 mb-3">
-                <div>
-                  <h2 className="font-display text-2xl" style={{ color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.1 }}>{result.word}</h2>
-                  <p className="font-sans text-xs mt-1" style={{ color: "var(--bj-ink4)" }}>
-                    {result.original.language} · {result.original.term} · {result.original.transliteration}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="font-sans text-xs px-2.5 py-1 rounded-full"
-                    style={{ background: "var(--bj-bg-soft)", color: "var(--bj-ink3)", border: "1px solid var(--bj-line)" }}>
-                    {result.original.strongsNumber}
-                  </span>
-                  <SaveBtn saved={saved} onSave={saveResult} />
-                </div>
-              </div>
-              <p className="font-sans text-sm" style={{ color: "var(--bj-ink2)", lineHeight: 1.75 }}>{result.definition}</p>
-              {result.usageCount > 0 && (
-                <p className="font-sans text-xs mt-2" style={{ color: "var(--bj-ink4)" }}>Appears ~{result.usageCount}× in Scripture</p>
-              )}
-            </Card>
-            <Card>
-              <SectionLabel>Shades of Meaning</SectionLabel>
-              <div className="flex flex-col gap-1.5">
-                {result.nuances.map((n, i) => (
-                  <div key={i} className="flex items-start gap-2">
-                    <div className="w-1 h-1 rounded-full mt-2 shrink-0" style={{ background: "var(--bj-gold)" }} />
-                    <p className="font-sans text-sm" style={{ color: "var(--bj-ink2)", lineHeight: 1.65 }}>{n}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
-            <Card>
-              <SectionLabel>Notable Uses</SectionLabel>
-              <div className="flex flex-col gap-3">
-                {result.keyOccurrences.map((o) => (
-                  <div key={o.ref} className="flex gap-3">
-                    <RefBadge>{o.ref}</RefBadge>
-                    <p className="font-sans text-sm" style={{ color: "var(--bj-ink2)", lineHeight: 1.65 }}>{o.note}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
-            <Card>
-              <SectionLabel>Insight</SectionLabel>
-              <p className="font-display italic text-base" style={{ color: "var(--bj-ink2)", fontWeight: 400, lineHeight: 1.7 }}>{result.insight}</p>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// ── Notes Panel ────────────────────────────────────────────
-
-function compileNotes(notes: NoteItem[], freeText: string): string {
-  const date = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  const lines: string[] = [`RESEARCH NOTES — ${date}`, ""];
-  for (const note of notes) {
-    lines.push(`── ${note.source}`);
-    lines.push(note.content);
-    if (note.personalNote.trim()) lines.push(`\n💭 ${note.personalNote}`);
-    lines.push("");
-  }
-  if (freeText.trim()) {
-    lines.push("── MY WRITING ─────────────────────────────");
-    lines.push(freeText);
-  }
-  return lines.join("\n");
-}
-
-function NotesPanel({
-  notes, onUpdateNote, onRemove, onClose,
-}: {
-  notes: NoteItem[];
-  onUpdateNote: (id: string, note: string) => void;
-  onRemove: (id: string) => void;
-  onClose: () => void;
+function AskPassage({ passage, version, keep, isKept }: {
+  passage: ParsedRef; version: string;
+  keep: (k: ResearchNote["kind"], t: string, b: string, r?: string) => void; isKept: (t: string) => boolean;
 }) {
-  const [freeText, setFreeText] = useState("");
-  const [finalizeOpen, setFinalizeOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const compiled = compileNotes(notes, freeText);
+  const writeFont = useWritingStore((s) => s.font);
+  const [thread, setThread] = useState<{ q: string; a?: AskResult; error?: string }[]>([]);
+  const [draft, setDraft] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [thread]);
 
-  function handleCopy() {
-    navigator.clipboard.writeText(compiled);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  function ask() {
+    const q = draft.trim();
+    if (!q) return;
+    setDraft("");
+    const i = thread.length;
+    setThread((t) => [...t, { q }]);
+    fetch("/api/research/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q, version, passage: { book: passage.book, chapter: passage.chapter } }) })
+      .then(async (r) => { const d = await r.json(); if (!r.ok || d.error) throw new Error(d.error || "Something went wrong"); return d as AskResult; })
+      .then((a) => setThread((t) => t.map((x, k) => (k === i ? { ...x, a } : x))))
+      .catch((e: Error) => setThread((t) => t.map((x, k) => (k === i ? { ...x, error: e.message } : x))));
   }
 
   return (
-    <div className="flex flex-col h-full" style={{ background: "var(--bj-bg-panel)", borderLeft: "1px solid var(--bj-line-soft)" }}>
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0" style={{ borderColor: "var(--bj-line-soft)" }}>
-        <Pencil size={13} style={{ color: "var(--bj-gold)" }} />
-        <span className="font-sans text-xs font-semibold uppercase tracking-widest flex-1" style={{ color: "var(--bj-ink4)" }}>
-          Notes {notes.length > 0 && <span style={{ color: "var(--bj-gold-deep)" }}>({notes.length})</span>}
-        </span>
-        <button onClick={() => setFinalizeOpen(!finalizeOpen)}
-          className="flex items-center gap-1.5 font-sans text-xs px-2.5 py-1.5 rounded-lg transition-all duration-150"
-          style={{
-            background: finalizeOpen ? "var(--bj-gold)" : "var(--bj-gold-tint)",
-            color: finalizeOpen ? "white" : "var(--bj-gold-deep)",
-            border: `1px solid var(--bj-gold-soft)`,
-          }}>
-          <FileText size={11} />
-          {finalizeOpen ? "Hide" : "Finalise"}
-        </button>
-        <button onClick={onClose} className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"
-          style={{ color: "var(--bj-ink4)" }}>
-          <X size={14} />
-        </button>
-      </div>
-
-      {/* Finalize compiled view */}
-      <AnimatePresence>
-        {finalizeOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
-            className="overflow-hidden shrink-0 border-b" style={{ borderColor: "var(--bj-line-soft)" }}
-          >
-            <div className="px-4 py-3 flex flex-col gap-2">
-              <div className="flex items-center justify-between mb-1">
-                <p className="font-sans text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--bj-ink4)" }}>Compiled</p>
-                <button onClick={handleCopy}
-                  className="flex items-center gap-1 font-sans text-xs px-2 py-1 rounded-lg transition-all duration-150"
-                  style={{ background: copied ? "var(--bj-gold-tint)" : "var(--bj-bg-soft)", color: copied ? "var(--bj-gold-deep)" : "var(--bj-ink3)", border: "1px solid var(--bj-line-soft)" }}>
-                  {copied ? <Check size={10} /> : <Copy size={10} />}
-                  {copied ? "Copied!" : "Copy all"}
-                </button>
+    <div className="flex flex-col min-h-0 max-h-[55%] border-b" style={{ borderColor: "var(--bj-line-soft)" }}>
+      <p className="font-display px-4 pt-4 pb-2 text-[20px]" style={{ color: "var(--bj-ink)" }}>Ask about {passage.book} {passage.chapter}</p>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 flex flex-col gap-2.5">
+        {!thread.length && <p className="font-display italic text-[15px]" style={{ color: "var(--bj-ink4)" }}>Why this word? What did it mean to them? Ask with the passage in view.</p>}
+        {thread.map((t, i) => (
+          <div key={i} className="flex flex-col gap-2">
+            <p className="bj-raised self-end max-w-[88%] px-3 py-2 rounded-[14px] rounded-br-[4px] font-sans text-[13px]" style={{ color: "var(--bj-ink)" }}>{t.q}</p>
+            {!t.a && !t.error && <Wait label="Thinking it through…" />}
+            {t.error && <Problem text={t.error} />}
+            {t.a && (
+              <div>
+                <p style={{ ...writingFontStyle(writeFont, 15.5), lineHeight: 1.55, color: "var(--bj-ink2)", whiteSpace: "pre-line" }}>{t.a.answer}</p>
+                <KeepBtn kept={isKept(t.q)} onKeep={() => keep("answer", t.q, t.a!.answer)} />
               </div>
-              <textarea readOnly value={compiled} rows={8}
-                className="w-full font-sans text-xs resize-none rounded-xl px-3 py-2.5 outline-none"
-                style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)", color: "var(--bj-ink2)", lineHeight: 1.7 }} />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Notes list */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2 min-h-0">
-        {notes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "var(--bj-bg-soft)" }}>
-              <BookmarkPlus size={18} style={{ color: "var(--bj-ink4)" }} />
-            </div>
-            <div>
-              <p className="font-sans text-xs font-medium mb-1" style={{ color: "var(--bj-ink2)" }}>No saved findings yet</p>
-              <p className="font-sans text-xs" style={{ color: "var(--bj-ink4)", lineHeight: 1.6 }}>
-                Hit <strong>Save</strong> on any result to collect it here
-              </p>
-            </div>
+            )}
           </div>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            {notes.map((note, i) => (
-              <NoteCard key={note.id} note={note} index={i} onUpdate={onUpdateNote} onRemove={onRemove} />
-            ))}
-          </AnimatePresence>
-        )}
+        ))}
+        <div ref={endRef} />
       </div>
-
-      {/* Free writing area */}
-      <div className="shrink-0 border-t px-3 py-3" style={{ borderColor: "var(--bj-line-soft)" }}>
-        <p className="font-sans text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: "var(--bj-ink4)" }}>
-          My Writing
-        </p>
-        <textarea value={freeText} onChange={(e) => setFreeText(e.target.value)}
-          placeholder="Write your thoughts, reflections, or sermon outline here…"
-          rows={5} className="w-full bg-transparent outline-none resize-none font-sans text-xs rounded-xl px-3 py-2.5"
-          style={{ color: "var(--bj-ink)", caretColor: "var(--bj-gold)", border: "1px solid var(--bj-line-soft)", background: "var(--bj-bg-soft)", lineHeight: 1.7 }} />
-      </div>
+      <form onSubmit={(e) => { e.preventDefault(); ask(); }} className="bj-well m-3 flex items-center gap-2 h-11 pl-3 pr-1.5 rounded-[13px]">
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask a question…" aria-label={`Ask about ${passage.book} ${passage.chapter}`}
+          className="flex-1 min-w-0 bg-transparent outline-none font-sans text-[13px]" style={{ color: "var(--bj-ink)" }} />
+        <button type="submit" disabled={!draft.trim()} aria-label="Ask" className="bj-gold w-8 h-8 rounded-[9px] flex items-center justify-center disabled:opacity-40"><Send size={13} /></button>
+      </form>
     </div>
   );
 }
 
-function NoteCard({ note, index, onUpdate, onRemove }: {
-  note: NoteItem; index: number;
-  onUpdate: (id: string, note: string) => void;
-  onRemove: (id: string) => void;
+function Notebook({ notes, topic, uid, onOpen, onJournal }: {
+  notes: ResearchNote[]; topic: string; uid?: string; onOpen: (t: string) => void; onJournal: (topic: string) => void;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const ICON_MAP: Record<Tab, React.ElementType> = {
-    compare: Languages, commentary: BookOpen, ask: MessageSquare, word: FlaskConical,
-  };
-  const Icon = ICON_MAP[note.type];
+  const writeFont = useWritingStore((s) => s.font);
+  const groups = useMemo(() => {
+    const m = new Map<string, ResearchNote[]>();
+    for (const n of notes) m.set(n.topic, [...(m.get(n.topic) ?? []), n]);
+    // The topic on the desk first, then most recent.
+    return [...m.entries()].sort((a, b) => (a[0] === topic ? -1 : b[0] === topic ? 1 : +b[1][0].createdAt - +a[1][0].createdAt));
+  }, [notes, topic]);
+  const day = (d: Date) => d.toDateString() === new Date().toDateString() ? "today" : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const here = groups.find(([t]) => t === topic);
 
   return (
-    <motion.div layout
-      initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: index * 0.03, duration: 0.18 }}
-      className="rounded-xl overflow-hidden"
-      style={{ background: "var(--bj-bg-soft)", border: "1px solid var(--bj-line-soft)" }}
-    >
-      {/* Card header */}
-      <div className="flex items-center gap-2 px-3 py-2">
-        <Icon size={11} style={{ color: "var(--bj-gold)", flexShrink: 0 }} />
-        <p className="font-sans text-xs font-medium flex-1 truncate" style={{ color: "var(--bj-ink)" }}>{note.source}</p>
-        <button onClick={() => setCollapsed(!collapsed)} className="bj-btn-icon w-5 h-5 flex items-center justify-center rounded shrink-0" style={{ color: "var(--bj-ink4)" }}>
-          {collapsed ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
-        </button>
-        <button onClick={() => onRemove(note.id)} className="bj-btn-icon w-5 h-5 flex items-center justify-center rounded shrink-0" style={{ color: "var(--bj-ink4)" }}
-          title="Remove">
-          <Trash2 size={10} />
-        </button>
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex items-center gap-2 px-4 pt-4 pb-1">
+        <NotebookPen size={15} style={{ color: "var(--bj-gold)" }} />
+        <p className="font-display text-[20px] flex-1" style={{ color: "var(--bj-ink)" }}>Notebook</p>
       </div>
-
-      <AnimatePresence>
-        {!collapsed && (
-          <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} className="overflow-hidden">
-            <div className="px-3 pb-3 flex flex-col gap-2">
-              <p className="font-sans text-[11px] leading-relaxed line-clamp-3"
-                style={{ color: "var(--bj-ink3)", borderTop: "1px solid var(--bj-line-soft)", paddingTop: 8 }}>
-                {note.content}
-              </p>
-              <input
-                value={note.personalNote}
-                onChange={(e) => onUpdate(note.id, e.target.value)}
-                placeholder="Add your reflection…"
-                className="w-full bg-transparent outline-none font-sans text-xs"
-                style={{ color: "var(--bj-ink2)", caretColor: "var(--bj-gold)", borderTop: "1px solid var(--bj-line-soft)", paddingTop: 6 }}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
-}
-
-// ── Page ───────────────────────────────────────────────────
-
-export default function ResearchPage() {
-  const { version, setVersion } = useBibleStore();
-  const [tab, setTab] = useState<Tab>("compare");
-  const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
-  const [hoveredVersion, setHoveredVersion] = useState<string | null>(null);
-  const [notes, setNotes] = useState<NoteItem[]>([]);
-  const [notesOpen, setNotesOpen] = useState(false);
-  const [mobileNotesOpen, setMobileNotesOpen] = useState(false);
-
-  function handleSave(payload: SavePayload) {
-    setNotes((prev) => [
-      ...prev,
-      { ...payload, id: crypto.randomUUID(), personalNote: "", savedAt: Date.now() },
-    ]);
-    // Auto-open notes panel on first save
-    setNotesOpen(true);
-  }
-
-  function handleUpdateNote(id: string, note: string) {
-    setNotes((prev) => prev.map((n) => n.id === id ? { ...n, personalNote: note } : n));
-  }
-
-  function handleRemove(id: string) {
-    setNotes((prev) => prev.filter((n) => n.id !== id));
-  }
-
-  const notesPanel = notesOpen ? (
-    <NotesPanel notes={notes} onUpdateNote={handleUpdateNote} onRemove={handleRemove} onClose={() => setNotesOpen(false)} />
-  ) : null;
-
-  return (
-    <div className="flex h-full overflow-hidden">
-      {/* ── Research content ─────────────────────── */}
-      <div className="flex-1 min-w-0 overflow-y-auto">
-        <div className="px-4 md:px-8 lg:px-10 py-8 pb-32 md:pb-8" style={{ maxWidth: 680, margin: "0 auto" }}>
-
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Search size={14} style={{ color: "var(--bj-gold)" }} />
-                <p className="font-sans text-[11px] uppercase tracking-widest font-semibold" style={{ color: "var(--bj-gold-deep)" }}>Research</p>
-              </div>
-              <h1 className="font-display mb-1" style={{ fontSize: "clamp(1.5rem, 4vw, 2rem)", color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.1 }}>
-                Explore Scripture
-              </h1>
-              <p className="font-sans text-sm" style={{ color: "var(--bj-ink4)", lineHeight: 1.6 }}>
-                Compare, study, ask, and save findings to your research notes.
-              </p>
-            </div>
-
-            {/* Notes toggle button */}
-            <button
-              onClick={() => setNotesOpen(!notesOpen)}
-              className="hidden md:flex items-center gap-2 font-sans text-sm px-3 py-2 rounded-xl shrink-0 transition-all duration-150"
-              style={{
-                background: notesOpen ? "var(--bj-gold-tint)" : "var(--bj-bg-soft)",
-                color: notesOpen ? "var(--bj-gold-deep)" : "var(--bj-ink3)",
-                border: `1px solid ${notesOpen ? "var(--bj-gold-soft)" : "var(--bj-line-soft)"}`,
-              }}
-            >
-              <Pencil size={13} />
-              Notes {notes.length > 0 && <span className="font-sans text-xs px-1.5 py-0.5 rounded-full" style={{ background: "var(--bj-gold)", color: "white", fontSize: 10 }}>{notes.length}</span>}
-            </button>
-          </div>
-
-          {/* Version picker — applies to Commentary and Ask */}
-          <div className="mb-6">
-            <p className="font-sans text-[10px] uppercase tracking-widest font-semibold mb-2" style={{ color: "var(--bj-ink4)" }}>
-              Translation
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {VERSIONS.map((v) => {
-                const active = version === v;
-                const hovered = hoveredVersion === v && !active;
-                return (
-                  <button
-                    key={v}
-                    onClick={() => setVersion(v)}
-                    onMouseEnter={() => setHoveredVersion(v)}
-                    onMouseLeave={() => setHoveredVersion(null)}
-                    className="font-sans text-xs px-2.5 py-1 rounded-lg"
-                    style={{
-                      background: active ? "var(--bj-gold)" : hovered ? "var(--bj-line)" : "var(--bj-bg-soft)",
-                      color: active ? "white" : hovered ? "var(--bj-ink)" : "var(--bj-ink3)",
-                      fontWeight: active ? 600 : 400,
-                      border: `1px solid ${active ? "transparent" : "var(--bj-line-soft)"}`,
-                      transform: hovered ? "translateY(-1px)" : "none",
-                      boxShadow: hovered ? "0 2px 6px color-mix(in oklch, var(--bj-ink) 8%, transparent)" : "none",
-                      transition: "all 0.13s ease",
-                    }}
-                  >
-                    {v}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="font-sans text-[10px] mt-1.5" style={{ color: "var(--bj-ink4)" }}>
-              Used by Commentary and Ask. Compare has its own per-translation toggle.
-            </p>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1.5 mb-2 flex-wrap">
-            {TABS.map(({ id, label, icon: Icon }) => {
-              const active = tab === id;
-              const hovered = hoveredTab === id && !active;
-              return (
-                <button key={id} onClick={() => setTab(id)}
-                  onMouseEnter={() => setHoveredTab(id)}
-                  onMouseLeave={() => setHoveredTab(null)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-sans text-sm"
-                  style={{
-                    background: active ? "var(--bj-gold)" : hovered ? "var(--bj-line)" : "var(--bj-bg-soft)",
-                    color: active ? "white" : hovered ? "var(--bj-ink)" : "var(--bj-ink3)",
-                    fontWeight: active ? 500 : 400,
-                    border: active ? "none" : "1px solid var(--bj-line-soft)",
-                    transform: hovered ? "translateY(-1px)" : "none",
-                    boxShadow: hovered ? "0 2px 8px color-mix(in oklch, var(--bj-ink) 8%, transparent)" : "none",
-                    transition: "all 0.14s ease",
-                  }}>
-                  <Icon size={12} />
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-
-          <p className="font-sans text-xs mb-5" style={{ color: "var(--bj-ink4)" }}>
-            {TABS.find((t) => t.id === tab)?.desc}
+      <p className="px-4 font-sans text-[11.5px] mb-2" style={{ color: "var(--bj-ink4)" }}>Saved to your account, gathered by what you studied</p>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-3 flex flex-col gap-4">
+        {!groups.length && (
+          <p className="font-display italic text-[15px] mt-2 flex items-start gap-2" style={{ color: "var(--bj-ink4)" }}>
+            <Sparkles size={14} className="mt-1 shrink-0" style={{ color: "var(--bj-gold)" }} /> Press Keep on anything worth remembering. It waits here for Sunday.
           </p>
-
-          {/* Tab content */}
-          <AnimatePresence mode="wait">
-            <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
-              {tab === "compare"    && <CompareTab    onSave={handleSave} />}
-              {tab === "commentary" && <CommentaryTab onSave={handleSave} version={version} />}
-              {tab === "ask"        && <AskTab        onSave={handleSave} version={version} />}
-              {tab === "word"       && <WordStudyTab  onSave={handleSave} />}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+        )}
+        {groups.map(([t, items]) => (
+          <section key={t}>
+            <button type="button" onClick={() => onOpen(t)} className={`${LABEL} mb-2 hover:underline text-left`} style={{ color: t === topic ? "var(--bj-gold)" : "var(--bj-ink4)" }}>
+              {t} · {day(items[0].createdAt)}
+            </button>
+            <div className="flex flex-col gap-1.5">
+              {(t === topic ? items : items.slice(0, 2)).map((n) => (
+                <div key={n.id} className="group bj-raised rounded-[13px] px-3 py-2.5 relative">
+                  <p className="font-sans text-[12px] font-semibold pr-5" style={{ color: "var(--bj-ink2)" }}>{n.title}</p>
+                  <p className="mt-0.5 line-clamp-3" style={{ ...writingFontStyle(writeFont, 14.5), lineHeight: 1.45, color: "var(--bj-ink3)", whiteSpace: "pre-line" }}>{n.body}</p>
+                  {uid && (
+                    <button type="button" onClick={() => void forgetResearch(uid, n.id)} aria-label={`Remove ${n.title}`}
+                      className="bj-btn-icon absolute top-1.5 right-1.5 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity" style={{ color: "var(--bj-ink4)" }}>
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {t !== topic && items.length > 2 && <button type="button" onClick={() => onOpen(t)} className="font-sans text-[11.5px] text-left px-1 hover:underline" style={{ color: "var(--bj-ink4)" }}>+{items.length - 2} more</button>}
+            </div>
+          </section>
+        ))}
       </div>
-
-      {/* ── Desktop notes panel ──────────────────── */}
-      <AnimatePresence>
-        {notesOpen && (
-          <motion.aside
-            key="notes-desktop"
-            className="hidden md:flex flex-col shrink-0 overflow-hidden"
-            style={{ width: 340 }}
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 340, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.26 }}
-          >
-            {notesPanel}
-          </motion.aside>
-        )}
-      </AnimatePresence>
-
-      {/* ── Mobile FAB ───────────────────────────── */}
-      <button
-        onClick={() => setMobileNotesOpen(true)}
-        className="md:hidden fixed flex items-center gap-2 font-sans text-sm px-4 py-2.5 rounded-2xl shadow-lg z-40"
-        style={{
-          bottom: 88, right: 16,
-          background: "var(--bj-gold)",
-          color: "white",
-          boxShadow: "0 4px 20px color-mix(in oklch, var(--bj-gold) 40%, transparent)",
-        }}
-      >
-        <Pencil size={14} />
-        Notes {notes.length > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.25)", fontSize: 10 }}>{notes.length}</span>}
-      </button>
-
-      {/* ── Mobile notes bottom sheet ────────────── */}
-      <AnimatePresence>
-        {mobileNotesOpen && (
-          <>
-            <motion.div key="notes-scrim" className="md:hidden fixed inset-0 z-40"
-              style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setMobileNotesOpen(false)} />
-            <motion.div key="notes-sheet"
-              className="md:hidden fixed left-0 right-0 bottom-0 z-50 flex flex-col rounded-t-2xl overflow-hidden"
-              style={{ height: "78vh" }}
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ ease: [0.22, 1, 0.36, 1], duration: 0.3 }}
-            >
-              <div className="flex justify-center pt-2 pb-1 shrink-0" style={{ background: "var(--bj-bg-panel)" }}>
-                <div className="w-10 h-1 rounded-full" style={{ background: "var(--bj-line)" }} />
-              </div>
-              <div className="flex-1 min-h-0">
-                <NotesPanel
-                  notes={notes}
-                  onUpdateNote={handleUpdateNote}
-                  onRemove={handleRemove}
-                  onClose={() => setMobileNotesOpen(false)}
-                />
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {here && (
+        <div className="p-3 pt-0">
+          <button type="button" onClick={() => onJournal(topic)} className="bj-gold w-full h-10 rounded-[12px] flex items-center justify-center gap-2 font-sans text-[13px] font-semibold">
+            <BookOpen size={14} /> Turn into a journal entry
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,18 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Camera, X, RefreshCw, Smile, ImagePlus } from "lucide-react";
-import { useUploads, attachCover, pickPhotos } from "@/lib/photos";
-import { updateEntry } from "@/services/journal.service";
-import type { JournalEntry } from "@/types";
-
-/** The cover image for an entry: saved URL, or the local preview while it uploads. */
-export function useCoverSrc(entry: Pick<JournalEntry, "id" | "cover"> | null | undefined) {
-  const pending = useUploads((s) => (entry ? s.uploads[s.covers[entry.id] ?? ""] : undefined));
-  if (!entry) return { src: null as string | null, pending };
-  return { src: pending?.localUrl ?? entry.cover?.url ?? null, pending };
-}
+import { Smile, ImagePlus } from "lucide-react";
 
 /** Soft, blurred wash of the cover behind the top of the page. */
 export function CoverWash({ src, tint }: { src: string | null; tint?: string | null }) {
@@ -25,64 +14,6 @@ export function CoverWash({ src, tint }: { src: string | null; tint?: string | n
         background: src ? `center / cover no-repeat url("${src}")` : tint ?? undefined,
       }} />
     </div>
-  );
-}
-
-export function EntryCover({ entry, uid }: { entry: JournalEntry; uid: string }) {
-  const { src, pending } = useCoverSrc(entry);
-  const [hover, setHover] = useState(false);
-  if (!src) return null;
-
-  async function replace() {
-    const [file] = await pickPhotos();
-    if (file) attachCover(uid, entry.id, file);
-  }
-
-  return (
-    <div className="relative inline-block mb-2" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="How I felt" className="block object-cover rounded-2xl"
-        style={{
-          width: "min(220px, 62vw)", aspectRatio: "7 / 5", transform: "rotate(-1.5deg)", animation: "bj-pop 0.42s cubic-bezier(0.34, 1.4, 0.64, 1) both",
-          background: entry.cover?.tint ?? "var(--bj-bg-soft)",
-          boxShadow: "inset 0 0 0 1px rgba(255,255,255,.18), 0 18px 40px -12px var(--m-shade)",
-        }} />
-      <span className="bj-glass absolute left-2.5 -bottom-3 flex items-center gap-1.5 h-6 px-2.5 rounded-full font-sans text-[11px] font-medium"
-        style={{ color: "var(--bj-ink)" }}>
-        <Smile size={12} style={{ color: "var(--bj-gold)" }} />
-        {pending?.status === "uploading" ? `Saving… ${Math.round(pending.progress * 100)}%` : pending?.status === "error" ? "Couldn’t upload" : "How I felt"}
-      </span>
-      <AnimatePresence>
-        {hover && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}
-            className="absolute top-2 right-2 flex gap-1">
-            <button type="button" onClick={replace} aria-label="Replace photo" title="Replace"
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white" style={{ background: "rgba(0,0,0,.5)", backdropFilter: "blur(8px)" }}>
-              <RefreshCw size={12} />
-            </button>
-            <button type="button" onClick={() => void updateEntry(uid, entry.id, { cover: null })} aria-label="Remove photo" title="Remove"
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white" style={{ background: "rgba(0,0,0,.5)", backdropFilter: "blur(8px)" }}>
-              <X size={13} />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-/** Small chip in the entry's meta row: add a cover photo. */
-export function AddCoverChip({ entry, uid }: { entry: JournalEntry; uid: string }) {
-  const { src } = useCoverSrc(entry);
-  if (src) return null;
-  return (
-    <button type="button"
-      onClick={async () => { const [f] = await pickPhotos({ camera: window.matchMedia("(pointer: coarse)").matches }); if (f) attachCover(uid, entry.id, f); }}
-      className="bj-chip flex items-center gap-1.5 h-6 px-2.5 rounded-full font-sans text-[11.5px]"
-      style={{ color: "var(--bj-ink3)", border: "1px dashed var(--bj-line)" }}
-      title="Add a photo of how you feel (⌘⇧P adds one to the page)">
-      <Camera size={12} /> Photo
-    </button>
   );
 }
 
@@ -116,8 +47,8 @@ export function PhotoDropOverlay({ onCover, onPage, onLeave }: {
       onDragOver={(e) => e.preventDefault()}
       onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) onLeave(); }}
       onDrop={(e) => { e.preventDefault(); onLeave(); }}>
-      {zone("cover", "Set as how I felt", "Becomes the cover — the page takes its colours", Smile, true)}
-      {zone("page", "Add to the page", "Lands where your cursor is", ImagePlus, false)}
+      {zone("cover", "How I felt", "Shows next to this page in your list", Smile, true)}
+      {zone("page", "Add to this page’s photos", "Kept small beside your writing", ImagePlus, false)}
     </div>
   );
 }
