@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { create } from "zustand";
-import { Folder, FolderOpen, Lock, LockOpen, Plus, MoreHorizontal, ChevronDown, Loader2, Library } from "lucide-react";
+import { Folder, FolderOpen, Lock, LockOpen, Plus, MoreHorizontal, ChevronDown, Loader2, Library, Pencil, Trash2 } from "lucide-react";
 import { useMounted } from "@/hooks/useMounted";
 import { useLocks, createLockCode, unlockWith } from "@/lib/locks";
 import { useFolders, createFolder, renameFolder, setFolderLockedFlag, removeFolder, type JournalFolder } from "@/services/folder.service";
@@ -248,20 +248,29 @@ export function FolderSwitcher({ uid, current, onPick, entries }: {
         </button>
         {f && (
           <button type="button" onClick={() => setMenu(menu === f.id ? null : f.id)} aria-label={`${f.name} options`} aria-haspopup="menu" aria-expanded={menu === f.id}
-            className="bj-btn-icon absolute right-1 top-1/2 -translate-y-1/2 w-7 h-7 rounded-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
+            className="bj-btn-icon absolute right-1 top-1 w-7 h-7 rounded-[8px] flex items-center justify-center opacity-0 group-hover:opacity-100 focus-visible:opacity-100 aria-expanded:opacity-100"
             style={{ color: "var(--bj-ink3)" }}>
             <MoreHorizontal size={14} />
           </button>
         )}
-        <AnimatePresence>
-          {f && menu === f.id && (
-            <motion.div role="menu" {...pop} style={{ transformOrigin: "top right" }} className="bj-menu absolute right-0 top-[calc(100%+4px)] z-20 w-[210px] p-1 rounded-[13px]">
-              <Item icon={<Folder size={14} />} label="Rename" onClick={() => { setMenu(null); setName(f.name); setRenaming(f.id); }} />
-              <Item icon={f.locked ? <LockOpen size={14} /> : <Lock size={14} />} label={f.locked ? "Remove the lock" : "Lock this folder"} onClick={() => void toggleLock(f)} />
-              <Item icon={<MoreHorizontal size={14} />} label="Delete folder" danger onClick={() => void drop(f)} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Options open inline under the row — never a menu inside the menu. */}
+        {f && menu === f.id && (
+          <motion.div role="group" aria-label={`${f.name} options`}
+            initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.14, ease: [0.23, 1, 0.32, 1] }}
+            className="bj-well mx-1 mt-1 mb-1.5 p-1 rounded-[11px] grid grid-cols-3 gap-1">
+            {([
+              { icon: <Pencil size={13} />, label: "Rename", on: () => { setMenu(null); setName(f.name); setRenaming(f.id); } },
+              { icon: f.locked ? <LockOpen size={13} /> : <Lock size={13} />, label: f.locked ? "Unlock" : "Lock", on: () => void toggleLock(f) },
+              { icon: <Trash2 size={13} />, label: "Delete", on: () => void drop(f), danger: true },
+            ] as const).map((a) => (
+              <button key={a.label} type="button" onClick={a.on}
+                className="bj-menu-item h-8 rounded-[8px] flex items-center justify-center gap-1.5 font-sans text-[12px] font-medium whitespace-nowrap"
+                style={{ color: "danger" in a ? "var(--bj-ember)" : "var(--bj-ink2)" }}>
+                {a.icon}{a.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
       </div>
     );
   };
