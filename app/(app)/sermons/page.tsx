@@ -177,7 +177,7 @@ export default function SermonsPage() {
 
   return (
     <div className="bj-ambient min-h-full xl:h-full flex">
-      <div className="flex-1 min-w-0 xl:overflow-y-auto px-4 md:px-8 py-6 md:py-8 flex flex-col gap-6 bj-stagger">
+      <div className="flex-1 min-w-0 xl:overflow-y-auto px-4 md:px-8 py-6 md:py-8 flex flex-col gap-6 bj-stagger [&>*]:shrink-0">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-end gap-4">
           <div className="min-w-0">

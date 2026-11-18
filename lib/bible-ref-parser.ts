@@ -65,8 +65,18 @@ export interface ParsedRef {
   verseEnd?: number;
 }
 
+/** "1 Samuel  30 : 21", "1 Sam 30.21", "John 3:16 - 18" → "1 Samuel 30:21" etc. */
+export function normalizeRef(raw: string): string {
+  return raw
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s*:\s*/g, ":")
+    .replace(/(\d)\s*\.\s*(\d)/g, "$1:$2")
+    .replace(/(\d)\s*[-–—]\s*(\d)/g, "$1-$2");
+}
+
 export function parseRef(raw: string): ParsedRef | null {
-  const s = raw.trim();
+  const s = normalizeRef(raw);
   if (!s) return null;
 
   // Regex: optional leading digit (for "1 John", "2 Cor" etc),
@@ -123,7 +133,7 @@ export function resolveBookStrict(raw: string): string | null {
 
 /** Matches "John 3:16", "1 Cor 13:4-7", "Ps. 23:1", "Song of Solomon 2:4". */
 export const PROSE_REF_RE =
-  /\b((?:[1-3]\s?)?[A-Z][a-z]+\.?(?:\s(?:of\s)?[A-Z][a-z]+)?)\s(\d{1,3}):(\d{1,3})(?:\s?[-–]\s?(\d{1,3}))?\b/g;
+  /\b((?:[1-3]\s?)?[A-Z][a-z]+\.?(?:\s(?:of\s)?[A-Z][a-z]+)?)\s(\d{1,3})\s?:\s?(\d{1,3})(?:\s?[-–]\s?(\d{1,3}))?\b/g;
 
 export function findProseRefs(text: string): { from: number; to: number; ref: ParsedRef; label: string }[] {
   const out: { from: number; to: number; ref: ParsedRef; label: string }[] = [];

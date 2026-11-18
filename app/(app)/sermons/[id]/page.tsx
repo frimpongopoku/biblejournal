@@ -314,7 +314,7 @@ export default function SermonDetailPage() {
     const scriptures = verses.filter((m) => m.ref?.verse).slice(0, 4).map((m) => ({
       book: m.ref!.book, chapter: m.ref!.chapter, verse: m.ref!.verse!, ...(m.ref!.endVerse ? { endVerse: m.ref!.endVerse } : {}), version, ...(m.ref!.text ? { text: m.ref!.text } : {}),
     }));
-    if (apiRef.current?.playing()) apiRef.current.toggle();
+    // Keep it playing: leaving hands it to the floating player, so you can listen while you write.
     await startEntry(user.uid, router.push, { title: `On ${title ? `“${title}”` : "this sermon"}`, content: JSON.stringify(content), scriptures }, "body");
   }
 

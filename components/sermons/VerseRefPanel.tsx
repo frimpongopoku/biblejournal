@@ -6,18 +6,20 @@ import { Search, Plus, X, BookOpen, Hash, ChevronLeft, ChevronRight, Maximize2, 
 import { parseRef } from "@/lib/bible-ref-parser";
 import { PROTESTANT_BOOKS, CHAPTER_COUNTS } from "@/lib/bible-books";
 import { useBibleStore } from "@/store/bible.store";
-import { fontPairs } from "@/lib/fonts";
-import type { FontPairId } from "@/lib/fonts";
+import { useWritingStore, readingFontStyle } from "@/store/writing.store";
+import { face, READ_FACES } from "@/lib/typeface";
 import type { SermonRef } from "@/types";
 
-const REF_FONT_KEY = "bj-ref-font";
-const REF_SIZE_KEY = "bj-ref-size";
-const REF_SIZES = [
-  { label: "S", value: 13 },
-  { label: "M", value: 15 },
-  { label: "L", value: 18 },
-  { label: "XL", value: 22 },
-];
+/** Scripture here follows the reading face chosen in Settings, like the Bible does. */
+function useVerseFace() {
+  const readFont = useWritingStore((s) => s.readFont);
+  const readSize = useWritingStore((s) => s.readSize);
+  const italic = !!face(READ_FACES, readFont).italic;
+  return {
+    readSize,
+    style: (size: number): React.CSSProperties => ({ ...readingFontStyle(readFont, size), fontStyle: italic ? "italic" : "normal" }),
+  };
+}
 
 const VERSIONS = ["ESV", "KJV", "NIV", "AMP", "MSG", "ASV", "NKJV", "NLT"];
 
@@ -77,7 +79,7 @@ function getSuggestions(input: string): Suggestion[] {
   if (parsed) {
     const totalCh = CHAPTER_COUNTS[parsed.book] ?? 1;
     const ch = Math.min(parsed.chapter, totalCh);
-    return [ch - 1, ch, ch + 1]
+    return [ch, ch + 1, ch - 1]
       .filter((c) => c >= 1 && c <= totalCh)
       .map((c) => ({ type: "chapter" as const, book: parsed.book, chapter: c, label: `${parsed.book} ${c}` }));
   }
@@ -135,23 +137,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
   const suggestions = getSuggestions(value);
   const sortedRefs = [...refs].sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
 
-  const [refFontId, setRefFontId] = useState<FontPairId>(() =>
-    typeof window !== "undefined" ? (localStorage.getItem(REF_FONT_KEY) as FontPairId) ?? "classic" : "classic"
-  );
-  const [refFontSize, setRefFontSize] = useState<number>(() =>
-    typeof window !== "undefined" ? Number(localStorage.getItem(REF_SIZE_KEY)) || 15 : 15
-  );
-
-  function chooseRefFont(id: FontPairId) {
-    setRefFontId(id);
-    localStorage.setItem(REF_FONT_KEY, id);
-  }
-  function chooseRefSize(size: number) {
-    setRefFontSize(size);
-    localStorage.setItem(REF_SIZE_KEY, String(size));
-  }
-
-  const refFontPair = fontPairs.find((f) => f.id === refFontId) ?? fontPairs[0];
+  const verse = useVerseFace();
 
   // Sync dropdown open state
   useEffect(() => {
@@ -282,10 +268,6 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
           <h3 className="font-sans text-xs font-semibold uppercase tracking-wider flex-1" style={{ color: "var(--bj-ink4)" }}>
             Verse References
           </h3>
-          <RefFontPicker
-            fontId={refFontId} fontSize={refFontSize}
-            onFont={chooseRefFont} onSize={chooseRefSize}
-          />
         </div>
 
         {/* Search with suggestions */}
@@ -426,9 +408,7 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
                       {preview.ref} · {version}
                     </p>
                     <p className="mb-2" style={{
-                      fontFamily: `var(${refFontPair.displayVar})`,
-                      fontStyle: refFontId === "dyslexic" ? "normal" : "italic",
-                      fontSize: 13, color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.6,
+                      ...verse.style(14), color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.6,
                       display: "-webkit-box", WebkitLineClamp: 4,
                       WebkitBoxOrient: "vertical", overflow: "hidden",
                     }}>
@@ -468,8 +448,6 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
                 onUpdateNote={onUpdateNote}
                 onRemove={onRemove}
                 onExpand={() => setExpandedIndex(i)}
-                fontId={refFontId}
-                fontSize={refFontSize}
               />
             ))}
           </AnimatePresence>
@@ -484,8 +462,6 @@ export function VerseRefPanel({ refs, onAdd, onUpdateNote, onRemove }: Props) {
           index={expandedIndex}
           onClose={() => setExpandedIndex(null)}
           onNavigate={setExpandedIndex}
-          fontId={refFontId}
-          fontSize={refFontSize}
         />
       )}
     </AnimatePresence>
@@ -501,12 +477,10 @@ interface RefCardProps {
   onUpdateNote: (id: string, note: string) => Promise<void>;
   onRemove: (id: string) => Promise<void>;
   onExpand: () => void;
-  fontId: FontPairId;
-  fontSize: number;
 }
 
-function RefCard({ ref_, index, onUpdateNote, onRemove, onExpand, fontId, fontSize }: RefCardProps) {
-  const pair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
+function RefCard({ ref_, index, onUpdateNote, onRemove, onExpand }: RefCardProps) {
+  const verse = useVerseFace();
   const [note, setNote] = useState(ref_.note);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -559,9 +533,7 @@ function RefCard({ ref_, index, onUpdateNote, onRemove, onExpand, fontId, fontSi
       </div>
 
       <p className="mb-2" style={{
-        fontFamily: `var(${pair.displayVar})`,
-        fontStyle: fontId === "dyslexic" ? "normal" : "italic",
-        fontSize, color: "var(--bj-ink2)", fontWeight: 400, lineHeight: 1.65,
+        ...verse.style(Math.max(15, Math.round(verse.readSize * 0.8))), color: "var(--bj-ink2)", fontWeight: 400, lineHeight: 1.65,
         display: "-webkit-box", WebkitLineClamp: 4,
         WebkitBoxOrient: "vertical", overflow: "hidden",
       }}>
@@ -591,12 +563,10 @@ interface RefExpandModalProps {
   index: number;
   onClose: () => void;
   onNavigate: (i: number) => void;
-  fontId: FontPairId;
-  fontSize: number;
 }
 
-function RefExpandModal({ refs, index, onClose, onNavigate, fontId, fontSize }: RefExpandModalProps) {
-  const pair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
+function RefExpandModal({ refs, index, onClose, onNavigate }: RefExpandModalProps) {
+  const verse = useVerseFace();
   const ref_ = refs[index];
   const [copied, setCopied] = useState(false);
 
@@ -629,66 +599,39 @@ function RefExpandModal({ refs, index, onClose, onNavigate, fontId, fontSize }: 
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-      style={{ background: "var(--m-scrim)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+      className="bj-scrim fixed inset-0 z-[200] flex items-center justify-center p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.94, y: 12 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.94, y: 12 }}
+        initial={{ opacity: 0, scale: 0.96, y: 6 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.12 } }}
         transition={{ ease: EASE_OUT, duration: 0.22 }}
-        className="relative w-full max-w-lg rounded-2xl p-6 flex flex-col gap-5"
-        style={{
-          background: "var(--bj-bg-panel)",
-          border: "1px solid var(--bj-line)",
-          boxShadow: "0 24px 80px color-mix(in oklch, var(--bj-ink) 28%, transparent)",
-        }}
+        className="bj-window relative w-full max-w-xl overflow-hidden flex flex-col max-h-[86vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3">
-          <span
-            className="font-sans font-semibold px-2.5 py-1 rounded-full"
-            style={{ fontSize: 11, background: "var(--bj-gold-tint)", color: "var(--bj-gold-deep)", border: "1px solid var(--bj-gold-soft)" }}
-          >
-            {refLabel} · {ref_.version}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleCopy}
-              className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ color: copied ? "var(--bj-gold)" : "var(--bj-ink4)" }}
-              title="Copy text"
-            >
-              {copied ? <Check size={13} /> : <Copy size={13} />}
-            </button>
-            <button
-              onClick={onClose}
-              className="bj-btn-icon w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{ color: "var(--bj-ink4)" }}
-              title="Close"
-            >
-              <X size={13} />
-            </button>
-          </div>
+        {/* Title bar, like every window */}
+        <div className="bj-window-bar !cursor-default flex items-center gap-2.5 pl-3 pr-2 h-12 shrink-0">
+          <span className="w-7 h-7 rounded-[9px] bj-well flex items-center justify-center shrink-0" style={{ color: "var(--bj-gold)" }}><BookOpen size={14} /></span>
+          <span className="font-display text-[18px] flex-1 truncate" style={{ color: "var(--bj-ink)" }}>{refLabel}</span>
+          <span className="font-sans text-[11px] font-semibold uppercase tracking-[0.06em] shrink-0" style={{ color: "var(--bj-ink4)" }}>{ref_.version}</span>
+          <button type="button" onClick={handleCopy} aria-label="Copy the verse"
+            className="bj-btn-icon w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ color: copied ? "var(--bj-gold)" : "var(--bj-ink3)" }}>
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+          </button>
+          <button type="button" onClick={onClose} aria-label="Close"
+            className="bj-btn-icon w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ color: "var(--bj-ink3)" }}>
+            <X size={15} />
+          </button>
         </div>
 
-        {/* Verse text */}
-        <div className="px-1">
-          <p style={{
-            fontFamily: `var(${pair.displayVar})`,
-            fontStyle: fontId === "dyslexic" ? "normal" : "italic",
-            fontSize: Math.max(fontSize, 16),
-            color: "var(--bj-ink)", fontWeight: 400, lineHeight: 1.8,
-          }}>
+        {/* The verse, in your reading face */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-7 py-6">
+          <p style={{ ...verse.style(verse.readSize), color: "var(--bj-ink)", lineHeight: 1.75 }}>
             &ldquo;<VerseText text={ref_.text} />&rdquo;
           </p>
           {ref_.note && (
-            <p
-              className="font-sans text-sm mt-4 pt-3 border-t"
-              style={{ color: "var(--bj-ink3)", borderColor: "var(--bj-line-soft)" }}
-            >
+            <p className="font-write text-[15px] leading-relaxed mt-5 pt-4 border-t" style={{ color: "var(--bj-ink3)", borderColor: "var(--bj-line-soft)" }}>
               {ref_.note}
             </p>
           )}
@@ -696,28 +639,15 @@ function RefExpandModal({ refs, index, onClose, onNavigate, fontId, fontSize }: 
 
         {/* Prev / Next */}
         {refs.length > 1 && (
-          <div
-            className="flex items-center justify-between pt-3 border-t"
-            style={{ borderColor: "var(--bj-line-soft)" }}
-          >
-            <button
-              onClick={() => onNavigate(index - 1)}
-              disabled={index === 0}
-              className="bj-chip flex items-center gap-1.5 font-sans text-xs px-3 py-2 rounded-xl disabled:opacity-30 min-h-[36px]"
-              style={{ color: "var(--bj-ink3)", border: "1px solid var(--bj-line-soft)" }}
-            >
-              <ChevronLeft size={12} /> Prev
+          <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-t shrink-0" style={{ borderColor: "var(--bj-line-soft)" }}>
+            <button type="button" onClick={() => onNavigate(index - 1)} disabled={index === 0}
+              className="bj-raised bj-lift h-8 px-3 rounded-[10px] flex items-center gap-1.5 font-sans text-[12px] font-medium disabled:opacity-35 disabled:pointer-events-none" style={{ color: "var(--bj-ink2)" }}>
+              <ChevronLeft size={13} /> Previous
             </button>
-            <span className="font-sans text-xs" style={{ color: "var(--bj-ink4)" }}>
-              {index + 1} of {refs.length}
-            </span>
-            <button
-              onClick={() => onNavigate(index + 1)}
-              disabled={index === refs.length - 1}
-              className="bj-chip flex items-center gap-1.5 font-sans text-xs px-3 py-2 rounded-xl disabled:opacity-30 min-h-[36px]"
-              style={{ color: "var(--bj-ink3)", border: "1px solid var(--bj-line-soft)" }}
-            >
-              Next <ChevronRight size={12} />
+            <span className="font-sans text-[12px]" style={{ color: "var(--bj-ink4)", fontVariantNumeric: "tabular-nums" }}>{index + 1} of {refs.length}</span>
+            <button type="button" onClick={() => onNavigate(index + 1)} disabled={index === refs.length - 1}
+              className="bj-raised bj-lift h-8 px-3 rounded-[10px] flex items-center gap-1.5 font-sans text-[12px] font-medium disabled:opacity-35 disabled:pointer-events-none" style={{ color: "var(--bj-ink2)" }}>
+              Next <ChevronRight size={13} />
             </button>
           </div>
         )}
@@ -762,111 +692,3 @@ function VerseText({ text }: { text: string }) {
   );
 }
 
-// ── RefFontPicker ─────────────────────────────────────────
-
-function RefFontPicker({ fontId, fontSize, onFont, onSize }: {
-  fontId: FontPairId;
-  fontSize: number;
-  onFont: (id: FontPairId) => void;
-  onSize: (s: number) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const activePair = fontPairs.find((f) => f.id === fontId) ?? fontPairs[0];
-
-  return (
-    <div ref={wrapRef} className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        title="Font & size"
-        className="bj-btn-icon h-6 px-1.5 rounded flex items-center gap-1"
-        style={{
-          fontFamily: `var(${activePair.displayVar})`,
-          fontSize: 13,
-          fontStyle: fontId === "dyslexic" ? "normal" : "italic",
-          background: open ? "var(--bj-gold-tint)" : "transparent",
-          color: open ? "var(--bj-gold-deep)" : "var(--bj-ink4)",
-        }}
-      >
-        Aa
-      </button>
-
-      {open && (
-        <div
-          className="absolute right-0 rounded-xl overflow-hidden z-50"
-          style={{
-            top: "calc(100% + 4px)",
-            background: "var(--bj-bg-panel)",
-            border: "1px solid var(--bj-line)",
-            boxShadow: "0 8px 28px rgba(0,0,0,0.18)",
-            minWidth: 168,
-          }}
-        >
-          <p className="px-3 pt-2.5 pb-1 font-sans text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--bj-ink4)" }}>
-            Font
-          </p>
-          {fontPairs.map((pair) => {
-            const active = fontId === pair.id;
-            return (
-              <button
-                key={pair.id}
-                onClick={() => onFont(pair.id)}
-                className="flex items-center gap-2.5 w-full px-3 py-1.5"
-                style={{ background: active ? "var(--bj-gold-tint)" : "transparent", transition: "background 0.1s ease" }}
-              >
-                <span style={{
-                  fontFamily: `var(${pair.displayVar})`,
-                  fontSize: 16,
-                  fontStyle: pair.id === "dyslexic" ? "normal" : "italic",
-                  color: active ? "var(--bj-gold-deep)" : "var(--bj-ink2)",
-                  lineHeight: 1, width: 24, textAlign: "center", display: "block",
-                }}>
-                  Aa
-                </span>
-                <span className="font-sans text-xs flex-1 text-left" style={{ color: active ? "var(--bj-gold-deep)" : "var(--bj-ink)", fontWeight: active ? 500 : 400 }}>
-                  {pair.label}
-                </span>
-                {active && <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "var(--bj-gold)" }} />}
-              </button>
-            );
-          })}
-
-          <div className="px-3 py-2.5 border-t" style={{ borderColor: "var(--bj-line-soft)" }}>
-            <p className="font-sans text-[9px] uppercase tracking-widest font-semibold mb-2" style={{ color: "var(--bj-ink4)" }}>
-              Size
-            </p>
-            <div className="flex gap-1">
-              {REF_SIZES.map((s) => {
-                const active = fontSize === s.value;
-                return (
-                  <button
-                    key={s.value}
-                    onClick={() => onSize(s.value)}
-                    className="flex-1 py-1 rounded-lg font-sans text-xs font-medium"
-                    style={{
-                      background: active ? "var(--bj-gold)" : "var(--bj-bg-soft)",
-                      color: active ? "white" : "var(--bj-ink3)",
-                      border: `1px solid ${active ? "transparent" : "var(--bj-line-soft)"}`,
-                      transition: "all 0.12s ease",
-                    }}
-                  >
-                    {s.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

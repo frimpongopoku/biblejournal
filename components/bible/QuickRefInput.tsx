@@ -69,7 +69,7 @@ function getSuggestions(input: string): Suggestion[] {
   if (parsed) {
     const totalCh = CHAPTER_COUNTS[parsed.book] ?? 1;
     const ch = Math.min(parsed.chapter, totalCh);
-    return [ch - 1, ch, ch + 1]
+    return [ch, ch + 1, ch - 1]
       .filter((c) => c >= 1 && c <= totalCh)
       .map((c) => ({ type: "chapter" as const, book: parsed.book, chapter: c, label: `${parsed.book} ${c}` }));
   }
